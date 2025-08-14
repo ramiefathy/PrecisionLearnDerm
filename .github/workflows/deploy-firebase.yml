@@ -1,0 +1,65 @@
+name: Deploy to Firebase
+
+on:
+  push:
+    branches:
+      - main
+      - master  # Include both common branch names
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy Firebase Functions
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Node.js 20 (matches Firebase requirement)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      # Step 3: Install and build functions
+      - name: Install Functions Dependencies
+        working-directory: ./functions
+        run: |
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          npm ci || npm install
+
+      - name: Build Functions
+        working-directory: ./functions
+        run: npm run build
+
+      # Step 4: Install Firebase CLI
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@latest
+
+      # Step 5: Deploy to Firebase
+      - name: Deploy to Firebase
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Create .env file for functions
+          echo "GEMINI_API_KEY=${GEMINI_API_KEY}" > functions/.env
+          
+          # Deploy functions
+          firebase deploy --only functions --token "${FIREBASE_TOKEN}" --non-interactive
+          
+          # Clean up
+          rm -f functions/.env
+
+      # Optional: Post deployment notification
+      - name: Deployment Status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed. Check logs above."
+          fi

@@ -1,0 +1,187 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "question_stem": "A 45-year-old man presents with an acute onset of widespread, small, erythematous, scaly papules predominantly on the trunk and proximal extremities. This eruption developed 10 days after he was treated for a sore throat. Which of the following is the most likely diagnosis?",
+      "options": [
+        "Pityriasis rosea",
+        "Guttate psoriasis",
+        "Secondary syphilis",
+        "Drug eruption",
+        "Pityriasis rubra pilaris"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "The clinical presentation of an acute eruption of small, scaly papules following a recent sore throat (streptococcal pharyngitis is a common trigger) is classic for guttate psoriasis. Pityriasis rosea typically starts with a herald patch and has a 'Christmas tree' distribution with collarette scaling. Secondary syphilis can be papulosquamous but often involves palms and soles and is associated with other systemic symptoms. While a drug eruption is possible, the morphology and timing after a sore throat strongly suggest guttate psoriasis. Pityriasis rubra pilaris typically presents with follicular hyperkeratosis, salmon-colored plaques, and islands of sparing, which are not described here. \n\nEditor's Note: The question was maintained in its original form after removing the mention of prior psoriasis, addressing the user's concern about the question being too easy. The explanation relies on clinical presentation and association with sore throat, aligning with diagnostic reasoning expected in a board exam scenario.",
+      "original_id": 1,
+      "status": "revised_by_ai_awaiting_review",
+      "feedbackTrail": [
+        {
+          "sender": "user",
+          "text": "mentioning the history of PsO in the question stem makes it too easy, unless this is more a second- or third-degree question"
+        },
+        {
+          "sender": "ai",
+          "text": "Question revised based on your feedback. Please review the updated question and submit your answer again if you wish."
+        }
+      ],
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T17:16:29.785Z"
+    },
+    {
+      "id": 2,
+      "question_stem": "A 60-year-old woman presents with a 6-month history of intensely pruritic, tense blisters on her trunk and flexural areas. Some lesions are urticarial plaques. Oral mucosa is spared. A skin biopsy for direct immunofluorescence (DIF) is performed from perilesional skin. Which of the following findings is most characteristic of her condition?",
+      "options": [
+        "Intercellular IgG and C3 deposition within the epidermis",
+        "Linear IgA deposition along the dermoepidermal junction",
+        "Granular IgA deposition in the dermal papillae",
+        "Linear IgG and C3 deposition along the dermoepidermal junction",
+        "Subcorneal IgA deposition"
+      ],
+      "correct_answer_index": 3,
+      "explanation": "The clinical presentation of pruritic, tense blisters in an elderly patient, with urticarial plaques and sparing of oral mucosa, is highly suggestive of bullous pemphigoid. Direct immunofluorescence (DIF) in bullous pemphigoid characteristically shows linear deposition of IgG and/or C3 along the dermoepidermal junction (basement membrane zone). Intercellular IgG is seen in pemphigus vulgaris. Linear IgA deposition is characteristic of linear IgA bullous dermatosis. Granular IgA in dermal papillae is seen in dermatitis herpetiformis. Subcorneal IgA deposition is seen in IgA pemphigus.",
+      "original_id": 2,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T17:17:04.728Z"
+    },
+    {
+      "id": 3,
+      "question_stem": "A 30-year-old woman with known systemic lupus erythematosus (SLE) develops an annular, photosensitive rash on her upper back and chest. She denies joint pain or fever. Laboratory studies show a positive ANA and positive anti-Ro/SSA antibodies. Which of the following is the most likely cutaneous manifestation of her lupus?",
+      "options": [
+        "Acute cutaneous lupus erythematosus (ACLE)",
+        "Discoid lupus erythematosus (DLE)",
+        "Subacute cutaneous lupus erythematosus (SCLE)",
+        "Lupus profundus",
+        "Bullous systemic lupus erythematosus"
+      ],
+      "correct_answer_index": 2,
+      "explanation": "The presentation of an annular, photosensitive rash in a patient with SLE and positive anti-Ro/SSA antibodies is characteristic of Subacute Cutaneous Lupus Erythematosus (SCLE). ACLE typically presents as a malar rash or a more diffuse morbilliform eruption. DLE lesions are typically well-demarcated, erythematous plaques with adherent scale, follicular plugging, and potential for scarring and atrophy. Lupus profundus involves panniculitis. Bullous SLE is a rare blistering manifestation.",
+      "original_id": 3,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T17:17:27.589Z"
+    },
+    {
+      "id": 4,
+      "question_stem": "A 55-year-old man presents with a rapidly growing, dome-shaped, pink nodule with a central keratin-filled crater on his sun-exposed forearm that appeared 6 weeks ago. Histopathology shows well-differentiated squamous epithelium with glassy keratinocytes and a characteristic 'lip' of epidermis overhanging the crater. Which of the following is the most likely diagnosis?",
+      "options": [
+        "Squamous cell carcinoma, well-differentiated",
+        "Keratoacanthoma",
+        "Prurigo nodularis",
+        "Hypertrophic actinic keratosis",
+        "Verruca vulgaris"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "The rapid growth, dome-shape with central keratin plug, and characteristic histopathology (crateriform architecture with well-differentiated squamous epithelium and an overhanging lip) are classic features of a keratoacanthoma. While keratoacanthomas are considered by many to be a subtype of squamous cell carcinoma, their distinct clinical behavior of rapid growth and potential for spontaneous involution (though not always reliable) and specific architectural features often lead to this specific diagnosis. Prurigo nodularis presents as intensely itchy nodules. Hypertrophic actinic keratosis is a premalignant lesion. Verruca vulgaris is a viral wart.",
+      "original_id": 4,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T17:17:43.551Z"
+    },
+    {
+      "id": 5,
+      "question_stem": "A patient is being treated with topical clobetasol propionate 0.05% ointment twice daily for severe plaque psoriasis on their elbows and knees. Which of the following potential adverse effects is most commonly associated with prolonged use of this medication in these areas?",
+      "options": [
+        "Hypothalamic-pituitary-adrenal (HPA) axis suppression",
+        "Skin atrophy and telangiectasias",
+        "Allergic contact dermatitis",
+        "Hypertrichosis",
+        "Glaucoma"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "Prolonged use of high-potency topical corticosteroids like clobetasol propionate, especially on areas like elbows and knees (though less prone than intertriginous areas or face), can lead to local side effects. Skin atrophy, telangiectasias, and striae are the most common local adverse effects. HPA axis suppression is a systemic risk, more likely with extensive use over large body surface areas or under occlusion, but less common than local effects for limited plaque psoriasis. Allergic contact dermatitis to corticosteroids can occur but is less common than atrophy. Hypertrichosis is a possible side effect. Glaucoma is a risk if applied near the eyes.",
+      "original_id": 5,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T18:23:54.933Z"
+    },
+    {
+      "id": 6,
+      "question_stem": "A 28-year-old woman presents with a 3-week history of a pruritic rash. It began with a single, 2 cm oval patch on her trunk. One week later, numerous smaller, 1-2 cm, similar-appearing oval, erythematous patches appeared, oriented along skin cleavage lines on her trunk, resembling a 'Christmas tree' pattern. A fine collarette of scale is noted on some lesions. The patient denies any recent illness or new medications. What is the most likely diagnosis?",
+      "options": [
+        "Guttate psoriasis",
+        "Tinea versicolor",
+        "Nummular eczema",
+        "Pityriasis rosea",
+        "Secondary syphilis"
+      ],
+      "correct_answer_index": 3,
+      "explanation": "This presentation, including a herald patch followed by a generalized eruption of oval, erythematous, scaly patches in a 'Christmas tree' distribution with a collarette of scale, is most consistent with pityriasis rosea. Guttate psoriasis typically presents with smaller, drop-like lesions. Tinea versicolor presents with hypopigmented or hyperpigmented macules with fine scale. Nummular eczema presents as coin-shaped eczematous plaques. Secondary syphilis can mimic pityriasis rosea but often involves palms/soles and has associated systemic symptoms. (Reference: Fitzpatrick's Therapeutics, Pityriasis Rosea)",
+      "original_id": 6,
+      "status": "revised_by_ai_awaiting_review",
+      "feedbackTrail": [
+        {
+          "sender": "user",
+          "text": "too easy"
+        },
+        {
+          "sender": "ai",
+          "text": "Question revised based on your feedback. Please review the updated question and submit your answer again if you wish."
+        }
+      ],
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T18:24:34.923Z"
+    },
+    {
+      "id": 7,
+      "question_stem": "A 65-year-old man with a history of chronic kidney disease on hemodialysis develops extremely pruritic, firm, dome-shaped nodules with excoriated and crusted surfaces on his extensor extremities and upper back. The itch is severe and intractable. Which of the following is the most likely diagnosis for these skin lesions?",
+      "options": [
+        "Bullous pemphigoid, nodular variant",
+        "Prurigo nodularis",
+        "Hypertrophic lichen planus",
+        "Reactive perforating collagenosis",
+        "Metastatic calcinosis cutis"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "The description of intensely pruritic, firm, excoriated nodules, especially in a patient with chronic kidney disease (a known association with severe pruritus), is most consistent with prurigo nodularis. While a nodular variant of bullous pemphigoid exists, it typically involves blisters or urticarial plaques. Hypertrophic lichen planus usually presents as violaceous, very thick plaques, often on the shins. Reactive perforating collagenosis involves transepidermal elimination of collagen and presents with umbilicated papules. Metastatic calcinosis cutis presents as hard nodules but is not primarily characterized by intense pruritus.",
+      "original_id": 7,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T18:25:03.318Z"
+    },
+    {
+      "id": 8,
+      "question_stem": "A 4-year-old child presents with recurrent crops of erythematous papules primarily on the trunk and extremities. These lesions evolve into vesicles, then umbilicated pustules, and finally crusted lesions that heal with varioliform scars. Systemic symptoms are generally absent. This condition is known to have a chronic, relapsing-remitting course. What is the most likely diagnosis?",
+      "options": [
+        "Varicella",
+        "Pityriasis lichenoides et varioliformis acuta (PLEVA)",
+        "Gianotti-Crosti syndrome",
+        "Eczema herpeticum",
+        "Insect bite reactions"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "The recurrent nature of polymorphic lesions (papules, vesicles, pustules, crusts) that heal with varioliform scarring in a child is characteristic of Pityriasis Lichenoides et Varioliformis Acuta (PLEVA), also known as Mucha-Habermann disease. Varicella is typically a single episode with a prodrome. Gianotti-Crosti syndrome presents with monomorphic papules on the face, buttocks, and extremities. Eczema herpeticum is a disseminated herpes simplex infection in a patient with atopic dermatitis, presenting with monomorphic umbilicated vesicles. Insect bites are typically more sporadic and intensely pruritic at onset. Editor's Note: The reference text does not provide enough specific details to elaborate on the other options in the explanation.",
+      "original_id": 8,
+      "status": "revised_by_ai_awaiting_review",
+      "feedbackTrail": [
+        {
+          "sender": "user",
+          "text": "rash location would be helpful to include in the question stem"
+        },
+        {
+          "sender": "ai",
+          "text": "Question revised based on your feedback. Please review the updated question and submit your answer again if you wish."
+        }
+      ],
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T18:26:16.773Z"
+    },
+    {
+      "id": 9,
+      "question_stem": "A 50-year-old woman with a history of rheumatoid arthritis treated with adalimumab presents with new-onset, well-demarcated, erythematous plaques with silvery scale on her elbows and scalp. She has never had such a rash before. What is the most likely phenomenon occurring?",
+      "options": [
+        "Exacerbation of underlying psoriasis",
+        "Psoriasiform drug eruption induced by adalimumab",
+        "Seborrheic dermatitis",
+        "Discoid lupus erythematosus",
+        "Tinea corporis"
+      ],
+      "correct_answer_index": 1,
+      "explanation": "TNF-alpha inhibitors, such as adalimumab, can paradoxically induce or exacerbate psoriasis or cause psoriasiform drug eruptions in patients being treated for other conditions like rheumatoid arthritis. While she has RA, this is a new rash. Seborrheic dermatitis typically affects the scalp, face, and chest with greasy scales. Discoid lupus presents with atrophic, scarring plaques. Tinea corporis would typically be annular with central clearing and an active border, confirmed by KOH.",
+      "original_id": 9,
+      "status": "pending_review",
+      "approval_status": "approved",
+      "last_reviewed": "2025-05-23T18:26:38.189Z"
+    }
+  ]
+}

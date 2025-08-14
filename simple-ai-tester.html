@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple AI Pipeline Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .test-input {
+            margin: 20px 0;
+        }
+        .test-input label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .test-input input, .test-input select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+        }
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+        }
+        .error {
+            background: #fee2e2;
+            border-left-color: #dc2626;
+            color: #dc2626;
+        }
+        .success {
+            background: #dcfce7;
+            border-left-color: #16a34a;
+            color: #16a34a;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .question-display {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .question-stem {
+            font-weight: 600;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .answer-choice {
+            margin: 8px 0;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+        }
+        .answer-choice.correct {
+            border-left-color: #16a34a;
+            background: #f0fdf4;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Simple AI Pipeline Tester</h1>
+        <p>Test the AI question generation pipeline with direct function calls.</p>
+        
+        <div class="test-input">
+            <label for="topicInput">Topic/Condition:</label>
+            <input type="text" id="topicInput" value="psoriasis" placeholder="e.g., psoriasis, melanoma, eczema">
+        </div>
+        
+        <div class="test-input">
+            <label for="difficultySelect">Difficulty Level:</label>
+            <select id="difficultySelect">
+                <option value="intermediate">Intermediate</option>
+                <option value="beginner">Beginner</option>
+                <option value="advanced">Advanced</option>
+            </select>
+        </div>
+        
+        <button class="btn" onclick="testGeneration()">🚀 Test AI Generation</button>
+        <button class="btn" onclick="testFallback()">⚡ Test Fallback Generation</button>
+        <button class="btn" onclick="clearResults()">🧹 Clear Results</button>
+        
+        <div class="loading" id="loading">
+            <div>⏳ Generating question...</div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const PROJECT_ID = 'dermassist-ai-1zyic';
+        const REGION = 'us-central1';
+        
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testGeneration() {
+            const topic = document.getElementById('topicInput').value.trim();
+            const difficulty = document.getElementById('difficultySelect').value;
+            
+            if (!topic) {
+                showResult('Please enter a topic', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                // Try calling the generation function directly
+                const result = await callGenerationFunction(topic, difficulty, true);
+                showResult('AI Generation Successful!', 'success', result);
+            } catch (error) {
+                console.error('Generation failed:', error);
+                showResult(`Generation failed: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function testFallback() {
+            const topic = document.getElementById('topicInput').value.trim();
+            const difficulty = document.getElementById('difficultySelect').value;
+            
+            if (!topic) {
+                showResult('Please enter a topic', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                // Try calling the fallback generation
+                const result = await callGenerationFunction(topic, difficulty, false);
+                showResult('Fallback Generation Successful!', 'success', result);
+            } catch (error) {
+                console.error('Fallback failed:', error);
+                showResult(`Fallback failed: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function callGenerationFunction(topic, difficulty, useAI) {
+            // Create a minimal payload for testing
+            const payload = {
+                data: {
+                    topicIds: [topic],
+                    difficultyTarget: difficulty,
+                    useAI: useAI
+                }
+            };
+            
+            console.log('Calling with payload:', payload);
+            
+            // Try different approaches to call the function
+            
+            // Approach 1: Try the HTTP callable endpoint
+            const functionUrl = `https://${REGION}-${PROJECT_ID}.cloudfunctions.net/ai_generate_mcq`;
+            
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('HTTP Response Error:', response.status, errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            const result = await response.json();
+            console.log('Function result:', result);
+            return result;
+        }
+        
+        function showResult(message, type, data = null) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `<div class="results ${type}">
+                <h3>${message}</h3>`;
+            
+            if (data) {
+                if (data.question || data.stem) {
+                    html += formatQuestionDisplay(data);
+                } else {
+                    html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+        
+        function formatQuestionDisplay(data) {
+            // Handle different response formats
+            let question = data.question || data;
+            
+            if (!question.stem && !question.question) {
+                return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            let html = `<div class="question-display">
+                <div class="question-stem">${question.stem || question.question || 'No question stem'}</div>`;
+            
+            if (question.options || question.answers) {
+                const options = question.options || question.answers;
+                const correctIndex = question.correctAnswer || question.correct || 0;
+                
+                html += '<div class="answer-choices">';
+                options.forEach((option, index) => {
+                    const isCorrect = index === correctIndex;
+                    html += `<div class="answer-choice ${isCorrect ? 'correct' : ''}">
+                        ${String.fromCharCode(65 + index)}. ${option}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            // Add metrics if available
+            if (question.metadata || question.difficulty || question.topic) {
+                html += '<div class="metrics">';
+                
+                if (question.difficulty || question.difficultyTarget) {
+                    html += `<div class="metric">
+                        <div class="metric-value">${question.difficulty || question.difficultyTarget}</div>
+                        <div class="metric-label">Difficulty</div>
+                    </div>`;
+                }
+                
+                if (question.topic || question.topics) {
+                    const topics = Array.isArray(question.topics) ? question.topics.join(', ') : (question.topic || 'Unknown');
+                    html += `<div class="metric">
+                        <div class="metric-value">${topics}</div>
+                        <div class="metric-label">Topic</div>
+                    </div>`;
+                }
+                
+                if (question.metadata?.generatedAt || question.timestamp) {
+                    html += `<div class="metric">
+                        <div class="metric-value">✓</div>
+                        <div class="metric-label">Generated</div>
+                    </div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+        
+        // Initialize with a test
+        window.addEventListener('load', () => {
+            console.log('Simple AI Pipeline Tester loaded');
+            console.log('Project ID:', PROJECT_ID);
+            console.log('Region:', REGION);
+        });
+    </script>
+</body>
+</html> 

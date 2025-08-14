@@ -1,0 +1,172 @@
+{
+  "version": "2025.08",
+  "categories": [
+    {
+      "id": "BASIC",
+      "name": "Basic Science",
+      "topics": [
+        {
+          "id": "BASIC.BIO",
+          "name": "Skin Biology",
+          "subtopics": [
+            { "id": "BASIC.BIO.STRUCT", "name": "Structure & Function" },
+            { "id": "BASIC.BIO.BARRIER", "name": "Barrier & Physiology" }
+          ]
+        },
+        {
+          "id": "BASIC.IMMUNO",
+          "name": "Immunology",
+          "subtopics": [
+            { "id": "BASIC.IMMUNO.INNATE", "name": "Innate Immunity" },
+            { "id": "BASIC.IMMUNO.ADAPTIVE", "name": "Adaptive Immunity" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPI",
+      "name": "Epidemiology and Statistics",
+      "topics": [
+        {
+          "id": "EPI.STUDY",
+          "name": "Study Design",
+          "subtopics": [
+            { "id": "EPI.STUDY.TYPES", "name": "Design Types" },
+            { "id": "EPI.STUDY.BIAS", "name": "Bias & Confounding" }
+          ]
+        },
+        {
+          "id": "EPI.DIAG",
+          "name": "Diagnostic Tests",
+          "subtopics": [
+            { "id": "EPI.DIAG.PERF", "name": "Sensitivity/Specificity" },
+            { "id": "EPI.DIAG.LIKELIHOOD", "name": "Likelihood Ratios" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MED",
+      "name": "Medical Dermatology",
+      "topics": [
+        {
+          "id": "MED.PSOR",
+          "name": "Psoriasis",
+          "aliases": ["Psoriatic disease"],
+          "kbAnchors": ["Psoriasis"],
+          "subtopics": [
+            { "id": "MED.PSOR.DX", "name": "Diagnosis" },
+            { "id": "MED.PSOR.TX", "name": "Treatment" },
+            { "id": "MED.PSOR.PE", "name": "Physical Exam" },
+            { "id": "MED.PSOR.HISTO", "name": "Histopathology" }
+          ]
+        },
+        {
+          "id": "MED.URTI",
+          "name": "Urticaria",
+          "aliases": ["Hives", "Chronic spontaneous urticaria"],
+          "kbAnchors": ["Urticaria"],
+          "subtopics": [
+            { "id": "MED.URTI.DX", "name": "Diagnosis" },
+            { "id": "MED.URTI.TX", "name": "Treatment" },
+            { "id": "MED.URTI.PE", "name": "Physical Exam" },
+            { "id": "MED.URTI.PATHO", "name": "Pathophysiology" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PEDS",
+      "name": "Pediatric Dermatology",
+      "topics": [
+        {
+          "id": "PEDS.GENODERM",
+          "name": "Genodermatoses",
+          "subtopics": [
+            { "id": "PEDS.GENODERM.OVERVIEW", "name": "Overview" },
+            { "id": "PEDS.GENODERM.MGMT", "name": "Management" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SURG",
+      "name": "Surgical Dermatology",
+      "topics": [
+        {
+          "id": "SURG.MOHS",
+          "name": "Mohs Surgery",
+          "subtopics": [
+            { "id": "SURG.MOHS.INDICATIONS", "name": "Indications" },
+            { "id": "SURG.MOHS.STEPS", "name": "Technique & Steps" }
+          ]
+        },
+        {
+          "id": "SURG.EXCISION",
+          "name": "Excision Techniques",
+          "subtopics": [
+            { "id": "SURG.EXCISION.CLOSURE", "name": "Closure" },
+            { "id": "SURG.EXCISION.COMPLICATIONS", "name": "Complications" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "DERMPATH",
+      "name": "Dermatopathology",
+      "topics": [
+        {
+          "id": "DERMPATH.PSORI",
+          "name": "Psoriasiform Pattern",
+          "subtopics": [
+            { "id": "DERMPATH.PSORI.KEY", "name": "Key Features" },
+            { "id": "DERMPATH.PSORI.DDX", "name": "Differential" }
+          ]
+        },
+        {
+          "id": "DERMPATH.SPONG",
+          "name": "Spongiotic Pattern",
+          "subtopics": [
+            { "id": "DERMPATH.SPONG.KEY", "name": "Key Features" },
+            { "id": "DERMPATH.SPONG.DDX", "name": "Differential" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PHARM",
+      "name": "Dermatopharmacology",
+      "topics": [
+        {
+          "id": "PHARM.SYS",
+          "name": "Systemic Agents",
+          "subtopics": [
+            { "id": "PHARM.SYS.BIO", "name": "Biologics" },
+            { "id": "PHARM.SYS.RET", "name": "Retinoids" },
+            { "id": "PHARM.SYS.IMMUN", "name": "Immunomodulators" },
+            { "id": "PHARM.SYS.AB", "name": "Antibiotics & Antifungals" }
+          ]
+        },
+        {
+          "id": "PHARM.TOP",
+          "name": "Topical Therapies",
+          "subtopics": [
+            { "id": "PHARM.TOP.STEROIDS", "name": "Topical Corticosteroids" },
+            { "id": "PHARM.TOP.TCI", "name": "Calcineurin Inhibitors" },
+            { "id": "PHARM.TOP.KER", "name": "Keratolytics" }
+          ]
+        },
+        {
+          "id": "PHARM.SAFE",
+          "name": "Safety & Monitoring",
+          "subtopics": [
+            { "id": "PHARM.SAFE.AE", "name": "Adverse Effects" },
+            { "id": "PHARM.SAFE.LABS", "name": "Labs & Monitoring" },
+            { "id": "PHARM.SAFE.PREG", "name": "Pregnancy & Lactation" },
+            { "id": "PHARM.SAFE.INTERACT", "name": "Drug Interactions" }
+          ]
+        }
+      ]
+    }
+  ]
+} 

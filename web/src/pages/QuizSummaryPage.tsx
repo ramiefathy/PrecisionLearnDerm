@@ -1,0 +1,73 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { saveFeedback } from '../lib/feedback';
+import PageShell from '../components/ui/PageShell';
+import SectionCard from '../components/ui/SectionCard';
+
+export default function QuizSummaryPage(){
+  const { attemptId } = useParams();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    async function load(){
+      const uid = auth.currentUser?.uid;
+      if (!uid || !attemptId) return;
+      const ref = doc(db, 'quizzes', uid, 'attempts', attemptId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) setData(snap.data());
+      setLoading(false);
+    }
+    load();
+  }, [attemptId]);
+
+  if (loading) return <PageShell title="Quiz Summary"><div>Loading…</div></PageShell>;
+  if (!data) return <PageShell title="Quiz Summary"><div>Not found</div></PageShell>;
+
+  const correct = (data.items || []).filter((it: any) => it.correct).length;
+  const total = (data.items || []).length;
+
+  return (
+    <PageShell title="Quiz Summary" subtitle="Review your performance and learn from explanations" maxWidth="5xl">
+      <div className="space-y-6">
+        <SectionCard>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-3xl font-bold text-green-700">{data.score}%</div>
+              <div className="text-sm text-green-800">Score</div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-700">{correct}/{total}</div>
+              <div className="text-sm text-blue-800">Correct</div>
+            </div>
+            <div className="text-center p-4 bg-amber-50 rounded-lg">
+              <div className="text-3xl font-bold text-amber-700">{data.durationSec}s</div>
+              <div className="text-sm text-amber-800">Duration</div>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Questions Review">
+          <div className="space-y-3">
+            {(data.items || []).map((it: any, idx: number) => (
+              <div key={idx} className="border rounded-xl p-4 bg-white/70">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">Q{idx+1}: {String(it.correct ? '✅ Correct' : '❌ Incorrect')}</div>
+                  <div className="text-sm text-gray-600">Chosen {it.chosenIndex}, Correct {it.correctIndex}</div>
+                </div>
+                {it.note && <div className="mt-2 text-sm text-gray-700">Note: {it.note}</div>}
+                <div className="mt-2 flex gap-2 items-center">
+                  <button onClick={()=>saveFeedback(String(it.itemRef), { questionStars: it.ratings?.question??null, explanationStars: it.ratings?.explanation??null, reasons: it.ratings?.reasons??[], comment: it.note })} className="px-3 py-1.5 rounded-lg border text-sm">
+                    Save Feedback
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+    </PageShell>
+  );
+}

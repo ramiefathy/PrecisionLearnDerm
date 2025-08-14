@@ -1,0 +1,27 @@
+{
+  "name": "precision-learn-derm-functions",
+  "version": "0.1.0",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp -r src/kb/*.json lib/kb/ 2>/dev/null || true",
+    "watch": "tsc -w -p tsconfig.json",
+    "lint": "echo 'skip'",
+    "deploy": "firebase deploy --only functions",
+    "clean": "rm -rf lib",
+    "gcp-build": "npm run build"
+  },
+  "dependencies": {
+    "@precisionlearnderm/shared-types": "file:../../shared/types",
+    "dotenv": "^17.2.1",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.5.4"
+  }
+}
