@@ -3,6 +3,45 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MockExamPage from "../pages/MockExamPage";
 
+vi.mock('firebase/app', () => ({
+    initializeApp: vi.fn(() => ({})),
+    getApp: vi.fn(() => ({})),
+}));
+
+vi.mock('firebase/auth', async () => {
+    const actual = await vi.importActual('firebase/auth');
+    return {
+        ...actual,
+        getAuth: vi.fn(() => ({
+            onAuthStateChanged: vi.fn(),
+        })),
+    };
+});
+
+vi.mock('firebase/firestore', async () => {
+    const actual = await vi.importActual('firebase/firestore');
+    return {
+        ...actual,
+        getFirestore: vi.fn(() => ({})),
+        updateDoc: vi.fn(),
+        doc: vi.fn(),
+        collection: vi.fn(),
+        getDocs: vi.fn(),
+        orderBy: vi.fn(),
+        query: vi.fn(),
+        limit: vi.fn(),
+        startAfter: vi.fn(),
+    };
+});
+
+vi.mock('firebase/functions', async () => {
+    const actual = await vi.importActual('firebase/functions');
+    return {
+        ...actual,
+        getFunctions: vi.fn(() => ({})),
+    };
+});
+
 vi.mock("../lib/attempts", () => ({
   saveAttempt: vi.fn().mockResolvedValue("attempt-1")
 }));

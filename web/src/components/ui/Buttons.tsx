@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
   loading?: boolean;
+  variant?: 'gradient' | 'muted';
 };
 
 export function GradientButton({ children, loading, className, ...rest }: Props) {
@@ -14,6 +15,13 @@ export function GradientButton({ children, loading, className, ...rest }: Props)
       {loading ? '...' : children}
     </button>
   );
+}
+
+export function Button({ variant = 'gradient', ...rest }: Props) {
+  if (variant === 'muted') {
+    return <MutedButton {...rest} />;
+  }
+  return <GradientButton {...rest} />;
 }
 
 export function MutedButton({ children, loading, className, ...rest }: Props) {

@@ -125,7 +125,7 @@ export default function AdminQuestionReviewPage() {
         throw new Error('User not signed in');
       }
       const token = await user.getIdToken();
-      const functionUrl = 'https://us-central1-dermassist-ai-1zyic.cloudfunctions.net/admin_generate_per_topic_http';
+      const functionUrl = 'https://us-central1-precisionlearnderm-ab5a9.cloudfunctions.net/admin_generate_per_topic_http';
 
       const response = await fetch(functionUrl, {
         method: 'POST',
