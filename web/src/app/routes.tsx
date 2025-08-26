@@ -1,91 +1,131 @@
-import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, getUserProfile, createUserProfile } from '../lib/firebase';
-import { useAppStore } from './store';
+import { useAuth } from '../contexts/AuthContext';
 
-export function useAuthUser() {
-  const [loading, setLoading] = useState(true);
-  const { authUser, setAuthUser, setProfile, setProfileLoading } = useAppStore();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setAuthUser(user);
-
-      if (user) {
-        setProfileLoading(true);
-        try {
-          // Try to get existing profile
-          let profile = await getUserProfile(user.uid);
-
-          // If no profile exists, create one
-          if (!profile) {
-            profile = await createUserProfile(
-              user.uid,
-              user.email || '',
-              user.displayName || undefined
-            );
-          }
-
-          setProfile(profile);
-        } catch (error) {
-          console.error('Error loading/creating profile:', error);
-          setProfile(null);
-        } finally {
-          setProfileLoading(false);
-        }
-      } else {
-        setProfile(null);
-        setProfileLoading(false);
-      }
-
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [setAuthUser, setProfile, setProfileLoading]);
-
-  return { user: authUser, loading };
-}
 
 function AdminNavigation() {
   const location = useLocation();
   
   const tabs = [
-    { name: 'Setup', href: '/admin/setup', icon: '⚙️' },
-    { name: 'Items', href: '/admin/items', icon: '🗃️' },
-    { name: 'Questions', href: '/admin/questions', icon: '📝' },
-    { name: 'Question Bank', href: '/admin/question-bank', icon: '📚' },
-    { name: 'Taxonomy', href: '/admin/taxonomy', icon: '🏷️' },
-    { name: 'AI Testing', href: '/admin/testing', icon: '🧪' },
+    { 
+      name: 'Overview', 
+      href: '/admin/setup', 
+      icon: '🏠', 
+      description: 'System setup & status'
+    },
+    { 
+      name: 'Content', 
+      href: '/admin/items', 
+      icon: '📝', 
+      description: 'Items, taxonomy & content management',
+      subPages: [
+        { name: 'Items', href: '/admin/items', icon: '📄' },
+        { name: 'Taxonomy', href: '/admin/taxonomy', icon: '🏷️' }
+      ]
+    },
+    { 
+      name: 'Question Generation', 
+      href: '/admin/generate', 
+      icon: '✨', 
+      description: 'AI-powered question generation'
+    },
+    { 
+      name: 'Review Queue', 
+      href: '/admin/review', 
+      icon: '📋', 
+      description: 'Review AI-generated questions'
+    },
+    { 
+      name: 'Question Bank', 
+      href: '/admin/question-bank', 
+      icon: '📚', 
+      description: 'Statistics & question library'
+    },
+    { 
+      name: 'Development', 
+      href: '/admin/testing', 
+      icon: '🔧', 
+      description: 'AI testing & system diagnostics',
+      subPages: [
+        { name: 'Testing', href: '/admin/testing', icon: '🧪' },
+        { name: 'Logs', href: '/admin/logs', icon: '📋' }
+      ]
+    },
   ];
 
   return (
-    <div className="bg-white/90 backdrop-blur border-b border-gray-200/50 mb-4">
-      <div className="max-w-7xl mx-auto px-4 py-2">
-        <div className="flex items-center gap-1">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.href}
-              to={tab.href}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                location.pathname === tab.href
-                  ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              <span className="mr-2">{tab.icon}</span>
-              {tab.name}
-            </Link>
-          ))}
+    <div className="bg-white/95 backdrop-blur-md border-b border-gray-200/70 shadow-sm">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+            <p className="text-sm text-gray-600 mt-1">Manage your PrecisionLearnDerm platform</p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span className="inline-flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              System Operational
+            </span>
+          </div>
         </div>
+        <div className="flex items-center justify-center gap-2 overflow-x-auto">
+          {tabs.map((tab) => {
+            const isActive = location.pathname === tab.href || 
+              (tab.subPages && tab.subPages.some(sub => sub.href === location.pathname));
+            
+            return (
+              <Link
+                key={tab.href}
+                to={tab.href}
+                className={`group flex-shrink-0 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 hover:border-gray-300'
+                }`}
+                title={tab.description}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{tab.icon}</span>
+                  <span>{tab.name}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+        
+        {/* Sub-navigation for active tab with sub-pages */}
+        {tabs
+          .filter(tab => tab.subPages && (location.pathname === tab.href || tab.subPages.some(sub => sub.href === location.pathname)))
+          .map(activeTab => (
+            <div key={activeTab.href} className="mt-3 flex items-center gap-2">
+              <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+              <div className="flex items-center gap-1 overflow-x-auto">
+                {activeTab.subPages?.map(subPage => {
+                  const isSubActive = location.pathname === subPage.href;
+                  return (
+                    <Link
+                      key={subPage.href}
+                      to={subPage.href}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        isSubActive
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-sm">{subPage.icon}</span>
+                      <span>{subPage.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   );
 }
 
 export function AdminRoute() {
-  const { profile, authUser } = useAppStore();
+  const { profile, user } = useAuth();
   
   if (!profile) {
     return (
@@ -101,11 +141,10 @@ export function AdminRoute() {
     );
   }
 
-  // Check both role and specific email authorization
-  const isAdminRole = profile.role === 'admin';
-  const isAuthorizedEmail = authUser?.email === 'ramiefathy@gmail.com';
+  // Check admin role
+  const isAdminRole = profile.role === 'admin' || profile.isAdmin;
 
-  if (!isAdminRole && !isAuthorizedEmail) {
+  if (!isAdminRole) {
     return (
       <div className="min-h-screen grid place-items-center bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
         <div className="text-center max-w-md">
@@ -115,8 +154,8 @@ export function AdminRoute() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h1>
           <p className="text-gray-600 mb-6">
             You don't have permission to access this area. Admin access is required.
-            {authUser?.email && (
-              <><br/><span className="text-sm">Signed in as: {authUser.email}</span></>
+            {user?.email && (
+              <>< br/><span className="text-sm">Signed in as: {user.email}</span></>
             )}
           </p>
           <button 
@@ -139,7 +178,7 @@ export function AdminRoute() {
 }
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuthUser();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (

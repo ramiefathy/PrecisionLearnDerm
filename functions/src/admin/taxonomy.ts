@@ -1,10 +1,10 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { requireAdminByEmail } from '../util/adminAuth';
+import { requireAdmin } from '../util/auth';
 
 export const admin_listUncategorized = functions.https.onCall(async (data: any, context) => {
 	try {
-		await requireAdminByEmail(context);
+		requireAdmin(context);
 
 		const limit = Math.min(Number(data?.limit || 50), 200);
 
@@ -33,14 +33,14 @@ export const admin_listUncategorized = functions.https.onCall(async (data: any, 
 		console.error('Error listing uncategorized items:', error);
 		return {
 			success: false,
-			error: error.message
+			error: error instanceof Error ? error.message : String(error)
 		};
 	}
 });
 
 export const admin_setItemTaxonomy = functions.https.onCall(async (data: any, context: any) => {
 	try {
-		await requireAdminByEmail(context);
+		requireAdmin(context);
 
 		const { itemId, categoryId, topicId, subtopicId } = data || {};
 
@@ -80,7 +80,7 @@ export const admin_setItemTaxonomy = functions.https.onCall(async (data: any, co
 		console.error('Error setting item taxonomy:', error);
 		return {
 			success: false,
-			error: error.message
+			error: error instanceof Error ? error.message : String(error)
 		};
 	}
 }); 

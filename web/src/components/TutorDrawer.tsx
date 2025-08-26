@@ -16,7 +16,7 @@ export function TutorDrawer({ itemId, topicIds }: { itemId?: string; topicIds?: 
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await api.ai.chatExplain({ itemId, topicIds, userQuery: query });
+      const res = await api.ai.tutorQuery({ query, context: { questionId: itemId, topicId: topicIds?.[0] } });
       const data = res as any;
       setAnswer(data.answerMarkdown || '');
       setCitations(Array.isArray(data.citations) ? data.citations : []);

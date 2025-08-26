@@ -4,8 +4,10 @@ import { saveAttempt, type StoredQuestionAttempt } from '../lib/attempts';
 import { addDoc, collection } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { saveFeedback } from '../lib/feedback';
+import { useAppStore } from '../app/store';
 
 export function BatchQuizRunner() {
+  const activeQuiz = useAppStore(s => s.activeQuiz);
   const [queue, setQueue] = useState<any[]>([]);
   const [answers, setAnswers] = useState<Record<number, { chosenIndex: number|null; confidence: 'Low'|'Medium'|'High'; timeSec: number; ratingQ?: number|null; ratingE?: number|null; reasons?: string; note?: string; makeCard?: boolean }>>({});
   const [start, setStart] = useState<number>(Date.now());
@@ -16,8 +18,17 @@ export function BatchQuizRunner() {
     setLoading(true);
     try {
       const items: any[] = [];
+      
+      // Build request based on quiz config
+      const nextItemRequest: any = {};
+      if (activeQuiz?.config?.taxonomyFilter) {
+        nextItemRequest.taxonomyFilter = activeQuiz.config.taxonomyFilter;
+      } else if (activeQuiz?.config?.topicIds?.length && activeQuiz.config.topicIds.length > 0) {
+        nextItemRequest.topicIds = activeQuiz.config.topicIds;
+      }
+      
       for (let i=0;i<n;i++) {
-        const preview: any = await api.pe.nextItem({});
+        const preview: any = await api.pe.nextItem(nextItemRequest);
         if (preview?.itemId) {
           const full = await api.items.get(preview.itemId);
           items.push({ itemId: preview.itemId, fullItem: full });

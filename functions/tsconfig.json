@@ -9,7 +9,18 @@
     "moduleResolution": "node",
     "skipLibCheck": true,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "incremental": true,
+    "tsBuildInfoFile": "lib/.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "node_modules", 
+    "**/*.test.ts", 
+    "**/*.spec.ts", 
+    "src/test/automated-testing-pipeline.ts", 
+    "src/test/integrationTestUtils.ts", 
+    "src/test/run-testing-pipeline.ts",
+    "src/test/directGeneratorTest.ts"
+  ]
 }

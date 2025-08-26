@@ -1,0 +1,117 @@
+[
+  {
+    "type": "A",
+    "topicIds": ["inflammatory.psoriasis", "diagnosis"],
+    "stem": "A 35-year-old man presents with well-demarcated, erythematous plaques with silvery scales on his elbows and knees. The lesions have been present for several months and are mildly pruritic. On examination, you note pinpoint bleeding when scales are removed.",
+    "leadIn": "What is the most likely diagnosis?",
+    "options": [
+      { "text": "Psoriasis vulgaris", "isCorrect": true },
+      { "text": "Atopic dermatitis", "isCorrect": false },
+      { "text": "Seborrheic dermatitis", "isCorrect": false },
+      { "text": "Lichen planus", "isCorrect": false },
+      { "text": "Pityriasis rosea", "isCorrect": false }
+    ],
+    "explanation": "This presentation is classic for psoriasis vulgaris. The well-demarcated erythematous plaques with silvery scales in typical locations (elbows and knees), combined with the Auspitz sign (pinpoint bleeding when scales are removed), strongly suggest psoriasis. Atopic dermatitis typically presents with poorly demarcated patches in flexural areas. Seborrheic dermatitis affects sebaceous gland-rich areas. Lichen planus presents with purple, polygonal papules. Pityriasis rosea typically starts with a herald patch.",
+    "difficulty": 0.3,
+    "status": "active",
+    "telemetry": {
+      "attempts": 0,
+      "pCorrect": 0.75,
+      "avgTimeSec": 45,
+      "discrimination": 0.3
+    },
+    "createdBy": "seed"
+  },
+  {
+    "type": "A",
+    "topicIds": ["neoplastic.melanoma", "diagnosis"],
+    "stem": "A 62-year-old woman presents with a pigmented lesion on her back that her husband noticed has changed over the past 3 months. On examination, the lesion is 8mm in diameter, asymmetric, with irregular borders, variegated color (brown, black, and red areas), and appears slightly elevated.",
+    "leadIn": "Which feature is MOST concerning for melanoma?",
+    "options": [
+      { "text": "Asymmetry of the lesion", "isCorrect": false },
+      { "text": "Border irregularity", "isCorrect": false },
+      { "text": "Color variegation", "isCorrect": false },
+      { "text": "Diameter greater than 6mm", "isCorrect": false },
+      { "text": "Evolution (change over time)", "isCorrect": true }
+    ],
+    "explanation": "While all ABCDE criteria are important for melanoma detection, Evolution (E) - change over time - is considered the most specific indicator of melanoma. Studies show that most melanomas demonstrate some change over time, whereas benign nevi typically remain stable. The patient's history of change over 3 months is the most concerning feature.",
+    "difficulty": 0.5,
+    "status": "active",
+    "telemetry": {
+      "attempts": 0,
+      "pCorrect": 0.6,
+      "avgTimeSec": 60,
+      "discrimination": 0.4
+    },
+    "createdBy": "seed"
+  },
+  {
+    "type": "A",
+    "topicIds": ["infectious.bacterial", "treatment"],
+    "stem": "A 7-year-old boy presents with honey-crusted lesions around his mouth and nose that started 3 days ago. The lesions began as small vesicles that ruptured and formed golden crusts. He has no systemic symptoms and is otherwise healthy.",
+    "leadIn": "What is the most appropriate initial treatment?",
+    "options": [
+      { "text": "Oral cephalexin", "isCorrect": false },
+      { "text": "Topical mupirocin", "isCorrect": true },
+      { "text": "Oral prednisone", "isCorrect": false },
+      { "text": "Topical hydrocortisone", "isCorrect": false },
+      { "text": "Oral acyclovir", "isCorrect": false }
+    ],
+    "explanation": "This presentation is classic for impetigo, a superficial bacterial skin infection commonly caused by Staphylococcus aureus or Streptococcus pyogenes. For localized impetigo without systemic symptoms, topical mupirocin is the first-line treatment. Oral antibiotics like cephalexin are reserved for extensive disease or systemic symptoms. Corticosteroids and antivirals are not appropriate for bacterial infections.",
+    "difficulty": 0.4,
+    "status": "active",
+    "telemetry": {
+      "attempts": 0,
+      "pCorrect": 0.7,
+      "avgTimeSec": 50,
+      "discrimination": 0.35
+    },
+    "createdBy": "seed"
+  },
+  {
+    "type": "A",
+    "topicIds": ["inflammatory.eczema", "management"],
+    "stem": "A 4-month-old infant is brought in with erythematous, scaly patches on both cheeks that have been present for 2 weeks. The mother reports the baby seems to scratch at the areas frequently. Family history is positive for asthma and seasonal allergies.",
+    "leadIn": "What is the most appropriate initial management?",
+    "options": [
+      { "text": "Daily bathing with gentle cleanser and liberal emollient use", "isCorrect": true },
+      { "text": "Topical tacrolimus 0.03% ointment twice daily", "isCorrect": false },
+      { "text": "Oral antihistamines for itch control", "isCorrect": false },
+      { "text": "Elimination diet for the breastfeeding mother", "isCorrect": false },
+      { "text": "Topical antibiotic ointment", "isCorrect": false }
+    ],
+    "explanation": "This infant likely has atopic dermatitis (eczema). The first-line treatment is proper skin care with daily bathing using gentle cleansers and frequent application of emollients to restore the skin barrier. Topical calcineurin inhibitors like tacrolimus are not FDA-approved for infants under 2 years. Oral antihistamines have limited efficacy for eczema-related itch. Elimination diets and antibiotics are not first-line treatments.",
+    "difficulty": 0.35,
+    "status": "active",
+    "telemetry": {
+      "attempts": 0,
+      "pCorrect": 0.65,
+      "avgTimeSec": 55,
+      "discrimination": 0.32
+    },
+    "createdBy": "seed"
+  },
+  {
+    "type": "A",
+    "topicIds": ["procedures.biopsy", "technique"],
+    "stem": "You need to perform a biopsy on a 12mm pigmented lesion suspicious for melanoma on a patient's upper back.",
+    "leadIn": "What is the most appropriate biopsy technique?",
+    "options": [
+      { "text": "Shave biopsy", "isCorrect": false },
+      { "text": "Punch biopsy of the darkest area", "isCorrect": false },
+      { "text": "Incisional biopsy through the center", "isCorrect": false },
+      { "text": "Excisional biopsy with 1-2mm margins", "isCorrect": true },
+      { "text": "Multiple 2mm punch biopsies", "isCorrect": false }
+    ],
+    "explanation": "For pigmented lesions suspicious for melanoma, excisional biopsy with 1-2mm margins is preferred when feasible. This allows for complete histologic assessment including accurate Breslow depth measurement, which is crucial for staging and treatment planning. Partial biopsies (shave, punch, incisional) may miss the deepest part of the lesion and can complicate definitive treatment planning.",
+    "difficulty": 0.6,
+    "status": "active",
+    "telemetry": {
+      "attempts": 0,
+      "pCorrect": 0.55,
+      "avgTimeSec": 70,
+      "discrimination": 0.45
+    },
+    "createdBy": "seed"
+  }
+]

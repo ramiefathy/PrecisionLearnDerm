@@ -25,24 +25,32 @@ async function processReview(item: any, reviewId: string) {
 
 const db = admin.firestore();
 
-// Load knowledge base for testing
-let testKnowledgeBase: Record<string, any> = {};
-let testHighQualityEntries: Array<[string, any]> = [];
+// Lazy-load knowledge base for testing
+let testKnowledgeBase: Record<string, any> | null = null;
+let testHighQualityEntries: Array<[string, any]> | null = null;
 
-try {
-  const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  testKnowledgeBase = JSON.parse(kbData);
+function initializeTestKB() {
+  if (testKnowledgeBase !== null) {
+    return; // Already loaded
+  }
   
-  // Filter entities with completeness score > 65
-  testHighQualityEntries = Object.entries(testKnowledgeBase)
-    .filter(([key, entity]) => entity.completeness_score > 65)
-    .sort((a, b) => b[1].completeness_score - a[1].completeness_score)
-    .slice(0, 10); // Take top 10 for testing
+  try {
+    const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
+    const kbData = fs.readFileSync(kbPath, 'utf8');
+    testKnowledgeBase = JSON.parse(kbData);
     
-  console.log(`Test loaded ${testHighQualityEntries.length} high-quality KB entries`);
-} catch (error) {
-  console.error('Failed to load KB for testing:', error);
+    // Filter entities with completeness score > 65
+    testHighQualityEntries = Object.entries(testKnowledgeBase!)
+      .filter(([key, entity]) => entity.completeness_score > 65)
+      .sort((a, b) => b[1].completeness_score - a[1].completeness_score)
+      .slice(0, 10); // Take top 10 for testing
+      
+    console.log(`Test loaded ${testHighQualityEntries.length} high-quality KB entries`);
+  } catch (error) {
+    console.error('Failed to load KB for testing:', error);
+    testKnowledgeBase = {};
+    testHighQualityEntries = [];
+  }
 }
 
 export const testSimple = functions.https.onCall(async (data: any, context) => {
@@ -50,21 +58,54 @@ export const testSimple = functions.https.onCall(async (data: any, context) => {
     return {
       success: true,
       message: 'Simple test function working',
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: new Date().toISOString(),
+      data: data || {}
     };
   } catch (error: any) {
     console.error('Error in testSimple:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
+  }
+});
+
+// CORS-enabled HTTP version for production compatibility
+export const testSimpleHttp = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  
+  try {
+    res.json({
+      success: true,
+      message: 'Simple test HTTP function working',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Error in testSimpleHttp:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
 // New function to test the iterative scoring pipeline 3 times
 export const testIterativeScoringPipeline = functions.https.onCall(async (data: any, context) => {
   try {
-    if (testHighQualityEntries.length === 0) {
+    // Initialize test KB if not already done
+    initializeTestKB();
+    
+    if (!testHighQualityEntries || testHighQualityEntries.length === 0) {
       throw new Error('No high-quality KB entries available for testing');
     }
 
@@ -129,11 +170,11 @@ export const testIterativeScoringPipeline = functions.https.onCall(async (data: 
         });
         
       } catch (error: any) {
-        console.error(`✗ Error in iteration ${i + 1} for ${entityName}:`, error.message);
+        console.error(`✗ Error in iteration ${i + 1} for ${entityName}:`, error instanceof Error ? error.message : String(error));
         results.push({
           iteration: i + 1,
           entityName,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           success: false
         });
       }
@@ -172,11 +213,11 @@ export const testIterativeScoringPipeline = functions.https.onCall(async (data: 
     };
     
   } catch (error: any) {
-    logError('iterative_scoring_test_error', { error: error.message });
+    logError('iterative_scoring_test_error', { error: error instanceof Error ? error.message : String(error) });
     console.error('Error in iterative scoring pipeline test:', error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       details: error.stack
     };
   }

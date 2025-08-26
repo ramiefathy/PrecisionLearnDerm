@@ -1,14 +1,38 @@
-import * as admin from 'firebase-admin';
+import { log, logError as monitoringLogError, LogLevel, generateCorrelationId } from './monitoring';
 
-const db = admin.firestore();
+/**
+ * Legacy logging functions - now use the new monitoring system
+ * These are kept for backward compatibility
+ */
 
-export function logInfo(op: string, details: unknown) {
-  const entry = { level: 'INFO', op, details, at: Date.now() };
-  console.log(JSON.stringify(entry));
-  db.collection('ops').doc('runLogs').collection('entries').add(entry).catch(()=>{});
+export async function logInfo(op: string, details: unknown): Promise<void> {
+  await log({
+    level: LogLevel.INFO,
+    operation: op,
+    details: typeof details === 'object' ? details as Record<string, any> : { value: details },
+    correlationId: generateCorrelationId()
+  });
 }
-export function logError(op: string, details: unknown) {
-  const entry = { level: 'ERROR', op, details, at: Date.now() };
-  console.error(JSON.stringify(entry));
-  db.collection('ops').doc('runLogs').collection('entries').add(entry).catch(()=>{});
+
+export async function logError(op: string, details: unknown): Promise<void> {
+  if (details instanceof Error) {
+    await monitoringLogError(op, details);
+  } else {
+    await log({
+      level: LogLevel.ERROR,
+      operation: op,
+      details: typeof details === 'object' ? details as Record<string, any> : { value: details },
+      correlationId: generateCorrelationId()
+    });
+  }
 }
+
+// Re-export monitoring utilities for new code
+export { 
+  log,
+  LogLevel,
+  PerformanceTimer,
+  withMonitoring,
+  recordMetric,
+  generateCorrelationId
+} from './monitoring';

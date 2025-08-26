@@ -1,8 +1,0 @@
-{
-  "name": "precision-learnderm",
-  "private": true,
-  "scripts": {
-    "deploy": "firebase deploy",
-    "predeploy": "npm --prefix web run build && npm --prefix functions run build"
-  }
-}

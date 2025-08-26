@@ -15,6 +15,6 @@ export const exportsNightly = functions.https.onCall(async (data: any, context: 
     
   } catch (error: any) {
     console.error('Nightly export job failed:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 });

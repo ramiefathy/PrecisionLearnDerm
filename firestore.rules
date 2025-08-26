@@ -2,10 +2,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
     match /users/{uid} {
+      allow read, write: if isOwner(uid);
+      
+      // User activities subcollection
+      match /activities/{activityId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // User answers collection
+    match /userAnswers/{answerId} {
+      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // User abilities collection
+    match /userAbilities/{uid} {
       allow read, write: if isOwner(uid);
     }
 

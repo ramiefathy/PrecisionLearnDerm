@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../app/store';
 import type { QuizConfig } from '../app/store';
+import { SimpleTaxonomySelector } from '../components/SimpleTaxonomySelector';
 
 const ALL_TOPICS = [
   'Acne and Related Disorders',
@@ -44,6 +45,10 @@ export default function QuizConfigPage() {
   );
   const [timed, setTimed] = useState(activeQuiz?.config?.timed || false);
   const [timeLimit, setTimeLimit] = useState(activeQuiz?.config?.durationMins || 30);
+  
+  // New taxonomy selection state
+  const [useTaxonomy, setUseTaxonomy] = useState(true);
+  const [taxonomySelection, setTaxonomySelection] = useState<any>(null);
 
   const handleTopicToggle = (topic: string) => {
     setSelectedTopics(prev => 
@@ -68,7 +73,14 @@ export default function QuizConfigPage() {
       durationMins: timeLimit,
       progressionMode,
       captureConfidence: true,
-      topicIds: selectedTopics.length > 0 ? selectedTopics : ALL_TOPICS,
+      // Use taxonomy filtering if enabled, otherwise fall back to topics
+      ...(useTaxonomy && taxonomySelection ? {
+        taxonomyFilter: taxonomySelection,
+        topicIds: [] // Clear legacy topics when using taxonomy
+      } : {
+        topicIds: selectedTopics.length > 0 ? selectedTopics : ALL_TOPICS,
+        taxonomyFilter: undefined
+      }),
     };
     
     const quiz = {
@@ -84,7 +96,9 @@ export default function QuizConfigPage() {
     navigate('/quiz/play');
   };
 
-  const canStart = true; // Always allow start (will use all topics if none selected)
+  const canStart = useTaxonomy ? 
+    (taxonomySelection !== null) : // For taxonomy, require selection
+    true; // For topics, always allow (will use all topics if none selected)
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -223,7 +237,7 @@ export default function QuizConfigPage() {
               </div>
             </motion.div>
 
-            {/* Topic Selection */}
+            {/* Topic/Taxonomy Selection */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -231,40 +245,85 @@ export default function QuizConfigPage() {
               className="bg-white/90 backdrop-blur rounded-2xl p-6 shadow-lg border border-gray-100"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Topics</h2>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleSelectAll}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-gray-300">|</span>
-                  <button
-                    onClick={handleClearAll}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                  >
-                    Clear All
-                  </button>
+                <h2 className="text-lg font-bold text-gray-900">Content Selection</h2>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      <input
+                        type="radio"
+                        checked={useTaxonomy}
+                        onChange={() => setUseTaxonomy(true)}
+                        className="mr-2"
+                      />
+                      By Category
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      <input
+                        type="radio"
+                        checked={!useTaxonomy}
+                        onChange={() => setUseTaxonomy(false)}
+                        className="mr-2"
+                      />
+                      By Topic
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-                {ALL_TOPICS.map((topic) => (
-                  <label
-                    key={topic}
-                    className="flex items-center p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTopics.includes(topic)}
-                      onChange={() => handleTopicToggle(topic)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-3 text-sm text-gray-700">{topic}</span>
-                  </label>
-                ))}
-              </div>
+              {useTaxonomy ? (
+                <div>
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600">
+                      Select questions from our structured knowledge base organized by medical categories.
+                    </p>
+                  </div>
+                  <SimpleTaxonomySelector
+                    value={taxonomySelection}
+                    onChange={setTaxonomySelection}
+                    showStats={true}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-gray-600">
+                      Select from traditional topic-based categories.
+                    </p>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleSelectAll}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={handleClearAll}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                    {ALL_TOPICS.map((topic) => (
+                      <label
+                        key={topic}
+                        className="flex items-center p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTopics.includes(topic)}
+                          onChange={() => handleTopicToggle(topic)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-700">{topic}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
 
@@ -299,9 +358,15 @@ export default function QuizConfigPage() {
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Topics</span>
+                  <span className="text-sm text-gray-600">Content</span>
                   <span className="text-sm font-semibold text-gray-900">
-                    {selectedTopics.length > 0 ? selectedTopics.length : 'All'}
+                    {useTaxonomy ? 
+                      (taxonomySelection ? 
+                        `${taxonomySelection.category}${taxonomySelection.subcategory ? ' > ' + taxonomySelection.subcategory : ''}` : 
+                        'Select Category'
+                      ) : 
+                      (selectedTopics.length > 0 ? `${selectedTopics.length} topics` : 'All Topics')
+                    }
                   </span>
                 </div>
               </div>

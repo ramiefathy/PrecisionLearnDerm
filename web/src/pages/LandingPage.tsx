@@ -1,7 +1,40 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  
+  // If still loading auth state, show loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 grid place-items-center text-white font-bold animate-pulse">
+            PL
+          </div>
+          <div className="flex gap-1">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-blue-500 animate-bounce"
+                style={{ animationDelay: `${i * 0.1}s` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Redirect logged-in users to the app dashboard
+  if (user) {
+    return <Navigate to="/app" replace />;
+  }
+  
+  // Check multiple conditions for admin access (should never show since user is null at this point)
+  const isAdmin = false; // User is not authenticated on landing page
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-hidden">
       {/* Header */}
@@ -23,6 +56,11 @@ export default function LandingPage() {
           <a className="text-gray-600 hover:text-blue-600 transition-colors font-medium" href="#features">Features</a>
           <a className="text-gray-600 hover:text-blue-600 transition-colors font-medium" href="#how">How it works</a>
           <a className="text-gray-600 hover:text-blue-600 transition-colors font-medium" href="#science">The Science</a>
+          {isAdmin && (
+            <Link className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md font-medium" to="/admin/review">
+              Admin Panel
+            </Link>
+          )}
           <Link className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md" to="/auth">
             Login
           </Link>

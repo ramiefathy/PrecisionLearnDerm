@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from '../components/Toast';
 import { api } from '../lib/api';
-import { auth } from '../lib/firebase';
-// import type { QueuedQuestion } from '@shared/types'; // This line should be commented out or removed
+import { handleAdminError, handleLoadingError } from '../lib/errorHandler';
+import PipelineViewer from '../components/PipelineViewer';
+import EnhancedPipelineViewer from '../components/EnhancedPipelineViewer';
 
 interface QueuedQuestion {
   id: string;
@@ -17,6 +18,8 @@ interface QueuedQuestion {
     citations: Array<{ source: string }>;
     difficulty: number;
     qualityScore: number;
+    iterationHistory?: any[];
+    scoringData?: any;
   };
   status: 'pending' | 'approved' | 'rejected';
   topicHierarchy: {
@@ -28,6 +31,12 @@ interface QueuedQuestion {
   kbSource: {
     entity: string;
     completenessScore: number;
+  };
+  pipelineOutputs?: {
+    generation?: any;
+    validation?: any;
+    review?: any;
+    scoring?: any;
   };
   createdAt: any;
   priority: number;
@@ -48,6 +57,7 @@ export default function AdminQuestionReviewPage() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [showPipelineDetails, setShowPipelineDetails] = useState(false);
 
   useEffect(() => {
     loadQuestionQueue();
@@ -57,11 +67,33 @@ export default function AdminQuestionReviewPage() {
     try {
       setLoading(true);
       const result = await api.admin.getQuestionQueue({}) as any;
-      setQuestions(result.questions);
-      setStats(result.stats);
+      
+      // Set questions - ensure loadedQuestions is always an array
+      const loadedQuestions = Array.isArray(result.questions) ? result.questions : [];
+      setQuestions(loadedQuestions);
+      
+      // Calculate stats from questions if not provided by backend
+      if (result.stats) {
+        setStats(result.stats);
+      } else {
+        // Calculate stats from the questions array with null safety
+        const calculatedStats = {
+          pending: (loadedQuestions || []).filter((q: any) => q.status === 'pending').length,
+          approved: (loadedQuestions || []).filter((q: any) => q.status === 'approved').length,
+          rejected: (loadedQuestions || []).filter((q: any) => q.status === 'rejected').length,
+          total: (loadedQuestions || []).length
+        };
+        setStats(calculatedStats);
+      }
     } catch (error: any) {
-      console.error('Error loading question queue:', error);
-      toast.error('Failed to load questions', { description: error.message });
+      handleLoadingError(
+        error,
+        'load question queue',
+        undefined,
+        setQuestions,
+        []
+      );
+      setStats({ pending: 0, approved: 0, rejected: 0, total: 0 });
     } finally {
       setLoading(false);
     }
@@ -85,13 +117,10 @@ export default function AdminQuestionReviewPage() {
 
       setSelectedQuestion(null);
       setReviewNotes('');
-      toast.success(`Question ${action}d`, {
-        description: `Successfully ${action}d the question`,
-      });
+      toast.success(`Question ${action}d`, `Successfully ${action}d the question`);
 
     } catch (error: any) {
-      console.error('Error reviewing question:', error);
-      toast.error(`Failed to ${action} question`, { description: error.message });
+      handleAdminError(error, `${action} question`);
     } finally {
       setReviewing(null);
     }
@@ -100,14 +129,13 @@ export default function AdminQuestionReviewPage() {
   const handleGenerateMore = async () => {
     try {
       setGenerating(true);
-      const result = await api.admin.generateQueuedQuestions({ targetCount: 25 }) as any;
+      console.log('Calling generateQuestionQueue...');
+      const result = await api.admin.generateQuestionQueue({ count: 25 }) as any;
+      console.log('Generation result:', result);
       await loadQuestionQueue();
-      toast.success('Generated new questions', {
-        description: `Added ${result.generated} questions to review queue`,
-      });
+      toast.success('Generated new questions', `Added ${result.generated} questions to review queue`);
     } catch (error: any) {
-      console.error('Error generating questions:', error);
-      toast.error('Failed to generate questions', { description: error.message });
+      handleAdminError(error, 'generate questions');
     } finally {
       setGenerating(false);
     }
@@ -116,59 +144,19 @@ export default function AdminQuestionReviewPage() {
   const handleGeneratePerTopic = async () => {
     try {
       setGenerating(true);
-
-      const user = auth.currentUser;
-      if (!user) {
-        toast.error('Authentication Error', {
-          description: 'You must be signed in to perform this action.',
-        });
-        throw new Error('User not signed in');
-      }
-      const token = await user.getIdToken();
-      const functionUrl = 'https://us-central1-dermassist-ai-1zyic.cloudfunctions.net/admin_generate_per_topic_http';
-
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ perTopic: 5 }),
-      });
-
-      const res = await response.json();
-
-      if (!response.ok) {
-        throw new Error(res.error || 'The request failed.');
-      }
-
+      console.log('Calling generatePerTopic...');
+      const result = await api.admin.generatePerTopic({ perTopic: 5 }) as any;
+      console.log('Per-topic generation result:', result);
+      
       await loadQuestionQueue();
-      toast.success('Per-topic generation complete', {
-        description: `Generated ${res.totalGenerated || 0} items across topics`,
-      });
+      toast.success('Per-topic generation complete', `Generated ${result.totalGenerated || 0} items across topics`);
     } catch (error: any) {
-      console.error('Error generating per-topic:', error);
-      toast.error('Failed per-topic generation', { description: error.message });
+      handleAdminError(error, 'generate per-topic questions');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleInitializeQueue = async () => {
-    try {
-      setGenerating(true);
-      const result = await api.admin.initializeQueue({}) as any;
-
-      await loadQuestionQueue();
-      toast.success('Queue initialized', { description: result.message });
-
-    } catch (error: any) {
-      console.error('Error initializing queue:', error);
-      toast.error('Failed to initialize queue', { description: error.message });
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   const getTopicBreadcrumb = (hierarchy: any) => {
     if (!hierarchy) return 'Uncategorized';
@@ -207,30 +195,21 @@ export default function AdminQuestionReviewPage() {
               {/* Stats */}
               <div className="flex items-center gap-4 text-sm">
                 <div className="bg-blue-50 px-3 py-1 rounded-lg">
-                  <span className="text-blue-600 font-semibold">{stats.pending}</span>
+                  <span className="text-blue-600 font-semibold">{stats?.pending || 0}</span>
                   <span className="text-blue-500 ml-1">Pending</span>
                 </div>
                 <div className="bg-green-50 px-3 py-1 rounded-lg">
-                  <span className="text-green-600 font-semibold">{stats.approved}</span>
+                  <span className="text-green-600 font-semibold">{stats?.approved || 0}</span>
                   <span className="text-green-500 ml-1">Approved</span>
                 </div>
                 <div className="bg-red-50 px-3 py-1 rounded-lg">
-                  <span className="text-red-600 font-semibold">{stats.rejected}</span>
+                  <span className="text-red-600 font-semibold">{stats?.rejected || 0}</span>
                   <span className="text-red-500 ml-1">Rejected</span>
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex gap-2">
-                {stats.pending === 0 && (
-                  <button
-                    onClick={handleInitializeQueue}
-                    disabled={generating}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50"
-                  >
-                    {generating ? 'Initializing...' : 'Initialize Queue'}
-                  </button>
-                )}
 
                 <button
                   onClick={handleGenerateMore}
@@ -262,7 +241,7 @@ export default function AdminQuestionReviewPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-2">Loading Questions...</h2>
             <p className="text-gray-600 mb-6">Please wait while we fetch the review queue.</p>
           </div>
-        ) : questions.length === 0 ? (
+        ) : !questions || !Array.isArray(questions) || questions.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-500 grid place-items-center text-white text-2xl mx-auto mb-4">
               📝
@@ -270,20 +249,20 @@ export default function AdminQuestionReviewPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-2">No Questions to Review</h2>
             <p className="text-gray-600 mb-6">The review queue is empty. Generate some questions to get started.</p>
             <button
-              onClick={handleInitializeQueue}
+              onClick={handleGenerateMore}
               disabled={generating}
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50"
             >
-              {generating ? 'Initializing...' : 'Initialize Queue with 25 Questions'}
+              {generating ? 'Generating...' : 'Generate Questions'}
             </button>
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Question List */}
             <div className="lg:col-span-1 space-y-4">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Pending Questions ({questions.length})</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Pending Questions ({Array.isArray(questions) ? questions.length : 0})</h2>
 
-              {questions.map((question, index) => (
+              {(questions || []).map((question, index) => (
                 <motion.div
                   key={question.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -297,22 +276,22 @@ export default function AdminQuestionReviewPage() {
                   onClick={() => setSelectedQuestion(question)}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className={`px-2 py-1 rounded text-xs font-semibold ${getQualityColor(question.kbSource.completenessScore)}`}>
-                      Quality: {question.kbSource.completenessScore}
+                    <div className={`px-2 py-1 rounded text-xs font-semibold ${getQualityColor(question.kbSource?.completenessScore || 0)}`}>
+                      Quality: {question.kbSource?.completenessScore || 0}
                     </div>
                     <div className="text-xs text-gray-500">#{index + 1}</div>
                   </div>
 
                   <div className="text-xs text-gray-500 mb-2">
-                    {getTopicBreadcrumb(question.topicHierarchy)}
+                    {question.topicHierarchy ? getTopicBreadcrumb(question.topicHierarchy) : 'Unknown Topic'}
                   </div>
 
                   <div className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {question.kbSource.entity}
+                    {question.kbSource?.entity || 'Unknown Entity'}
                   </div>
 
                   <div className="text-sm text-gray-600 line-clamp-3">
-                    {question.draftItem.stem}
+                    {question.draftItem?.stem || 'No stem available'}
                   </div>
                 </motion.div>
               ))}
@@ -325,11 +304,11 @@ export default function AdminQuestionReviewPage() {
                   {/* Header */}
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">{selectedQuestion.kbSource.entity}</h2>
-                      <p className="text-gray-600">{getTopicBreadcrumb(selectedQuestion.topicHierarchy)}</p>
+                      <h2 className="text-xl font-bold text-gray-900">{selectedQuestion.kbSource?.entity || 'Unknown Entity'}</h2>
+                      <p className="text-gray-600">{selectedQuestion.topicHierarchy ? getTopicBreadcrumb(selectedQuestion.topicHierarchy) : 'Unknown Topic'}</p>
                     </div>
-                    <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getQualityColor(selectedQuestion.kbSource.completenessScore)}`}>
-                      KB Score: {selectedQuestion.kbSource.completenessScore}
+                    <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getQualityColor(selectedQuestion.kbSource?.completenessScore || 0)}`}>
+                      KB Score: {selectedQuestion.kbSource?.completenessScore || 0}
                     </div>
                   </div>
 
@@ -339,7 +318,7 @@ export default function AdminQuestionReviewPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Clinical Vignette</h3>
                       <div className="bg-gray-50 rounded-xl p-4">
-                        <p className="text-gray-700">{selectedQuestion.draftItem.stem}</p>
+                        <p className="text-gray-700">{selectedQuestion.draftItem?.stem || 'No stem available'}</p>
                       </div>
                     </div>
 
@@ -347,13 +326,13 @@ export default function AdminQuestionReviewPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Question</h3>
                       <div className="bg-blue-50 rounded-xl p-4">
-                        <p className="font-medium text-blue-900 mb-4">{selectedQuestion.draftItem.leadIn}</p>
+                        <p className="font-medium text-blue-900 mb-4">{selectedQuestion.draftItem?.leadIn || 'No lead-in available'}</p>
                         <div className="space-y-2">
-                          {selectedQuestion.draftItem.options.map((option: { text: string }, index: number) => (
+                          {(selectedQuestion.draftItem?.options || []).map((option: { text: string }, index: number) => (
                             <div
                               key={index}
                               className={`p-3 rounded-lg border-2 ${
-                                index === selectedQuestion.draftItem.keyIndex
+                                index === (selectedQuestion.draftItem?.keyIndex || -1)
                                   ? 'border-green-300 bg-green-50 text-green-900'
                                   : 'border-gray-200 bg-white text-gray-700'
                               }`}
@@ -362,7 +341,7 @@ export default function AdminQuestionReviewPage() {
                                 {String.fromCharCode(65 + index)}.
                               </span>
                               {option.text}
-                              {index === selectedQuestion.draftItem.keyIndex && (
+                              {index === (selectedQuestion.draftItem?.keyIndex || -1) && (
                                 <span className="ml-2 text-green-600 font-semibold">✓ Correct</span>
                               )}
                             </div>
@@ -376,7 +355,7 @@ export default function AdminQuestionReviewPage() {
                       <h3 className="font-semibold text-gray-900 mb-2">Explanation</h3>
                       <div className="prose prose-sm max-w-none">
                         <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded border text-gray-700">
-                          {selectedQuestion.draftItem.explanation}
+                          {selectedQuestion.draftItem?.explanation || 'No explanation available'}
                         </pre>
                       </div>
                     </div>
@@ -386,24 +365,72 @@ export default function AdminQuestionReviewPage() {
                       <div className="bg-purple-50 rounded-xl p-4">
                         <h4 className="font-semibold text-purple-900 mb-2">Question Metadata</h4>
                         <div className="space-y-1 text-sm">
-                          <div><span className="text-purple-600">Type:</span> {selectedQuestion.draftItem.type}</div>
-                          <div><span className="text-purple-600">Difficulty:</span> {selectedQuestion.draftItem.difficulty.toFixed(2)}</div>
-                          <div><span className="text-purple-600">Quality Score:</span> {selectedQuestion.draftItem.qualityScore}/100</div>
+                          <div><span className="text-purple-600">Type:</span> {selectedQuestion.draftItem?.type || 'Unknown'}</div>
+                          <div><span className="text-purple-600">Difficulty:</span> {selectedQuestion.draftItem?.difficulty ? selectedQuestion.draftItem.difficulty.toFixed(2) : 'N/A'}</div>
+                          <div><span className="text-purple-600">Quality Score:</span> {selectedQuestion.draftItem?.qualityScore || 0}/100</div>
                         </div>
                       </div>
 
                       <div className="bg-indigo-50 rounded-xl p-4">
                         <h4 className="font-semibold text-indigo-900 mb-2">Citations</h4>
                         <div className="space-y-1 text-sm">
-                          {selectedQuestion.draftItem.citations.map((citation: { source: string }, index: number) => (
+                          {(selectedQuestion.draftItem?.citations || []).map((citation: { source: string }, index: number) => (
                             <div key={index} className="text-indigo-600">{citation.source}</div>
                           ))}
                         </div>
                       </div>
                     </div>
 
+                    {/* Pipeline Details */}
+                    {(selectedQuestion.pipelineOutputs || selectedQuestion.draftItem?.iterationHistory) && (
+                      <div className="border-t pt-6">
+                        <PipelineViewer 
+                          pipelineOutputs={selectedQuestion.pipelineOutputs}
+                          iterationHistory={selectedQuestion.draftItem?.iterationHistory}
+                          scoringData={selectedQuestion.draftItem?.scoringData}
+                        />
+                      </div>
+                    )}
+
+                    {/* Pipeline Data Section */}
+                    {selectedQuestion.pipelineOutputs && (
+                      <div className="mt-6 border-t pt-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <span>🔬</span> Generation Pipeline Analysis
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                              {selectedQuestion.pipelineOutputs.generation?.method || 'Unknown'}
+                            </span>
+                            <button
+                              onClick={() => setShowPipelineDetails(!showPipelineDetails)}
+                              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                              {showPipelineDetails ? 'Hide' : 'Show'} Details
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {showPipelineDetails && (
+                          <AnimatePresence>
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <EnhancedPipelineViewer 
+                                pipelineOutputs={selectedQuestion.pipelineOutputs}
+                              />
+                            </motion.div>
+                          </AnimatePresence>
+                        )}
+                      </div>
+                    )}
+
                     {/* Review Actions */}
-                    <div className="border-t pt-6">
+                    <div className="border-t pt-6 mt-6">
                       <h3 className="font-semibold text-gray-900 mb-4">Review Decision</h3>
 
                       <div className="mb-4">

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../lib/api';
 import { toast } from '../components/Toast';
+import { handleAdminError } from '../lib/errorHandler';
+import TaxonomySelector from '../components/TaxonomySelector';
 
 interface QuestionBankStats {
   totalQuestions: number;
@@ -12,10 +14,42 @@ interface QuestionBankStats {
   qualityRange: { min: number; max: number } | null;
 }
 
+interface Question {
+  id: string;
+  stem: string;
+  options: Array<{ text: string }>;
+  correctIndex: number;
+  explanation: string;
+  topic: string;
+  difficulty: number;
+  tags: string[];
+  qualityMetrics?: {
+    overallScore: number;
+    clinicalRelevance: number;
+    diagnosticDifficulty: number;
+    educationalValue: number;
+  };
+  taxonomyCategory?: string;
+  taxonomySubcategory?: string;
+  taxonomySubSubcategory?: string;
+  taxonomyEntity?: string;
+}
+
 export default function AdminQuestionBankPage() {
   const [stats, setStats] = useState<QuestionBankStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  
+  // Taxonomy filtering state
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedSubSubcategory, setSelectedSubSubcategory] = useState('');
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  
+  // Question browsing state
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [showQuestions, setShowQuestions] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -27,11 +61,39 @@ export default function AdminQuestionBankPage() {
       const result = await api.admin.getQuestionBankStats({}) as any;
       setStats(result);
     } catch (error: any) {
-      console.error('Failed to load question bank stats:', error);
-      toast.error('Failed to load stats', error.message);
+      handleAdminError(error, 'load question bank stats');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadQuestions = async (filters: any = {}) => {
+    try {
+      setQuestionsLoading(true);
+      
+      // TODO: Replace with actual API call when implemented
+      console.log('Loading questions with filters:', filters);
+      // For now, we'll show a placeholder
+      const mockQuestions: Question[] = [];
+      
+      setQuestions(mockQuestions);
+      setShowQuestions(true);
+    } catch (error: any) {
+      handleAdminError(error, 'load questions');
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
+
+  const handleBrowseQuestions = () => {
+    const filters = {
+      category: selectedCategory || undefined,
+      subcategory: selectedSubcategory || undefined,
+      subSubcategory: selectedSubSubcategory || undefined,
+      entity: selectedEntity?.name || undefined
+    };
+    
+    loadQuestions(filters);
   };
 
   const handleImportLegacyQuestions = async () => {
@@ -49,8 +111,7 @@ export default function AdminQuestionBankPage() {
       await loadStats();
       
     } catch (error: any) {
-      console.error('Failed to import legacy questions:', error);
-      toast.error('Import Failed', error.message);
+      handleAdminError(error, 'import legacy questions');
     } finally {
       setImporting(false);
     }
@@ -275,6 +336,145 @@ export default function AdminQuestionBankPage() {
             </div>
           </motion.div>
         )}
+
+        {/* Question Browser */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-white rounded-xl p-8 shadow-lg border border-gray-100"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Browse Questions by Topic</h2>
+              <p className="text-gray-600">Filter and explore questions using the taxonomy structure</p>
+            </div>
+            <div className="text-sm text-gray-500">
+              Based on 1,274 medical entities
+            </div>
+          </div>
+          
+          <div className="space-y-6">
+            {/* Taxonomy Selector */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <TaxonomySelector
+                selectedCategory={selectedCategory}
+                selectedSubcategory={selectedSubcategory}
+                selectedSubSubcategory={selectedSubSubcategory}
+                selectedEntity={selectedEntity?.name}
+                onCategoryChange={setSelectedCategory}
+                onSubcategoryChange={setSelectedSubcategory}
+                onSubSubcategoryChange={setSelectedSubSubcategory}
+                onEntityChange={setSelectedEntity}
+                showEntitySelector={false}
+                showStats={true}
+              />
+            </div>
+
+            {/* Browse Button */}
+            <div className="flex justify-center">
+              <button
+                onClick={handleBrowseQuestions}
+                disabled={questionsLoading}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {questionsLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Loading Questions...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>🔍</span>
+                    Browse Questions
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Questions Display */}
+            {showQuestions && (
+              <div className="border-t border-gray-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Filtered Questions ({questions.length})
+                  </h3>
+                  {(selectedCategory || selectedSubcategory || selectedSubSubcategory) && (
+                    <div className="text-sm text-gray-600">
+                      Filters: {selectedCategory && `${selectedCategory}`}
+                      {selectedSubcategory && ` → ${selectedSubcategory}`}
+                      {selectedSubSubcategory && ` → ${selectedSubSubcategory}`}
+                    </div>
+                  )}
+                </div>
+
+                {questions.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-500 grid place-items-center text-white text-2xl mx-auto mb-4">
+                      📋
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">No Questions Found</h4>
+                    <p className="text-gray-600 max-w-md mx-auto">
+                      No questions match the selected filters. Try broadening your selection or check the Review Queue for questions awaiting approval.
+                    </p>
+                    <div className="mt-4 space-x-3">
+                      <a
+                        href="/admin/review"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <span>📋</span>
+                        Review Queue
+                      </a>
+                      <a
+                        href="/admin/generation"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                      >
+                        <span>✨</span>
+                        Generate Questions
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {questions.map((question, index) => (
+                      <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 mb-1">
+                              Question {index + 1}
+                            </h4>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {question.stem}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            {question.qualityMetrics && (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                                Quality: {Math.round(question.qualityMetrics.overallScore)}/10
+                              </span>
+                            )}
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                              Difficulty: {question.difficulty}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {question.taxonomyCategory && (
+                          <div className="text-xs text-gray-500">
+                            📁 {question.taxonomyCategory}
+                            {question.taxonomySubcategory && ` → ${question.taxonomySubcategory}`}
+                            {question.taxonomySubSubcategory && ` → ${question.taxonomySubSubcategory}`}
+                            {question.taxonomyEntity && ` → ${question.taxonomyEntity}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
 
       </div>
     </main>

@@ -1,20 +1,29 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { requireAdmin } from '../util/auth';
+import { CallableContext } from '../types';
 
-export const itemsRevise = functions.https.onCall(async (data: any, context: any) => {
+interface ReviseItemData {
+  itemId: string;
+  instructions: string;
+}
+
+export const itemsRevise = functions.https.onCall(async (data: ReviseItemData, context: CallableContext) => {
   try {
-    const { itemId, instructions } = data || {};
+    requireAdmin(context);
     
-    if (!itemId || !instructions) {
-      throw new Error('Missing required parameters: itemId and instructions');
+    if (!data?.itemId || !data?.instructions) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters: itemId and instructions');
     }
+    
+    const { itemId, instructions } = data;
     
     const db = admin.firestore();
     const itemRef = db.collection('items').doc(itemId);
     
     const itemDoc = await itemRef.get();
     if (!itemDoc.exists) {
-      throw new Error('Item not found');
+      throw new functions.https.HttpsError('not-found', 'Item not found');
     }
     
     // Create revision record
@@ -23,7 +32,7 @@ export const itemsRevise = functions.https.onCall(async (data: any, context: any
       itemId,
       originalData: itemDoc.data(),
       revisionInstructions: instructions,
-      revisedBy: context?.auth?.uid || 'admin',
+      revisedBy: context.auth?.uid || 'unknown',
       revisedAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'pending_review'
     });
@@ -37,9 +46,13 @@ export const itemsRevise = functions.https.onCall(async (data: any, context: any
     
   } catch (error: any) {
     console.error('Error revising item:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    
+    // Re-throw HttpsError for proper client handling
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError('internal', 
+      error instanceof Error ? error.message : 'An unexpected error occurred');
   }
 });

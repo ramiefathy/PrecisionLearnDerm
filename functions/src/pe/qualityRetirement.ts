@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { requireAdmin } from '../util/auth';
 
 const db = admin.firestore();
 
@@ -36,7 +37,7 @@ export const submitQuestionFeedback = functions.https.onCall(async (data: any, c
     console.error('Error submitting feedback:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });
@@ -44,6 +45,7 @@ export const submitQuestionFeedback = functions.https.onCall(async (data: any, c
 // Get quality review queue
 export const getQualityReviewQueue = functions.https.onCall(async (data: any, context: any) => {
   try {
+    requireAdmin(context);
     const { status = 'pending', limit = 25 } = data || {};
     
     const queueRef = db.collection('qualityReviewQueue');
@@ -73,7 +75,7 @@ export const getQualityReviewQueue = functions.https.onCall(async (data: any, co
     console.error('Error getting quality review queue:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });
@@ -81,6 +83,7 @@ export const getQualityReviewQueue = functions.https.onCall(async (data: any, co
 // Resolve quality review
 export const resolveQualityReview = functions.https.onCall(async (data: any, context: any) => {
   try {
+    requireAdmin(context);
     const { queueId, action, adminNotes } = data || {};
     
     if (!queueId || !action) {
@@ -111,7 +114,7 @@ export const resolveQualityReview = functions.https.onCall(async (data: any, con
     console.error('Error resolving quality review:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });
@@ -119,6 +122,7 @@ export const resolveQualityReview = functions.https.onCall(async (data: any, con
 // Get quality analytics
 export const getQualityAnalytics = functions.https.onCall(async (data: any, context: any) => {
   try {
+    requireAdmin(context);
     const { timeRange = 30 } = data || {};
     
     const db = admin.firestore();
@@ -164,7 +168,7 @@ export const getQualityAnalytics = functions.https.onCall(async (data: any, cont
     console.error('Error getting quality analytics:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }); 

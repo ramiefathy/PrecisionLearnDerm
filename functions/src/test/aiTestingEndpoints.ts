@@ -1,20 +1,23 @@
 import * as functions from 'firebase-functions';
-import { generateEnhancedMCQ, generateFallbackMCQ } from '../ai/drafting';
+import { generateEnhancedMCQ } from '../ai/drafting';
+import { config } from '../util/config';
+import { withCORS } from '../util/corsConfig';
+import { getSharedKB } from '../util/sharedCache';
 
 // Testing versions of AI functions that don't require authentication
 // These are specifically for local testing and development
+// DISABLED IN PRODUCTION for security
 
-export const test_generate_question = functions.https.onRequest(async (req, res) => {
-  // Enable CORS for all origins
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    res.status(204).send('');
-    return;
-  }
+export const test_generate_question = functions.https.onRequest(
+  withCORS('TEST', async (req, res) => {
+    // SECURITY: Disable in production
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({
+        success: false,
+        error: 'Test endpoints not available in production'
+      });
+      return;
+    }
   
   const data = req.body.data || req.body;
   try {
@@ -28,12 +31,32 @@ export const test_generate_question = functions.https.onRequest(async (req, res)
     
     let result;
     
-    if (useAI && process.env.GEMINI_API_KEY) {
+    if (useAI && config.gemini.hasApiKey()) {
       console.log('TEST: Using AI generation with topics:', topicIds);
-      result = await generateEnhancedMCQ(topicIds, difficultyTarget);
+      
+      // Fetch entity from knowledge base
+      const kb = await getSharedKB();
+      const searchTerm = topicIds[0]; // Use first topic
+      
+      // Search in the knowledge base for relevant entities
+      const relevantEntities: Array<[string, any]> = [];
+      for (const [key, value] of Object.entries(kb)) {
+        if (key.toLowerCase().includes(searchTerm.toLowerCase())) {
+          relevantEntities.push([key, value]);
+        }
+      }
+      
+      if (relevantEntities.length === 0) {
+        throw new Error(`No knowledge base entries found for topic: ${searchTerm}`);
+      }
+      
+      const [entityName, entity] = relevantEntities[0];
+      console.log(`TEST: Found entity "${entityName}" for topic "${searchTerm}"`);
+      
+      // Generate MCQ with correct parameters
+      result = await generateEnhancedMCQ(entity, entityName, difficultyTarget);
     } else {
-      console.log('TEST: Using fallback generation');
-      result = await generateFallbackMCQ(topicIds[0], difficultyTarget);
+      throw new Error('TEST: AI generation is required but API key is not available. No fallback generation allowed.');
     }
     
     console.log('TEST: Generation completed successfully');
@@ -48,23 +71,22 @@ export const test_generate_question = functions.https.onRequest(async (req, res)
     console.error('TEST: Error in ai_generate_mcq:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     });
   }
-});
+}));
 
-export const test_review_question = functions.https.onRequest(async (req, res) => {
-  // Enable CORS for all origins
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    res.status(204).send('');
-    return;
-  }
+export const test_review_question = functions.https.onRequest(
+  withCORS('TEST', async (req, res) => {
+    // SECURITY: Disable in production
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({
+        success: false,
+        error: 'Test endpoints not available in production'
+      });
+      return;
+    }
   
   const data = req.body.data || req.body;
   try {
@@ -114,23 +136,22 @@ export const test_review_question = functions.https.onRequest(async (req, res) =
     console.error('TEST: Error in ai_review_mcq:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     });
   }
-});
+}));
 
-export const test_score_question = functions.https.onRequest(async (req, res) => {
-  // Enable CORS for all origins
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    res.status(204).send('');
-    return;
-  }
+export const test_score_question = functions.https.onRequest(
+  withCORS('TEST', async (req, res) => {
+    // SECURITY: Disable in production
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({
+        success: false,
+        error: 'Test endpoints not available in production'
+      });
+      return;
+    }
   
   const data = req.body.data || req.body;
   try {
@@ -182,8 +203,8 @@ export const test_score_question = functions.https.onRequest(async (req, res) =>
     console.error('TEST: Error in ai_score_mcq:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     });
   }
-}); 
+})); 

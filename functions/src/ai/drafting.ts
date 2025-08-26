@@ -2,180 +2,53 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { requireAuth } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as https from 'https';
-import { URL } from 'url';
+import { getRobustGeminiClient } from '../util/robustGeminiClient';
+import { validateInput, GenerateMCQSchema } from '../util/validation';
+import { getGeminiApiKey } from '../util/config';
+// KB imports removed - no longer using knowledge base
 
 const db = admin.firestore();
 
-// Gemini AI configuration
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-pro'; // Using Gemini 2.5 Pro - Google's most intelligent AI model
+// Using centralized robust Gemini client for consistency
 
-// Load knowledge base for question generation
-let draftingKnowledgeBase: Record<string, any> = {};
-let draftingHighQualityEntries: Array<{ key: string; entity: any }> = [];
+// KB loading removed - using web search context instead
 
-try {
-  const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  draftingKnowledgeBase = JSON.parse(kbData);
-  
-  // Filter entities with completeness score > 65
-  draftingHighQualityEntries = Object.entries(draftingKnowledgeBase)
-    .filter(([key, entity]) => entity.completeness_score > 65)
-    .map(([key, entity]) => ({ key, entity }));
-    
-  console.log(`Drafting agent loaded ${draftingHighQualityEntries.length} high-quality KB entries`);
-} catch (error) {
-  console.error('Failed to load KB for drafting agent:', error);
-}
-
+/**
+ * Use robust Gemini client with consistent safety settings and retry logic
+ * Note: Uses structured text format instead of JSON to prevent truncation
+ */
 async function callGeminiAPI(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  
-  const requestBody = {
-    contents: [{
-      parts: [{
-        text: prompt
-      }]
-    }],
-    generationConfig: {
-      temperature: 0.7, // Higher creativity for question generation
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 3072,
-      responseMimeType: "application/json"
-    },
-    safetySettings: [
-      {
-        category: "HARM_CATEGORY_HARASSMENT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE"
-      },
-      {
-        category: "HARM_CATEGORY_HATE_SPEECH",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE"
-      },
-      {
-        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE"
-      },
-      {
-        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE"
-      }
-    ]
-  };
-
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(JSON.stringify(requestBody))
-      } as any
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            const responseData = JSON.parse(data);
-            if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
-              reject(new Error('Invalid Gemini API response structure'));
-              return;
-            }
-            resolve(responseData.candidates[0].content.parts[0].text);
-          } catch (e) {
-            reject(new Error(`Failed to parse Gemini API response: ${e}`));
-          }
-        } else {
-          reject(new Error(`Gemini API error: ${res.statusCode} ${res.statusMessage}`));
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      reject(new Error(`Request failed: ${error.message}`));
-    });
-
-    req.write(JSON.stringify(requestBody));
-    req.end();
+  const client = getRobustGeminiClient({
+    maxRetries: 3,
+    fallbackToFlash: true,
+    timeout: 120000 // 2 minutes for drafting operations
   });
-}
 
-function findRelevantKBEntries(topicIds: string[], maxEntries: number = 5): Array<{ key: string; entity: any }> {
-  const relevantEntries: Array<{ key: string; entity: any; score: number }> = [];
-  
-  for (const { key, entity } of draftingHighQualityEntries) {
-    let relevanceScore = 0;
-    
-    // Direct name matching
-    for (const topicId of topicIds) {
-      const normalizedTopic = topicId.toLowerCase().replace(/[_.-]/g, ' ');
-      const normalizedKey = key.toLowerCase().replace(/[_.-]/g, ' ');
-      
-      if (normalizedKey.includes(normalizedTopic) || normalizedTopic.includes(normalizedKey)) {
-        relevanceScore += 10;
-      }
-    }
-    
-    // Content matching in description/symptoms
-    const searchText = (entity.description + ' ' + entity.symptoms + ' ' + entity.treatment).toLowerCase();
-    for (const topicId of topicIds) {
-      const normalizedTopic = topicId.toLowerCase().replace(/[_.-]/g, ' ');
-      if (searchText.includes(normalizedTopic)) {
-        relevanceScore += 3;
-      }
-    }
-    
-    // Boost for higher completeness scores
-    relevanceScore += entity.completeness_score / 10;
-    
-    if (relevanceScore > 0) {
-      relevantEntries.push({ key, entity, score: relevanceScore });
-    }
-  }
-  
-  // Sort by relevance score and return top entries
-  relevantEntries.sort((a, b) => b.score - a.score);
-  
-  // If no specific matches, return random high-quality entries
-  if (relevantEntries.length === 0) {
-    const randomEntries = draftingHighQualityEntries
-      .sort(() => 0.5 - Math.random())
-      .slice(0, maxEntries);
-    return randomEntries;
+  const result = await client.generateText({
+    prompt,
+    operation: 'draft_mcq_structured', // Uses structured text, not JSON
+    preferredModel: 'gemini-2.5-pro',
+    temperature: 0.7 // Higher creativity for question generation
+  });
+
+  if (result.success && result.text) {
+    return result.text;
   }
 
-  return relevantEntries.slice(0, maxEntries);
+  throw new Error(result.error || 'Drafting API call failed');
 }
 
-function generateEnhancedMCQPrompt(entity: any, entityName: string, difficultyTarget?: number): string {
+// KB search removed - using web search context instead
+
+function generateEnhancedMCQPrompt(topic: string, context: string, difficultyTarget?: number): string {
   const targetDifficulty = difficultyTarget || 0.3; // Default moderate difficulty
   
   return `You are Dr. Lisa Thompson, MD, a board-certified dermatologist and expert medical question writer with 12 years of experience creating high-quality board examination questions for the American Board of Dermatology (ABD).
 
-Your task is to create a premium-quality Type A (One-Best-Answer) multiple-choice question about "${entityName}" for dermatology board preparation that meets ABD standards.
+Your task is to create a premium-quality Type A (One-Best-Answer) multiple-choice question about "${topic}" for dermatology board preparation that meets ABD standards.
 
-KNOWLEDGE BASE ENTITY DATA:
-\`\`\`json
-${JSON.stringify(entity, null, 2)}
-\`\`\`
+CURRENT MEDICAL LITERATURE CONTEXT (from PubMed and Academic Sources):
+${context}
 
 CRITICAL REQUIREMENTS (ABD Guidelines):
 
@@ -228,48 +101,163 @@ CRITICAL REQUIREMENTS (ABD Guidelines):
     - Ensure face validity (reflects real-life clinical problem-solving)
     - Eliminate any cues or patterns that could hint at the correct answer
 
-PROVIDE YOUR RESPONSE IN THIS EXACT JSON FORMAT:
-{
-  "clinical_vignette": "A [AGE]-year-old [GENDER] presents to the dermatology clinic with [DURATION] history of [SYMPTOMS]. Physical examination reveals [FINDINGS]. [ADDITIONAL RELEVANT INFORMATION]. [RELEVANT HISTORY IF APPLICABLE].",
-  "lead_in": "What is the most likely diagnosis?",
-  "answer_options": [
-    {"text": "[CORRECT ANSWER - specific diagnosis/treatment]", "is_correct": true},
-    {"text": "[PLAUSIBLE DISTRACTOR 1 - same category]", "is_correct": false},
-    {"text": "[PLAUSIBLE DISTRACTOR 2 - same category]", "is_correct": false},
-    {"text": "[PLAUSIBLE DISTRACTOR 3 - same category]", "is_correct": false},
-    {"text": "[PLAUSIBLE DISTRACTOR 4 - same category]", "is_correct": false}
-  ],
-  "comprehensive_explanation": {
-    "correct_answer_rationale": "Detailed explanation of why this is the correct answer, citing specific elements from the clinical vignette and explaining the underlying pathophysiology or clinical reasoning.",
-    "distractor_explanations": {
-      "distractor_1": "Specific explanation of why this option is incorrect, including what clinical features would be expected if this were the correct diagnosis.",
-      "distractor_2": "Specific explanation of why this option is incorrect, including what clinical features would be expected if this were the correct diagnosis.",
-      "distractor_3": "Specific explanation of why this option is incorrect, including what clinical features would be expected if this were the correct diagnosis.",
-      "distractor_4": "Specific explanation of why this option is incorrect, including what clinical features would be expected if this were the correct diagnosis."
-    },
-    "educational_pearls": [
-      "Key learning point 1: [Specific clinical pearl or diagnostic tip]",
-      "Key learning point 2: [Differential diagnosis consideration]",
-      "Key learning point 3: [Management principle or clinical decision-making insight]"
-    ]
-  },
-  "quality_validation": {
-    "covers_options_test": "Question can be answered without seeing options: [YES/NO]",
-    "cognitive_level": "Application of knowledge: [YES/NO]",
-    "clinical_realism": "Reflects real clinical scenario: [YES/NO]",
-    "homogeneous_options": "All options are same category: [YES/NO]",
-    "difficulty_appropriate": "Targets 70-80% success rate: [YES/NO]"
-  }
-}
+PROVIDE YOUR RESPONSE IN THIS EXACT STRUCTURED FORMAT:
+
+CLINICAL_VIGNETTE:
+A [AGE]-year-old [GENDER] presents to the dermatology clinic with [DURATION] history of [SYMPTOMS]. Physical examination reveals [FINDINGS]. [ADDITIONAL RELEVANT INFORMATION]. [RELEVANT HISTORY IF APPLICABLE].
+
+LEAD_IN:
+What is the most likely diagnosis?
+
+OPTION_A:
+[CORRECT ANSWER - specific diagnosis/treatment]
+
+OPTION_B:
+[PLAUSIBLE DISTRACTOR 1 - same category]
+
+OPTION_C:
+[PLAUSIBLE DISTRACTOR 2 - same category]
+
+OPTION_D:
+[PLAUSIBLE DISTRACTOR 3 - same category]
+
+OPTION_E:
+[PLAUSIBLE DISTRACTOR 4 - same category]
+
+CORRECT_ANSWER:
+A
+
+CORRECT_ANSWER_RATIONALE:
+Detailed explanation of why this is the correct answer, citing specific elements from the clinical vignette and explaining the underlying pathophysiology or clinical reasoning.
+
+DISTRACTOR_1_EXPLANATION:
+Specific explanation of why option B is incorrect, including what clinical features would be expected if this were the correct diagnosis.
+
+DISTRACTOR_2_EXPLANATION:
+Specific explanation of why option C is incorrect, including what clinical features would be expected if this were the correct diagnosis.
+
+DISTRACTOR_3_EXPLANATION:
+Specific explanation of why option D is incorrect, including what clinical features would be expected if this were the correct diagnosis.
+
+DISTRACTOR_4_EXPLANATION:
+Specific explanation of why option E is incorrect, including what clinical features would be expected if this were the correct diagnosis.
+
+EDUCATIONAL_PEARLS:
+1. Key learning point: [Specific clinical pearl or diagnostic tip]
+2. Key learning point: [Differential diagnosis consideration]
+3. Key learning point: [Management principle or clinical decision-making insight]
+
+QUALITY_VALIDATION:
+- Covers options test: [YES/NO]
+- Cognitive level: [YES/NO]
+- Clinical realism: [YES/NO]
+- Homogeneous options: [YES/NO]
+- Difficulty appropriate: [YES/NO]
 
 IMPORTANT: Ensure your question follows ALL ABD guidelines above. The question must be answerable without options, test application of knowledge, use bottom-up clinical reasoning, and maintain the highest standards of medical education quality.`;
 }
 
-async function generateEnhancedMCQ(entity: any, entityName: string, difficultyTarget?: number): Promise<any> {
+// Helper function to parse structured text response
+function parseStructuredMCQResponse(text: string): any {
   try {
-    const prompt = generateEnhancedMCQPrompt(entity, entityName, difficultyTarget);
+    const cleanedText = text.trim();
+    
+    // Extract sections using regex patterns
+    const extractSection = (sectionName: string, nextSection?: string): string => {
+      const pattern = nextSection 
+        ? new RegExp(`${sectionName}:\s*([\s\S]*?)(?=\n\s*${nextSection}:|$)`, 'i')
+        : new RegExp(`${sectionName}:\s*([\s\S]*?)$`, 'i');
+      const match = cleanedText.match(pattern);
+      return match ? match[1].trim() : '';
+    };
+    
+    // Extract all sections
+    const clinicalVignette = extractSection('CLINICAL_VIGNETTE', 'LEAD_IN');
+    const leadIn = extractSection('LEAD_IN', 'OPTION_A');
+    
+    // Extract options
+    const optionA = extractSection('OPTION_A', 'OPTION_B');
+    const optionB = extractSection('OPTION_B', 'OPTION_C');
+    const optionC = extractSection('OPTION_C', 'OPTION_D');
+    const optionD = extractSection('OPTION_D', 'OPTION_E');
+    const optionE = extractSection('OPTION_E', 'CORRECT_ANSWER');
+    
+    // Extract correct answer letter
+    const correctAnswerMatch = cleanedText.match(/CORRECT_ANSWER:\s*([A-E])/i);
+    const correctAnswer = correctAnswerMatch ? correctAnswerMatch[1].toUpperCase() : 'A';
+    
+    // Extract explanations
+    const correctRationale = extractSection('CORRECT_ANSWER_RATIONALE', 'DISTRACTOR_1_EXPLANATION');
+    const distractor1Exp = extractSection('DISTRACTOR_1_EXPLANATION', 'DISTRACTOR_2_EXPLANATION');
+    const distractor2Exp = extractSection('DISTRACTOR_2_EXPLANATION', 'DISTRACTOR_3_EXPLANATION');
+    const distractor3Exp = extractSection('DISTRACTOR_3_EXPLANATION', 'DISTRACTOR_4_EXPLANATION');
+    const distractor4Exp = extractSection('DISTRACTOR_4_EXPLANATION', 'EDUCATIONAL_PEARLS');
+    
+    // Extract educational pearls
+    const pearlsSection = extractSection('EDUCATIONAL_PEARLS', 'QUALITY_VALIDATION');
+    const pearls = pearlsSection.split('\n').filter(line => line.trim()).map(line => 
+      line.replace(/^\d+\.\s*/, '').replace(/^Key learning point:\s*/i, '')
+    );
+    
+    // Extract quality validation
+    const validationSection = extractSection('QUALITY_VALIDATION');
+    const validationLines = validationSection.split('\n').filter(line => line.trim());
+    const qualityValidation: any = {};
+    
+    validationLines.forEach(line => {
+      if (line.includes('Covers options test:')) {
+        qualityValidation.covers_options_test = line.includes('YES') ? 'YES' : 'NO';
+      } else if (line.includes('Cognitive level:')) {
+        qualityValidation.cognitive_level = line.includes('YES') ? 'YES' : 'NO';
+      } else if (line.includes('Clinical realism:')) {
+        qualityValidation.clinical_realism = line.includes('YES') ? 'YES' : 'NO';
+      } else if (line.includes('Homogeneous options:')) {
+        qualityValidation.homogeneous_options = line.includes('YES') ? 'YES' : 'NO';
+      } else if (line.includes('Difficulty appropriate:')) {
+        qualityValidation.difficulty_appropriate = line.includes('YES') ? 'YES' : 'NO';
+      }
+    });
+    
+    // Map correct answer letter to index
+    const correctIndex = correctAnswer.charCodeAt(0) - 'A'.charCodeAt(0);
+    
+    // Build the structured data object
+    return {
+      clinical_vignette: clinicalVignette,
+      lead_in: leadIn,
+      answer_options: [
+        { text: optionA, is_correct: correctAnswer === 'A' },
+        { text: optionB, is_correct: correctAnswer === 'B' },
+        { text: optionC, is_correct: correctAnswer === 'C' },
+        { text: optionD, is_correct: correctAnswer === 'D' },
+        { text: optionE, is_correct: correctAnswer === 'E' }
+      ],
+      comprehensive_explanation: {
+        correct_answer_rationale: correctRationale,
+        distractor_explanations: {
+          distractor_1: distractor1Exp,
+          distractor_2: distractor2Exp,
+          distractor_3: distractor3Exp,
+          distractor_4: distractor4Exp
+        },
+        educational_pearls: pearls
+      },
+      quality_validation: qualityValidation
+    };
+    
+  } catch (error) {
+    console.error('Failed to parse structured MCQ response:', error);
+    throw new Error(`Structured text parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function generateEnhancedMCQ(topic: string, context: string, difficultyTarget?: number): Promise<any> {
+  try {
+    const prompt = generateEnhancedMCQPrompt(topic, context, difficultyTarget);
     const geminiResponse = await callGeminiAPI(prompt);
-    const mcqData = JSON.parse(geminiResponse);
+    
+    // Parse the structured text response instead of JSON
+    const mcqData = parseStructuredMCQResponse(geminiResponse);
     
     // Extract correct answer index
     const correctIndex = mcqData.answer_options.findIndex((opt: any) => opt.is_correct);
@@ -278,7 +266,7 @@ async function generateEnhancedMCQ(entity: any, entityName: string, difficultyTa
     const options = mcqData.answer_options.map((opt: any) => ({ text: opt.text }));
     
     // Combine explanations into a comprehensive explanation in PLAIN TEXT format
-    const explanation = `${entityName}
+    const explanation = `${topic}
 
 Correct Answer: ${mcqData.answer_options[correctIndex].text}
 
@@ -298,8 +286,8 @@ This explanation is based on current dermatological knowledge and evidence-based
     // Extract quality validation data if available
     const qualityValidation = mcqData.quality_validation || {};
     
-    // Calculate enhanced quality score based on validation
-    let enhancedQualityScore = Math.min(95, 75 + (entity.completeness_score - 65) * 0.5);
+    // Calculate enhanced quality score based on validation (start from base 75 without KB)
+    let enhancedQualityScore = 75;
     if (qualityValidation.covers_options_test === 'YES') enhancedQualityScore += 5;
     if (qualityValidation.cognitive_level === 'YES') enhancedQualityScore += 5;
     if (qualityValidation.clinical_realism === 'YES') enhancedQualityScore += 5;
@@ -308,13 +296,13 @@ This explanation is based on current dermatological knowledge and evidence-based
     
     return {
       type: 'A',
-      topicIds: [entityName.toLowerCase().replace(/\s+/g, '.')],
+      topicIds: [topic.toLowerCase().replace(/\s+/g, '.')],
       stem: mcqData.clinical_vignette,
       leadIn: mcqData.lead_in,
       options,
       keyIndex: correctIndex,
       explanation,
-      citations: [{ source: `KB:${entityName.toLowerCase().replace(/\s+/g, '_')}` }],
+      citations: [{ source: `Research:${topic.toLowerCase().replace(/\s+/g, '_')}` }],
       difficulty: mcqData.estimated_difficulty || difficultyTarget || 0.3,
       qualityScore: Math.min(95, enhancedQualityScore),
       status: 'draft',
@@ -334,205 +322,60 @@ This explanation is based on current dermatological knowledge and evidence-based
     };
     
   } catch (error: any) {
-    // Fallback to KB-only generation if AI fails
-    return generateFallbackMCQ(entity, entityName, difficultyTarget);
+    // No fallback - throw error to properly fail the operation
+    logError('ai_generation_failed', { error: error instanceof Error ? error.message : String(error), topic });
+    throw new Error(`AI generation failed for ${topic}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-function generateFallbackMCQ(entity: any, entityName: string, difficultyTarget?: number): any {
-  // Enhanced fallback generation logic
-  const demographics = [
-    'A 28-year-old woman',
-    'A 45-year-old man', 
-    'A 35-year-old patient',
-    'A 32-year-old female',
-    'A 52-year-old male'
-  ];
-  
-  const demographic = demographics[Math.floor(Math.random() * demographics.length)];
-  
-  // More sophisticated stem generation
-  let symptoms = entity.symptoms || entity.description || '';
-  if (symptoms.length > 200) {
-    symptoms = symptoms.split(';')[0] || symptoms.substring(0, 200);
-  }
-  
-  const stem = `${demographic} presents to the dermatology clinic with ${symptoms.toLowerCase().trim()}. Physical examination reveals findings consistent with this condition.`;
-  
-  // Generate contextual lead-in
-  let leadIn = 'What is the most likely diagnosis?';
-  if (entity.treatment && entity.treatment.trim()) {
-    const treatments = entity.treatment.split(',').map((t: string) => t.trim());
-    if (treatments.length > 1) {
-      leadIn = 'What is the most appropriate initial treatment?';
-    }
-  }
-  
-  // Enhanced distractor generation
-  const distractors = Object.keys(draftingKnowledgeBase)
-    .filter(name => 
-      name !== entityName && 
-      draftingKnowledgeBase[name].completeness_score > 65 &&
-      // Try to find related conditions
-      (draftingKnowledgeBase[name].description?.toLowerCase().includes(entity.description?.split(' ')[0]?.toLowerCase()) ||
-       Math.random() < 0.3) // Some random distractors
-    )
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 3);
-  
-  const options = [
-    { text: entityName },
-    ...distractors.map(name => ({ text: name }))
-  ].sort(() => 0.5 - Math.random());
-  
-  const keyIndex = options.findIndex(opt => opt.text === entityName);
-  
-  // Enhanced explanation in plain text format
-  let explanation = `${entityName}
+// Export the simplified MCQ generation function
+export { generateEnhancedMCQ };
 
-Correct Answer: ${entityName}
-
-`;
-  if (entity.description) {
-    explanation += `${entity.description.trim()}
-
-`;
-  }
-  if (entity.symptoms) {
-    explanation += `Clinical Features: ${entity.symptoms}
-
-`;
-  }
-  if (entity.treatment) {
-    explanation += `Treatment: ${entity.treatment.substring(0, 400)}${entity.treatment.length > 400 ? '...' : ''}
-
-`;
-  }
-  if (entity.diagnosis) {
-    explanation += `Diagnosis: ${entity.diagnosis}
-
-`;
-  }
-  explanation += `This explanation is based on current dermatological knowledge for educational purposes.`;
-  
-  return {
-    type: 'A',
-    topicIds: [entityName.toLowerCase().replace(/\s+/g, '.')],
-    stem,
-    leadIn,
-    options,
-    keyIndex,
-    explanation,
-    citations: [{ source: `KB:${entityName.toLowerCase().replace(/\s+/g, '_')}` }],
-    difficulty: difficultyTarget || 0.3,
-    qualityScore: Math.min(85, 65 + (entity.completeness_score - 65) * 0.3),
-    status: 'draft',
-    aiGenerated: false,
-    createdBy: { type: 'agent', model: 'kb-fallback-generator', at: admin.firestore.FieldValue.serverTimestamp() },
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  };
+// Export for internal use by other modules
+export async function generateMCQInternal(topic: string, context: string, difficulty?: number): Promise<any> {
+  return generateEnhancedMCQ(topic, context, difficulty);
 }
 
-export { generateEnhancedMCQ, generateFallbackMCQ };
-
-export const generateMcq = functions.https.onCall(async (data: any, context) => {
+export const generateMcq = functions
+  .runWith({
+    timeoutSeconds: 300, // 5 minutes for question drafting
+    memory: '1GB'
+  })
+  .https.onCall(async (data: any, callContext) => {
   try {
-    const { topicIds, itemType, difficultyTarget, constraints, useAI = true } = data || {};
+    requireAuth(callContext);
+    // Validate input
+    const validatedData = validateInput(GenerateMCQSchema, data);
+    const { topicIds, difficulty: difficultyTarget = 0.3, useAI = true } = validatedData;
     
-    if (!topicIds || !Array.isArray(topicIds) || topicIds.length === 0) {
+    if (!topicIds || topicIds.length === 0) {
       throw new Error('topicIds array is required');
     }
     
-    // Load knowledge base if not already loaded
-    if (!draftingKnowledgeBase || Object.keys(draftingKnowledgeBase).length === 0) {
-      try {
-        const kbPath = path.join(__dirname, '..', 'kb', 'knowledgeBase.json');
-        const kbContent = fs.readFileSync(kbPath, 'utf8');
-        draftingKnowledgeBase = JSON.parse(kbContent);
-        console.log(`Loaded ${Object.keys(draftingKnowledgeBase).length} entities for drafting`);
-      } catch (error) {
-        console.error('Failed to load knowledge base:', error);
-        throw new Error('Knowledge base not available');
-      }
-    }
+    // Use the first topic as the main topic
+    const mainTopic = topicIds[0];
     
-    // Find relevant entities based on topic IDs
-    const relevantEntities = Object.entries(draftingKnowledgeBase)
-      .filter(([name, entity]: [string, any]) => {
-        // Check if entity matches any of the requested topic IDs
-        return topicIds.some(topicId => {
-          const topicLower = topicId.toLowerCase();
-          const entityNameLower = name.toLowerCase();
-          const entityDescLower = (entity.description || '').toLowerCase();
-          const entityTopicLower = (entity.topic || '').toLowerCase();
-          
-          return entityNameLower.includes(topicLower) ||
-                 entityDescLower.includes(topicLower) ||
-                 entityTopicLower.includes(topicLower);
-        });
-      })
-      .filter(([_, entity]: [string, any]) => entity.completeness_score > 65)
-      .sort(([_, a]: [string, any], [__, b]: [string, any]) => b.completeness_score - a.completeness_score);
+    // Generate context for the question
+    const context = `Generate a dermatology board exam question about ${mainTopic}. Use your medical knowledge to create clinically accurate, educational questions that test understanding of diagnosis, treatment, and pathophysiology.`;
     
-    if (relevantEntities.length === 0) {
-      throw new Error(`No relevant entities found for topics: ${topicIds.join(', ')}`);
-    }
-    
-    // Select entity based on constraints and difficulty
-    let selectedEntity: [string, any] | null = null;
-    
-    if (constraints && constraints.length > 0) {
-      // Apply constraints if specified
-      const constrainedEntities = relevantEntities.filter(([name, entity]: [string, any]) => {
-        return constraints.every((constraint: any) => {
-          if (constraint.type === 'difficulty_range') {
-            const entityDifficulty = entity.difficulty || 0.5;
-            return entityDifficulty >= constraint.min && entityDifficulty <= constraint.max;
-          }
-          if (constraint.type === 'completeness_min') {
-            return entity.completeness_score >= constraint.value;
-          }
-          return true;
-        });
-      });
-      
-      if (constrainedEntities.length > 0) {
-        selectedEntity = constrainedEntities[0];
-      }
-    }
-    
-    if (!selectedEntity) {
-      // Default selection: highest completeness score
-      selectedEntity = relevantEntities[0];
-    }
-    
-    const [entityName, entity] = selectedEntity;
-    
-    // Generate question using AI or fallback
+    // Generate question using AI
     let question;
-    if (useAI && process.env.GEMINI_API_KEY) {
-      try {
-        question = await generateEnhancedMCQ(entity, entityName, difficultyTarget);
-      } catch (aiError) {
-        console.log(`AI generation failed for ${entityName}, falling back to KB generation:`, aiError);
-        question = generateFallbackMCQ(entity, entityName, difficultyTarget);
-      }
+    if (useAI && getGeminiApiKey()) {
+      question = await generateEnhancedMCQ(mainTopic, context, difficultyTarget);
     } else {
-      question = generateFallbackMCQ(entity, entityName, difficultyTarget);
+      throw new Error('AI generation is required but API key is not available.');
     }
     
     // Add metadata
     question.generatedForTopics = topicIds;
-    question.generationMethod = useAI ? 'ai-enhanced' : 'kb-fallback';
-    question.entitySource = entityName;
-    question.entityCompletenessScore = entity.completeness_score;
+    question.generationMethod = 'ai-enhanced';
+    question.topicSource = mainTopic;
     
     return {
       success: true,
       question,
       metadata: {
-        entityName,
-        entityCompletenessScore: entity.completeness_score,
+        topic: mainTopic,
         topicsMatched: topicIds,
         generationMethod: question.generationMethod
       }
@@ -542,7 +385,7 @@ export const generateMcq = functions.https.onCall(async (data: any, context) => 
     console.error('Error generating MCQ:', error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       details: error.stack
     };
   }

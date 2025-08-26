@@ -3,25 +3,30 @@ import * as functions from 'firebase-functions';
 import { requireAuth } from '../util/auth';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getSharedKB } from '../util/sharedCache';
 
-// Load knowledge base on startup
+// Knowledge base loaded via shared cache
 let knowledgeBase: Record<string, any> = {};
 let highQualityEntries: Array<{ key: string; entity: any }> = [];
 
-try {
-  const kbPath = path.join(__dirname, 'knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  knowledgeBase = JSON.parse(kbData);
-  
-  // Filter entities with completeness score > 65
-  highQualityEntries = Object.entries(knowledgeBase)
-    .filter(([key, entity]) => entity.completeness_score > 65)
-    .map(([key, entity]) => ({ key, entity }));
+// Initialize knowledge base asynchronously
+async function initializeKB() {
+  try {
+    knowledgeBase = await getSharedKB();
     
-  console.log(`Loaded ${Object.keys(knowledgeBase).length} total KB entries, ${highQualityEntries.length} high-quality entries`);
-} catch (error) {
-  console.error('Failed to load knowledge base:', error);
+    // Filter entities with completeness score > 65
+    highQualityEntries = Object.entries(knowledgeBase)
+      .filter(([key, entity]) => entity.completeness_score > 65)
+      .map(([key, entity]) => ({ key, entity }));
+      
+    console.log(`Loaded ${Object.keys(knowledgeBase).length} total KB entries, ${highQualityEntries.length} high-quality entries`);
+  } catch (error) {
+    console.error('Failed to load knowledge base via shared cache:', error);
+  }
 }
+
+// Lazy initialization - will be called on first search
+let initialized = false;
 
 interface KBSearchResult {
   entityName: string;
@@ -122,13 +127,20 @@ function formatEntityContent(entity: any): KBSearchResult['content'] {
 
 export const kbSearch = functions.https.onCall(async (data: any, context) => {
   try {
+    requireAuth(context);
     const { q: query, topicIds } = data || {};
     
     if (!query || typeof query !== 'string') {
       throw new Error('Query parameter is required and must be a string');
     }
     
-    // Load knowledge base if not already loaded
+    // Initialize knowledge base if not already done
+    if (!initialized) {
+      await initializeKB();
+      initialized = true;
+    }
+    
+    // Check if KB loaded successfully
     if (!knowledgeBase || Object.keys(knowledgeBase).length === 0) {
       try {
         const kbPath = path.join(__dirname, 'knowledgeBase.json');
@@ -189,7 +201,7 @@ export const kbSearch = functions.https.onCall(async (data: any, context) => {
     console.error('Error in KB search:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });

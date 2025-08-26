@@ -1,6 +1,9 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { requireAdmin } from '../util/auth';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const db = admin.firestore();
 
@@ -213,65 +216,68 @@ const HIGH_QUALITY_QUESTIONS = [
   }
 ];
 
-export const importLegacyQuestions = functions.https.onCall(async (data, context) => {
-  const uid = await requireAdmin(context);
+export const importLegacyQuestions = functions.storage.object().onFinalize(async (object) => {
+  const fileBucket = object.bucket; // The Storage bucket that contains the file.
+  const filePath = object.name; // File path in the bucket.
+  const contentType = object.contentType; // File content type.
+
+  // Exit if this is triggered on a file that is not a JSON file.
+  if (!contentType || !contentType.startsWith('application/json')) {
+    return console.log('This is not a JSON file.');
+  }
+
+  // Get the file name.
+  const fileName = path.basename(filePath || '');
+
+  // Download file from bucket.
+  const bucket = admin.storage().bucket(fileBucket);
+  const tempFilePath = path.join(os.tmpdir(), fileName);
+  await bucket.file(filePath || '').download({destination: tempFilePath});
+
+  // Read the file content.
+  const fileContent = fs.readFileSync(tempFilePath, 'utf8');
+  const questionsToImport = JSON.parse(fileContent);
+
+  const batch = db.batch();
+  let importCount = 0;
   
-  try {
-    console.log('Starting import of legacy questions...');
+  for (const question of questionsToImport) {
+    const docRef = db.collection('items').doc(); // Create a new document with a random ID.
     
-    // Import questions in batches
-    const batch = db.batch();
-    let importCount = 0;
-    
-    for (const question of HIGH_QUALITY_QUESTIONS) {
-      const docRef = db.collection('items').doc(question.itemId);
-      
-      // Add timestamps
-      const questionWithTimestamps = {
-        ...question,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-      
-      batch.set(docRef, questionWithTimestamps);
-      importCount++;
-    }
-    
-    // Commit the batch
-    await batch.commit();
-    
-    // Update metadata
-    await db.collection('admin').doc('questionBankMetadata').set({
-      lastImport: admin.firestore.FieldValue.serverTimestamp(),
-      totalImportedQuestions: importCount,
-      source: 'legacy_question_bank_sample',
-      importedBy: uid,
-      categories: {
-        'medical_dermatology': 2,
-        'oncology_tumors': 3
-      }
-    }, { merge: true });
-    
-    console.log(`Successfully imported ${importCount} legacy questions`);
-    
-    return {
-      success: true,
-      message: `Successfully imported ${importCount} high-quality legacy questions`,
-      questionsImported: importCount,
-      categories: {
-        'medical_dermatology': 2,
-        'oncology_tumors': 3
-      }
+    // Add timestamps
+    const questionWithTimestamps = {
+      ...question,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     
-  } catch (error: any) {
-    console.error('Error importing legacy questions:', error);
-    throw new functions.https.HttpsError('internal', `Import failed: ${error.message}`);
+    batch.set(docRef, questionWithTimestamps);
+    importCount++;
   }
+  
+  // Commit the batch
+  await batch.commit();
+  
+  // Update metadata
+  await db.collection('admin').doc('questionBankMetadata').set({
+    lastImport: admin.firestore.FieldValue.serverTimestamp(),
+    totalImportedQuestions: importCount,
+    source: fileName
+  }, { merge: true });
+  
+  console.log(`Successfully imported ${importCount} legacy questions from ${fileName}`);
+  
+  return {
+    success: true,
+    message: `Successfully imported ${importCount} high-quality legacy questions from ${fileName}`,
+    questionsImported: importCount
+  };
 });
 
+
 export const getQuestionBankStats = functions.https.onCall(async (data, context) => {
-  const uid = await requireAdmin(context);
+  requireAdmin(context);
+  const uid = context.auth?.uid || 'unknown';
   
   try {
     // Get total questions count
@@ -324,6 +330,6 @@ export const getQuestionBankStats = functions.https.onCall(async (data, context)
     
   } catch (error: any) {
     console.error('Error getting question bank stats:', error);
-    throw new functions.https.HttpsError('internal', `Failed to get stats: ${error.message}`);
+    throw new functions.https.HttpsError('internal', `Failed to get stats: ${error instanceof Error ? error.message : String(error)}`);
   }
 }); 

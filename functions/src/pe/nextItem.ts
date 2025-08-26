@@ -4,9 +4,11 @@ import * as functions from 'firebase-functions';
 export const getNextItem = functions.https.onCall(async (data: any, context: any) => {
   try {
     const topicIds: string[] | undefined = data?.topicIds;
+    const taxonomyFilter = data?.taxonomyFilter; // New taxonomy filtering
     
-    if (!topicIds || !Array.isArray(topicIds) || topicIds.length === 0) {
-      throw new Error('topicIds array is required');
+    // Allow either topicIds OR taxonomyFilter (not both required)
+    if (!topicIds && !taxonomyFilter) {
+      throw new Error('Either topicIds array or taxonomyFilter is required');
     }
     
     const db = admin.firestore();
@@ -26,9 +28,28 @@ export const getNextItem = functions.https.onCall(async (data: any, context: any
       userAbilities = abilityData?.topicAbilities || {};
     }
     
-    // Find items matching the topic IDs
+    // Build query based on filtering method
     const itemsRef = db.collection('items');
-    let query = itemsRef.where('topicIds', 'array-contains-any', topicIds);
+    let query: admin.firestore.Query = itemsRef;
+    
+    if (taxonomyFilter) {
+      // Filter by taxonomy hierarchy
+      if (taxonomyFilter.category) {
+        query = query.where('taxonomyCategory', '==', taxonomyFilter.category);
+      }
+      if (taxonomyFilter.subcategory) {
+        query = query.where('taxonomySubcategory', '==', taxonomyFilter.subcategory);
+      }
+      if (taxonomyFilter.subSubcategory) {
+        query = query.where('taxonomySubSubcategory', '==', taxonomyFilter.subSubcategory);
+      }
+      if (taxonomyFilter.entity) {
+        query = query.where('taxonomyEntity', '==', taxonomyFilter.entity);
+      }
+    } else if (topicIds && Array.isArray(topicIds) && topicIds.length > 0) {
+      // Fallback to legacy topicIds filtering
+      query = query.where('topicIds', 'array-contains-any', topicIds);
+    }
     
     // Filter by status
     query = query.where('status', '==', 'active');
@@ -40,9 +61,10 @@ export const getNextItem = functions.https.onCall(async (data: any, context: any
     })) as any[];
     
     if (items.length === 0) {
+      const filterType = taxonomyFilter ? 'taxonomy filter' : 'topics';
       return {
         success: false,
-        error: 'No items found for the specified topics'
+        error: `No items found for the specified ${filterType}`
       };
     }
     
@@ -74,7 +96,7 @@ export const getNextItem = functions.https.onCall(async (data: any, context: any
     console.error('Error getting next item:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });

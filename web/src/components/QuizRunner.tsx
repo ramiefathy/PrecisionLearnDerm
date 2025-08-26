@@ -90,8 +90,16 @@ export function QuizRunner() {
         });
         toast.success('Personalized Question', 'This question was created specifically for your learning needs!');
       } else {
-        // Load regular question
-        const res: any = await api.pe.nextItem({});
+        // Load regular question with taxonomy or topic filtering
+        const nextItemRequest: any = {};
+        
+        if (activeQuiz?.config?.taxonomyFilter) {
+          nextItemRequest.taxonomyFilter = activeQuiz.config.taxonomyFilter;
+        } else if (activeQuiz?.config?.topicIds?.length && activeQuiz.config.topicIds.length > 0) {
+          nextItemRequest.topicIds = activeQuiz.config.topicIds;
+        }
+        
+        const res: any = await api.pe.nextItem(nextItemRequest);
         if (res && res.itemId) {
           const full = await api.items.get(res.itemId);
           setItem({ 

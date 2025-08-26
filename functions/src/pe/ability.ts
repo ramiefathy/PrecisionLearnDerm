@@ -58,8 +58,15 @@ export const updateAbility = functions.https.onCall(async (data: any, context: a
       };
     }
     
+    // Get item difficulty
+    const itemRef = db.collection('items').doc(itemId);
+    const itemDoc = await itemRef.get();
+    if (!itemDoc.exists) {
+      throw new Error('Item not found');
+    }
+    const itemDifficulty = itemDoc.data()?.difficulty || 0.5;
+    
     // Calculate new ability rating
-    const itemDifficulty = 0.5; // This should come from the item data
     const newAbility = calculateNewAbility(
       abilityData.overallAbility,
       correct,
@@ -116,7 +123,7 @@ export const updateAbility = functions.https.onCall(async (data: any, context: a
     console.error('Error updating ability:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });

@@ -1,0 +1,13 @@
+{
+  "require": ["lib/test/test_setup.js"],
+  "timeout": 10000,
+  "recursive": true,
+  "reporter": "spec",
+  "colors": true,
+  "exit": true,
+  "spec": "lib/test/**/*.test.js",
+  "ignore": ["lib/test/test_setup.js", "lib/test/mocks/**/*.js"],
+  "env": {
+    "NODE_ENV": "test"
+  }
+}

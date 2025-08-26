@@ -4,6 +4,7 @@ import { requireAdmin } from '../util/auth';
 
 export const itemsPropose = functions.https.onCall(async (data: any, context) => {
   try {
+    requireAdmin(context);
     const { topicIds = [], constraints = [] } = data || {};
     
     if (!topicIds || !Array.isArray(topicIds) || topicIds.length === 0) {
@@ -46,7 +47,7 @@ export const itemsPropose = functions.https.onCall(async (data: any, context) =>
     console.error('Error proposing items:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });

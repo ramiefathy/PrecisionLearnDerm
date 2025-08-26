@@ -1,12 +1,33 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /items/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.role == 'admin';
+    // Question item images - authenticated users can read, admins can write
+    match /items/{itemId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
-    match /user/{uid}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid && false; // off by default
+    
+    // User-specific content - users can manage their own files
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if request.auth != null && 
+        request.auth.uid == userId &&
+        request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+        request.resource.contentType.matches('image/.*'); // Images only
+      allow delete: if request.auth != null && 
+        (request.auth.uid == userId || request.auth.token.admin == true);
+    }
+    
+    // Public assets (logos, etc) - anyone can read, admins can write
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Temporary uploads - authenticated users can write, auto-cleaned
+    match /temp/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

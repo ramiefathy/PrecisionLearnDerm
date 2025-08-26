@@ -117,10 +117,29 @@ async function callGeminiAPI(prompt: string): Promise<string> {
 }
 
 function generateScoringPrompt(questionItem: any, reviewData?: any): string {
+  // Format options for display - handle both array and object formats
+  const formattedOptions = Array.isArray(questionItem.options) 
+    ? questionItem.options.map((opt: any, idx: number) => 
+        `${String.fromCharCode(65 + idx)}) ${opt.text || opt}`
+      ).join('\n')
+    : typeof questionItem.options === 'object' && questionItem.options
+    ? Object.keys(questionItem.options).sort().map(key => 
+        `${key}) ${questionItem.options[key]}`
+      ).join('\n')
+    : 'No options provided';
+
+  const formattedQuestion = {
+    stem: questionItem.stem || '',
+    leadIn: questionItem.leadIn || '',
+    options: formattedOptions,
+    correctAnswer: questionItem.correctAnswer || String.fromCharCode(65 + (questionItem.keyIndex || 0)),
+    explanation: questionItem.explanation || ''
+  };
+
   return `You are Dr. Michael Rodriguez, MD, a senior dermatology board item reviewer and psychometrician with 15 years of experience evaluating board examination questions. Score the question using this 5-criterion rubric (1–5 each; 25 max), then predict difficulty.
 
 QUESTION:
-\n\n${JSON.stringify(questionItem, null, 2)}
+\n\n${JSON.stringify(formattedQuestion, null, 2)}
 
 ${reviewData ? `REVIEW_FEEDBACK:\n\n${JSON.stringify(reviewData, null, 2)}` : ''}
 
@@ -466,6 +485,75 @@ async function processIterativeScoring(originalQuestion: any, entityName: string
 }
 
 export { processIterativeScoring, rewriteQuestionBasedOnFeedback };
+
+// Export internal version for use in orchestrator
+export async function scoreMCQInternal(questionItem: any): Promise<{
+  scores: {
+    clinicalRelevance: number;
+    clarity: number;
+    singleBestAnswer: number;
+    difficulty: number;
+    educationalValue: number;
+  };
+  totalScore: number;
+  feedback: string;
+}> {
+  try {
+    // Normalize options format to handle both array and object formats
+    let normalizedItem = { ...questionItem };
+    
+    // Convert object format {A: "...", B: "..."} to array format
+    if (normalizedItem.options && typeof normalizedItem.options === 'object' && !Array.isArray(normalizedItem.options)) {
+      console.warn('[Scoring] Received object format for MCQ options, converting to array format');
+      
+      const optionsObject = normalizedItem.options as Record<string, string>;
+      normalizedItem.options = Object.keys(optionsObject)
+        .sort() // Ensure A, B, C, D, E order
+        .map(key => ({ 
+          text: optionsObject[key] 
+        }));
+      
+      // Convert correctAnswer letter to keyIndex
+      if (normalizedItem.correctAnswer && typeof normalizedItem.correctAnswer === 'string') {
+        const answerLetter = normalizedItem.correctAnswer.toUpperCase();
+        if (answerLetter.length === 1 && answerLetter >= 'A' && answerLetter <= 'E') {
+          normalizedItem.keyIndex = answerLetter.charCodeAt(0) - 65;
+        }
+      }
+      
+      // Also handle if keyIndex is passed as a letter string
+      if (typeof normalizedItem.keyIndex === 'string') {
+        const keyLetter = normalizedItem.keyIndex.toUpperCase();
+        if (keyLetter.length === 1 && keyLetter >= 'A' && keyLetter <= 'E') {
+          normalizedItem.keyIndex = keyLetter.charCodeAt(0) - 65;
+        }
+      }
+    }
+    
+    const scoringResult = await processScoringInternal(normalizedItem, null, `score_${Date.now()}`, 0);
+    
+    // Map the detailed scoring result to the simplified interface
+    return {
+      scores: {
+        clinicalRelevance: scoringResult.rubric.vignette_quality,
+        clarity: scoringResult.rubric.technical_clarity,
+        singleBestAnswer: scoringResult.rubric.options_quality,
+        difficulty: scoringResult.rubric.cognitive_level,
+        educationalValue: scoringResult.rubric.rationale_explanations
+      },
+      totalScore: scoringResult.totalScore,
+      feedback: [
+        ...scoringResult.rubric.feedback.overall,
+        `Quality Tier: ${scoringResult.qualityTier}`,
+        `Predicted Difficulty: ${scoringResult.difficultyCalibration.predicted_difficulty}`,
+        scoringResult.needsRewrite ? 'Question needs rewriting' : 'Question meets standards'
+      ].join('\n')
+    };
+  } catch (error) {
+    logError('scoreMCQInternal error', { error });
+    throw new Error(`Scoring failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 // Rename original function
 async function processScoringCore(questionItem: any, reviewData: any, draftId: string, iterationCount: number = 0): Promise<ScoringResult> {

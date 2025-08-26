@@ -55,4 +55,43 @@ question_bank_analysis_*.json
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Claude and AI assistance files
+.claude/
+.playwright-mcp/
+
+# Temporary documentation and analysis files
+*_Status Report.md
+befof
+before
+did
+codebase_analysis.md
+
+# Backup files
+backups/
+*.backup
+
+# Test files that are not needed in repo
+test-*.html
+test-*.js
+simple-*.html
+simple-*.js
+*-tester*.html
+debug-*.js
+grant-admin.js
+verify-deployment.sh
+
+# Temporary disabled features
+temp-disabled/
+
+# Knowledge base updating scripts (keep local)
+knowledgeBaseUpdating/
+
+# GraphRAG experimental features
+GraphRAG/
+
+# Duplicate files
+*" 2.json"
+*" 3.json"
+"tsconfig 2.json"

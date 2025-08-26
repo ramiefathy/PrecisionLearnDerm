@@ -1,16 +1,67 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAppStore } from '../app/store';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import AdaptiveNotifications from '../components/AdaptiveNotifications';
 
+interface UserActivity {
+  id: string;
+  type: 'quiz_completion' | 'flashcard_session' | 'mock_exam_attempt' | 'study_session' | 'question_answered';
+  timestamp: Date;
+  data: {
+    title: string;
+    score?: number;
+    totalQuestions?: number;
+    correctAnswers?: number;
+    timeSpent?: number;
+    difficulty?: string;
+    topicIds?: string[];
+  };
+}
+
 export default function DashboardPage() {
-  const profile = useAppStore(s => s.profile);
+  const { profile, user } = useAuth();
   const [suggestion, setSuggestion] = useState<any | null>(null);
+  const [activities, setActivities] = useState<UserActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
   useEffect(() => {
     api.pe.nextItem({}).then(setSuggestion).catch(()=>setSuggestion(null));
+  }, []);
+
+  useEffect(() => {
+    // Fetch user activities
+    const fetchActivities = async () => {
+      try {
+        setActivitiesLoading(true);
+        setActivitiesError(null);
+        const response = await api.activities.get({ limit: 10 }) as any;
+        
+        if (response.success) {
+          // Convert timestamp strings to Date objects and sort by most recent
+          const activitiesWithDates = response.activities.map((activity: any) => ({
+            ...activity,
+            timestamp: new Date(activity.timestamp)
+          })).sort((a: UserActivity, b: UserActivity) => 
+            b.timestamp.getTime() - a.timestamp.getTime()
+          );
+          
+          setActivities(activitiesWithDates);
+        } else {
+          setActivitiesError('Failed to load activities');
+        }
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+        setActivitiesError('Failed to load activities');
+        setActivities([]); // Set empty array as fallback
+      } finally {
+        setActivitiesLoading(false);
+      }
+    };
+
+    fetchActivities();
   }, []);
 
   const greeting = useMemo(() => {
@@ -26,6 +77,33 @@ export default function DashboardPage() {
     const streak = profile?.stats.streak || 0;
     return { quizzes, score, streak };
   }, [profile]);
+
+  interface QuickAction {
+    title: string;
+    desc: string;
+    href: string;
+    gradient: string;
+    icon: string;
+  }
+
+  // Check if user is admin - check multiple conditions
+  const isAdmin = useMemo(() => {
+    return profile?.isAdmin || 
+           profile?.role === 'admin' || 
+           user?.email === 'ramiefathy@gmail.com';
+  }, [profile, user]);
+
+  const quickActions: QuickAction[] = useMemo(() => {
+    const baseActions: QuickAction[] = [
+      { title: 'Start Quiz', desc: 'Adaptive learning', href: '/quiz/topics', gradient: 'from-blue-500 to-indigo-500', icon: '🧠' },
+      { title: 'Flashcards', desc: 'Spaced repetition', href: '/flashcards', gradient: 'from-teal-500 to-cyan-500', icon: '💡' },
+      { title: 'Mock Exam', desc: 'Test readiness', href: '/mock-exam', gradient: 'from-slate-500 to-gray-600', icon: '📝' },
+      { title: 'Patient Sim', desc: 'Real scenarios', href: '/patient-sim', gradient: 'from-indigo-500 to-purple-500', icon: '👥' },
+    ];
+    
+    // Admin Panel removed from Quick Actions as requested
+    return baseActions;
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -43,6 +121,14 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {isAdmin && (
+                <Link 
+                  to="/admin/setup"
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md font-medium text-sm"
+                >
+                  Admin Panel
+                </Link>
+              )}
               <motion.div 
                 whileHover={{ scale: 1.05 }}
                 className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 text-sm font-medium"
@@ -66,12 +152,7 @@ export default function DashboardPage() {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { title: 'Start Quiz', desc: 'Adaptive learning', href: '/quiz/topics', gradient: 'from-blue-500 to-indigo-500', icon: '🧠' },
-              { title: 'Flashcards', desc: 'Spaced repetition', href: '/flashcards', gradient: 'from-teal-500 to-cyan-500', icon: '💡' },
-              { title: 'Mock Exam', desc: 'Test readiness', href: '/mock-exam', gradient: 'from-slate-500 to-gray-600', icon: '📝' },
-              { title: 'Patient Sim', desc: 'Real scenarios', href: '/patient-sim', gradient: 'from-indigo-500 to-purple-500', icon: '👥' },
-            ].map((action, i) => (
+            {quickActions.map((action, i) => (
               <motion.div
                 key={action.title}
                 initial={{ y: 20, opacity: 0 }}
@@ -183,20 +264,62 @@ export default function DashboardPage() {
             <div className="bg-white/80 backdrop-blur rounded-2xl p-6 shadow-lg border border-gray-100">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h3>
               <div className="space-y-3">
-                {[
-                  { activity: 'Completed Psoriasis Quiz', time: '2 hours ago', score: '85%' },
-                  { activity: 'Reviewed Flashcards', time: 'Yesterday', score: '12 cards' },
-                  { activity: 'Mock Exam Attempt', time: '3 days ago', score: '78%' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                    <div>
-                      <p className="font-medium text-gray-900 text-sm">{item.activity}</p>
-                      <p className="text-xs text-gray-500">{item.time}</p>
+                {activitiesLoading ? (
+                  // Loading state
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                        <div className="h-4 bg-gray-200 rounded w-12"></div>
+                      </div>
                     </div>
-                    <span className="text-sm font-semibold text-blue-600">{item.score}</span>
+                  ))
+                ) : activitiesError ? (
+                  // Error state
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">{activitiesError}</p>
+                    <button 
+                      onClick={() => window.location.reload()} 
+                      className="mt-2 text-blue-600 text-sm hover:underline"
+                    >
+                      Try again
+                    </button>
                   </div>
-                ))}
+                ) : activities.length === 0 ? (
+                  // Empty state
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-3xl mb-2">📚</div>
+                    <p className="text-sm mb-2">No activities yet</p>
+                    <p className="text-xs text-gray-400">Complete a quiz or review flashcards to see your activity here</p>
+                  </div>
+                ) : (
+                  // Real activities
+                  activities.slice(0, 3).map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{activity.data.title}</p>
+                        <p className="text-xs text-gray-500">{formatRelativeTime(activity.timestamp)}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-blue-600">
+                        {formatActivityScore(activity)}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
+              {activities.length > 3 && (
+                <div className="mt-4 text-center">
+                  <Link 
+                    to="/profile" 
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    View all activities →
+                  </Link>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -219,6 +342,56 @@ export default function DashboardPage() {
       </div>
     </main>
   );
+}
+
+// Utility function to format relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffInMilliseconds = now.getTime() - date.getTime();
+  const diffInMinutes = Math.floor(diffInMilliseconds / (1000 * 60));
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+
+  if (diffInMinutes < 1) {
+    return 'Just now';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+  } else if (diffInDays === 1) {
+    return 'Yesterday';
+  } else if (diffInDays < 7) {
+    return `${diffInDays} days ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+}
+
+// Utility function to format activity score display
+function formatActivityScore(activity: UserActivity): string {
+  switch (activity.type) {
+    case 'quiz_completion':
+      if (activity.data.score !== undefined) {
+        return `${Math.round(activity.data.score * 100)}%`;
+      }
+      return `${activity.data.correctAnswers || 0}/${activity.data.totalQuestions || 0}`;
+    
+    case 'flashcard_session':
+      return `${activity.data.totalQuestions || 0} cards`;
+    
+    case 'mock_exam_attempt':
+      if (activity.data.score !== undefined) {
+        return `${Math.round(activity.data.score * 100)}%`;
+      }
+      return `${activity.data.correctAnswers || 0}/${activity.data.totalQuestions || 0}`;
+    
+    case 'study_session':
+      const timeInMin = Math.round((activity.data.timeSpent || 0) / 60);
+      return `${timeInMin} min`;
+    
+    default:
+      return '';
+  }
 }
 
 function StatsCard({ title, value, subtitle, gradient, icon }: {

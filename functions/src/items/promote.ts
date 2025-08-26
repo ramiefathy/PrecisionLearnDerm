@@ -1,12 +1,26 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { requireAdmin } from '../util/auth';
+import { CallableContext, QuestionItem } from '../types';
 
-export const itemsPromote = functions.https.onCall(async (data: any, context: any) => {
+interface PromoteItemRequest {
+  draftId: string;
+}
+
+interface PromoteItemResponse {
+  success: boolean;
+  message?: string;
+  itemId?: string;
+  error?: string;
+}
+
+export const itemsPromote = functions.https.onCall(async (data: PromoteItemRequest, context: CallableContext): Promise<PromoteItemResponse> => {
   try {
+    requireAdmin(context);
     const { draftId } = data || {};
     
     if (!draftId) {
-      throw new Error('Missing required parameter: draftId');
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required parameter: draftId');
     }
     
     const db = admin.firestore();
@@ -15,17 +29,20 @@ export const itemsPromote = functions.https.onCall(async (data: any, context: an
     
     const draftDoc = await draftRef.get();
     if (!draftDoc.exists) {
-      throw new Error('Draft not found');
+      throw new functions.https.HttpsError('not-found', 'Draft not found');
     }
     
-    const draftData = draftDoc.data();
+    const draftData = draftDoc.data() as QuestionItem;
     
     // Create new item from draft
     const newItemRef = await itemRef.add({
       ...draftData,
-      status: 'active',
-      promotedAt: admin.firestore.FieldValue.serverTimestamp(),
-      promotedBy: context?.auth?.uid || 'admin'
+      status: 'approved',
+      metadata: {
+        ...draftData.metadata,
+        promotedAt: admin.firestore.FieldValue.serverTimestamp(),
+        promotedBy: context?.auth?.uid || 'admin'
+      }
     });
     
     // Delete the draft
@@ -37,11 +54,14 @@ export const itemsPromote = functions.https.onCall(async (data: any, context: an
       itemId: newItemRef.id
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error promoting draft:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });

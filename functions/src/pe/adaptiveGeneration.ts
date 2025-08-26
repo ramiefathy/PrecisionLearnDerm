@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { requireAuth } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
+import { withCORS } from '../util/corsConfig';
 import * as https from 'https';
 import { URL } from 'url';
 import * as fs from 'fs';
@@ -10,19 +11,46 @@ import * as path from 'path';
 const db = admin.firestore();
 
 // Gemini AI configuration
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.0-flash-exp';
+import { config } from '../util/config';
+const GEMINI_MODEL = config.gemini.model;
 
 // Load knowledge base
 let adaptiveKnowledgeBase: Record<string, any> = {};
 
 try {
-  const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  adaptiveKnowledgeBase = JSON.parse(kbData);
-  console.log(`Adaptive generation loaded ${Object.keys(adaptiveKnowledgeBase).length} KB entries`);
+  // Try multiple path resolutions for different runtime environments
+  const possiblePaths = [
+    path.join(__dirname, '../kb/knowledgeBase.json'), // Development/TypeScript
+    path.join(__dirname, 'kb/knowledgeBase.json'),    // Production compiled
+    path.join(process.cwd(), 'lib/kb/knowledgeBase.json') // Runtime fallback
+  ];
+  
+  let loadSuccess = false;
+  for (const kbPath of possiblePaths) {
+    try {
+      const kbData = fs.readFileSync(kbPath, 'utf8');
+      adaptiveKnowledgeBase = JSON.parse(kbData);
+      console.log(`Adaptive generation loaded ${Object.keys(adaptiveKnowledgeBase).length} KB entries from ${kbPath}`);
+      loadSuccess = true;
+      break;
+    } catch (pathError) {
+      // Continue to next path
+      continue;
+    }
+  }
+  
+  if (!loadSuccess) {
+    throw new Error('KB file not found in any expected location');
+  }
 } catch (error) {
   console.error('Failed to load KB for adaptive generation:', error);
+  // Log attempted paths for debugging
+  const possiblePaths = [
+    path.join(__dirname, '../kb/knowledgeBase.json'),
+    path.join(__dirname, 'kb/knowledgeBase.json'),
+    path.join(process.cwd(), 'lib/kb/knowledgeBase.json')
+  ];
+  console.error('Attempted paths:', possiblePaths);
 }
 
 interface MissedQuestion {
@@ -62,11 +90,9 @@ interface PersonalizedQuestionRequest {
 }
 
 async function callGeminiAPI(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const apiKey = config.gemini.getApiKey();
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
   
   const requestBody = {
     contents: [{
@@ -139,7 +165,7 @@ async function callGeminiAPI(prompt: string): Promise<string> {
     });
 
     req.on('error', (error) => {
-      reject(new Error(`Request failed: ${error.message}`));
+      reject(new Error(`Request failed: ${error instanceof Error ? error.message : String(error)}`));
     });
 
     req.write(JSON.stringify(requestBody));
@@ -385,9 +411,9 @@ async function generatePersonalizedQuestion(request: PersonalizedQuestionRequest
     logError('adaptive.generation_failed', {
       userId: request.userId,
       targetTopic: request.targetTopic,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     });
-    throw new Error(`Failed to generate personalized question: ${error.message}`);
+    throw new Error(`Failed to generate personalized question: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -474,61 +500,65 @@ export const triggerAdaptiveGeneration = functions.https.onCall(async (data: any
     console.error('Error triggering adaptive generation:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 });
 
 // Function to get personalized questions for inclusion in next quiz
-export const getPersonalizedQuestions = functions.https.onCall(async (data: any, context: any) => {
-  try {
-    const { limit = 2 } = data || {};
-    
-    const db = admin.firestore();
-    const userId = context?.auth?.uid;
-    
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Get user's personal questions
-    const personalBankRef = db.collection('userPersonalQuestions').doc(userId);
-    const personalBankDoc = await personalBankRef.get();
-    
-    if (!personalBankDoc.exists) {
-      return {
+export const getPersonalizedQuestions = functions.https.onRequest(
+  withCORS('STRICT', async (req, res) => {
+    try {
+      const data = req.body?.data || req.body || {};
+      const { limit = 2 } = data;
+      
+      // HTTP authentication for HTTPS function
+      const { verifyAuth } = await import('../util/middleware');
+      const userId = await verifyAuth(req);
+      
+      const db = admin.firestore();
+      
+      // Get user's personal questions
+      const personalBankRef = db.collection('userPersonalQuestions').doc(userId);
+      const personalBankDoc = await personalBankRef.get();
+      
+      if (!personalBankDoc.exists) {
+        res.status(200).json({
+          success: true,
+          questions: [],
+          count: 0
+        });
+        return;
+      }
+      
+      const personalBank = personalBankDoc.data();
+      if (!personalBank) {
+        res.status(200).json({
+          success: true,
+          questions: [],
+          count: 0
+        });
+        return;
+      }
+      
+      const questions = personalBank.questions || [];
+      
+      // Return limited number of questions
+      const limitedQuestions = questions.slice(0, limit);
+      
+      res.status(200).json({
         success: true,
-        questions: [],
-        count: 0
-      };
+        questions: limitedQuestions,
+        count: limitedQuestions.length,
+        totalAvailable: questions.length
+      });
+      
+    } catch (error: any) {
+      console.error('Error getting personal questions:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
-    
-    const personalBank = personalBankDoc.data();
-    if (!personalBank) {
-      return {
-        success: true,
-        questions: [],
-        count: 0
-      };
-    }
-    
-    const questions = personalBank.questions || [];
-    
-    // Return limited number of questions
-    const limitedQuestions = questions.slice(0, limit);
-    
-    return {
-      success: true,
-      questions: limitedQuestions,
-      count: limitedQuestions.length,
-      totalAvailable: questions.length
-    };
-    
-  } catch (error: any) {
-    console.error('Error getting personal questions:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}); 
+  })
+); 

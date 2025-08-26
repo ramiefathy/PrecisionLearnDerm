@@ -8,23 +8,32 @@ import * as path from 'path';
 
 const db = admin.firestore();
 
-// Load knowledge base on startup for tutor
-let tutorKnowledgeBase: Record<string, any> = {};
-let tutorHighQualityEntries: Array<{ key: string; entity: any }> = [];
+// Lazy-loaded knowledge base for tutoring
+let tutorKnowledgeBase: Record<string, any> | null = null;
+let tutorHighQualityEntries: Array<{ key: string; entity: any }> | null = null;
 
-try {
-  const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  tutorKnowledgeBase = JSON.parse(kbData);
+// Initialize KB on first use, not at module level
+function ensureTutorKBLoaded() {
+  if (tutorKnowledgeBase !== null) return;
   
-  // Filter entities with completeness score > 65
-  tutorHighQualityEntries = Object.entries(tutorKnowledgeBase)
-    .filter(([key, entity]) => entity.completeness_score > 65)
-    .map(([key, entity]) => ({ key, entity }));
+  try {
+    const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
+    const kbData = fs.readFileSync(kbPath, 'utf8');
+    tutorKnowledgeBase = JSON.parse(kbData);
     
-  console.log(`Tutor loaded ${tutorHighQualityEntries.length} high-quality KB entries`);
-} catch (error) {
-  console.error('Failed to load KB for tutor:', error);
+    // Filter entities with completeness score > 65
+    tutorHighQualityEntries = Object.entries(tutorKnowledgeBase || {})
+      .filter(([key, entity]) => entity.completeness_score > 65)
+      .map(([key, entity]) => ({ key, entity }));
+      
+    logInfo('tutor.kb_loaded', { 
+      entries: tutorHighQualityEntries.length 
+    });
+  } catch (error) {
+    logError('tutor.kb_load_failed', { error });
+    tutorKnowledgeBase = {};
+    tutorHighQualityEntries = [];
+  }
 }
 
 // Domain validation for dermatology/STI topics
@@ -126,7 +135,9 @@ function calculateRelevance(query: string, entity: any, entityName: string): num
 }
 
 function searchKnowledgeBase(query: string) {
-  if (tutorHighQualityEntries.length === 0) {
+  ensureTutorKBLoaded();
+  
+  if (!tutorHighQualityEntries || tutorHighQualityEntries.length === 0) {
     return { results: [], totalFound: 0 };
   }
   
@@ -168,8 +179,14 @@ function searchKnowledgeBase(query: string) {
   };
 }
 
-export const tutorQuery = functions.https.onCall(async (data: any, context) => {
+export const tutorQuery = functions
+  .runWith({
+    timeoutSeconds: 180, // 3 minutes for tutoring
+    memory: '1GB'
+  })
+  .https.onCall(async (data: any, context) => {
   try {
+    requireAuth(context);
     const { itemId, topicIds, userQuery } = data || {};
     
     if (!userQuery || typeof userQuery !== 'string') {
@@ -218,7 +235,7 @@ export const tutorQuery = functions.https.onCall(async (data: any, context) => {
     console.error('Error in tutor query:', error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       response: 'I apologize, but I encountered an error processing your query. Please try again or rephrase your question.'
     };
   }

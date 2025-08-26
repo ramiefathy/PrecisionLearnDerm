@@ -4,6 +4,7 @@ import { ProtectedRoute, AdminRoute } from './app/routes'; // Assumed to exist a
 import { AnimatePresence, motion } from 'framer-motion';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ToastContainer } from './components/Toast';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // --- LAZY-LOADED PAGE COMPONENTS (No changes here) ---
 const LandingPage = lazy(() => import('./pages/LandingPage.tsx'));
@@ -20,11 +21,12 @@ const PerformancePage = lazy(() => import('./pages/PerformancePage.tsx'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.tsx'));
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage.tsx'));
 const AdminItemsPage = lazy(() => import('./pages/AdminItemsPage.tsx'));
-const AdminItemEditorPage = lazy(() => import('./pages/AdminItemEditorPage.tsx'));
-const AdminQuestionReviewPage = lazy(() => import('./pages/AdminQuestionReviewPage.tsx'));
+const AdminQuestionReviewPage = lazy(() => import('./pages/AdminQuestionReviewPage'));
+const AdminQuestionGenerationPage = lazy(() => import('./pages/AdminQuestionGenerationPage'));
+const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage'));
 const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
-const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
+const AdminLogsPage = lazy(() => import('./pages/AdminLogsPage.tsx'));
 
 // --- UI COMPONENTS (Loading, Error) ---
 
@@ -93,6 +95,18 @@ function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetError
   );
 }
 
+// --- NEW: CatchAllRoute handles undefined paths based on auth state ---
+function CatchAllRoute() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingFallback />;
+  }
+
+  // If user is authenticated, redirect to dashboard, otherwise to landing page
+  return <Navigate to={user ? "/app" : "/"} replace />;
+}
+
 // --- NEW: A layout component to apply page transitions consistently ---
 function PageLayout() {
   return (
@@ -109,8 +123,8 @@ function PageLayout() {
   );
 }
 
-// --- MAIN APP COMPONENT ---
-export default function App() {
+// --- APP ROUTES COMPONENT ---
+function AppRoutes() {
   const location = useLocation();
   
   return (
@@ -147,17 +161,19 @@ export default function App() {
                 <Route element={<PageLayout />}>
                   <Route path="/admin/setup" element={<AdminSetupPage />} />
                   <Route path="/admin/items" element={<AdminItemsPage />} />
-                  <Route path="/admin/items/:itemId" element={<AdminItemEditorPage />} />
-                  <Route path="/admin/questions" element={<AdminQuestionReviewPage />} />
+                  <Route path="/admin/review" element={<AdminQuestionReviewPage />} />
+                  <Route path="/admin/generate" element={<AdminQuestionGenerationPage />} />
                   <Route path="/admin/testing" element={<AdminTestingPage />} />
                   <Route path="/admin/question-bank" element={<AdminQuestionBankPage />} />
                   <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
+                  <Route path="/admin/logs" element={<AdminLogsPage />} />
+                  <Route path="/admin" element={<Navigate to="/admin/setup" replace />} />
                 </Route>
               </Route>
             </Route>
             
-            {/* Fallback route for any undefined paths */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Fallback route for any undefined paths - redirect to app if logged in, otherwise to landing */}
+            <Route path="*" element={<CatchAllRoute />} />
           </Routes>
         </AnimatePresence>
       </Suspense>
@@ -165,5 +181,14 @@ export default function App() {
       {/* Global Toast Container */}
       <ToastContainer />
     </ErrorBoundary>
+  );
+}
+
+// --- MAIN APP COMPONENT ---
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }

@@ -1,210 +1,235 @@
-# PrecisionLearnDerm 🎓
+# PrecisionLearnDerm 🧠🩺
 
-**AI-Powered Dermatology Board Exam Preparation Platform**
+> AI-powered dermatology board exam preparation platform with advanced taxonomy-based question generation
 
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-success)](https://github.com)
-[![AI Model](https://img.shields.io/badge/AI-Gemini%202.5%20Pro-blue)](https://ai.google.dev/)
-[![Firebase](https://img.shields.io/badge/Backend-Firebase-orange)](https://firebase.google.com)
-[![React](https://img.shields.io/badge/Frontend-React%2019-61dafb)](https://react.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat&logo=firebase&logoColor=black)](https://firebase.google.com/)
+[![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://typescriptlang.org/)
+[![Gemini](https://img.shields.io/badge/Gemini-4285F4?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
 
-## 🚀 Overview
+## 🌟 Overview
 
-PrecisionLearnDerm is a sophisticated, AI-powered medical education platform designed specifically for dermatology board exam preparation. The system leverages **Google's Gemini 2.5 Pro** - Google's most intelligent AI model - to generate, review, and optimize high-quality medical questions that meet American Board of Dermatology (ABD) standards.
+PrecisionLearnDerm is a sophisticated AI-powered platform designed to help medical professionals prepare for dermatology board examinations. The platform leverages multi-agent AI systems, advanced taxonomy organization, and personalized learning algorithms to deliver high-quality, contextually relevant practice questions.
 
-## ✨ Key Features
+### ✨ Key Features
 
-### **AI-Powered Question Generation**
-- **Powered by Gemini 2.5 Pro**: Google's most advanced AI model for superior medical content generation
-- **Multi-Agent Pipeline**: Three specialized AI agents (Drafting, Review, Scoring) ensure exceptional question quality
-- **Medical Knowledge Base**: 4,299 dermatology entities with 1,692 high-quality entries
-- **ABD Compliance**: Questions formatted to match board exam standards
-
-### **Personalization Engine**
-- **Adaptive Learning**: Spaced repetition system (SRS) for optimal retention
-- **Performance Tracking**: Detailed analytics and progress monitoring
-- **Difficulty Calibration**: Questions matched to individual skill levels
-- **Weakness Targeting**: Focus on areas needing improvement
-
-### **Clinical Excellence**
-- **Realistic Vignettes**: Patient scenarios that mirror real clinical situations
-- **Evidence-Based Content**: Questions backed by medical literature
-- **Expert Review System**: Quality assurance through medical validation
-- **Comprehensive Explanations**: Detailed rationales for all answers
+- **🤖 Multi-Agent AI Pipeline**: Powered by Gemini 2.5 Pro with specialized agents for drafting, review, and scoring
+- **📚 Taxonomy-Based Organization**: Hierarchical categorization of 4,299+ dermatology entities
+- **⚡ Personalized Learning**: Adaptive question selection based on user performance and preferences  
+- **🏥 Board-Style Questions**: Clinically accurate questions following ABD guidelines
+- **🎯 Real-time Performance Tracking**: SRS-based spaced repetition system
+- **👨‍⚕️ Admin Dashboard**: Comprehensive management tools for educators and administrators
 
 ## 🏗️ Architecture
 
-### **Technology Stack**
-- **Frontend**: React 19, TypeScript, Tailwind CSS, Zustand
-- **Backend**: Firebase Cloud Functions (Node.js 20)
-- **Database**: Cloud Firestore
-- **AI Models**: Gemini 2.5 Pro (All AI agents)
-- **Authentication**: Firebase Auth with role-based access
-- **Hosting**: Firebase Hosting
+### Frontend
+- **React 19** with TypeScript for modern, type-safe development
+- **Firebase Hosting** for reliable, global content delivery
+- **Responsive Design** optimized for desktop and mobile learning
 
-### **AI Agent Pipeline**
+### Backend  
+- **52+ Firebase Cloud Functions** providing scalable, serverless API endpoints
+- **Cloud Firestore** for real-time data synchronization
+- **Multi-tier caching** (L1: Memory, L2: Firestore) for optimal performance
 
-```mermaid
-graph LR
-    A[Knowledge Base] --> B[Drafting Agent<br/>Gemini 2.5 Pro]
-    B --> C[Review Agent<br/>Gemini 2.5 Pro]
-    C --> D[Scoring Agent<br/>Gemini 2.5 Pro]
-    D --> E[Quality Check]
-    E -->|Score < 20| B
-    E -->|Score ≥ 20| F[Question Bank]
-```
+### AI System
+- **Gemini 2.5 Pro** as the primary language model
+- **Structured text parsing** to eliminate JSON truncation issues
+- **Robust client** with retry logic and fallback to Gemini 2.5 Flash
+- **Parallel processing** for research and question generation
 
-## 📊 System Status
-
-- **✅ 52 Cloud Functions Deployed**
-- **✅ AI Pipeline Operational** (Gemini 2.5 Pro)
-- **✅ Knowledge Base Loaded** (4,299 entities)
-- **✅ Frontend Deployed**
-- **✅ Authentication System Active**
-- **✅ Admin Dashboard Functional**
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 20+
 - Firebase CLI
-- Google Cloud Project with Gemini API access
+- Git
 
 ### Installation
 
-1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/PrecisionLearnDerm.git
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/PrecisionLearnDerm.git
 cd PrecisionLearnDerm
+
+# Install dependencies
+cd functions && npm install
+cd ../web && npm install
+
+# Set up environment variables
+cp web/.env.sample web/.env.local
+# Add your Firebase config and API keys
+
+# Start local development
+cd web && npm run dev
 ```
 
-2. **Install dependencies**
+### Firebase Setup
+
 ```bash
-# Install root dependencies
-npm install
+# Install Firebase CLI if needed
+npm install -g firebase-tools
 
-# Install functions dependencies
-cd functions
-npm install
+# Login to Firebase
+firebase login
 
-# Install web dependencies
-cd ../web
-npm install
+# Initialize Firebase project
+firebase use YOUR_PROJECT_ID
+
+# Deploy functions
+cd functions && npm run build && firebase deploy --only functions
+
+# Deploy frontend
+cd ../web && npm run build && firebase deploy --only hosting
 ```
 
-3. **Configure environment**
-```bash
-# Create .env file in functions directory
-cd ../functions
-echo "GEMINI_API_KEY=your-gemini-api-key" > .env
-```
+## 🎮 Usage
 
-4. **Deploy to Firebase**
-```bash
-# From root directory
-firebase deploy
-```
+### For Students
+1. **Sign Up**: Create an account and complete the onboarding process
+2. **Configure Quiz**: Choose topics via traditional selection or advanced taxonomy browsing
+3. **Take Practice Exams**: Answer board-style questions with detailed explanations
+4. **Track Progress**: Monitor performance with analytics and spaced repetition scheduling
 
-### Local Development
+### For Administrators  
+1. **Access Admin Panel**: Navigate to `/admin` with administrative privileges
+2. **Generate Questions**: Use AI pipeline to create new questions with taxonomy targeting
+3. **Review Quality**: Manage question queue and approve generated content
+4. **Monitor System**: View performance metrics and system health
 
-1. **Start Firebase emulators**
-```bash
-firebase emulators:start
-```
+## 🔧 Development
 
-2. **Run frontend development server**
-```bash
-cd web
-npm run dev
-```
-
-3. **Test AI Pipeline**
-```bash
-# Open the local testing UI
-open ai-pipeline-tester-local.html
-```
-
-## 🧪 AI Pipeline Testing
-
-The AI pipeline can be tested using the included testing interfaces:
-
-- **`ai-pipeline-tester-local.html`** - Local emulator testing
-- **`simple-ai-tester.html`** - Simplified testing interface
-- **`cloud-function-seeder.html`** - Database seeding tool
-
-All AI agents are powered by **Gemini 2.5 Pro** for optimal performance.
-
-## 📁 Project Structure
+### Project Structure
 
 ```
 PrecisionLearnDerm/
-├── functions/          # Firebase Cloud Functions
+├── functions/                 # Firebase Cloud Functions
 │   ├── src/
-│   │   ├── ai/        # AI agents (Gemini 2.5 Pro)
-│   │   ├── admin/     # Admin functions
-│   │   ├── items/     # Question management
-│   │   ├── kb/        # Knowledge base
-│   │   └── pe/        # Personalization engine
-├── web/               # React frontend
+│   │   ├── ai/               # AI pipeline and orchestration
+│   │   ├── admin/            # Administrative functions
+│   │   ├── pe/               # Personalization engine
+│   │   ├── services/         # Core services (taxonomy, etc.)
+│   │   └── util/             # Utilities and helpers
+│   └── package.json
+├── web/                      # React frontend
 │   ├── src/
-│   │   ├── pages/     # Application pages
-│   │   ├── components/# Reusable components
-│   │   └── lib/       # Utilities and hooks
-├── shared/            # Shared types
-└── knowledge/         # Medical knowledge data
+│   │   ├── components/       # Reusable UI components
+│   │   ├── pages/           # Application pages
+│   │   ├── contexts/        # React contexts
+│   │   └── hooks/           # Custom React hooks
+│   └── package.json
+├── docs/                     # Documentation
+├── CLAUDE.md                 # Development guide
+└── README.md
 ```
 
-## 🔑 Key Components
+### Key Commands
 
-### AI Agents (Powered by Gemini 2.5 Pro)
-- **Drafting Agent**: Generates initial questions from knowledge base
-- **Review Agent**: Validates medical accuracy and improves quality
-- **Scoring Agent**: Evaluates questions against ABD standards
+```bash
+# Backend development
+cd functions
+npm run build         # Compile TypeScript
+npm run test:unit     # Run unit tests
+firebase emulators:start  # Start local emulators
 
-### Personalization Engine
-- **Adaptive Generation**: Creates personalized question sets
-- **SRS Algorithm**: Optimizes review scheduling
-- **Performance Analytics**: Tracks learning progress
+# Frontend development  
+cd web
+npm run dev          # Start development server
+npm run build        # Production build
+npm run test         # Run tests
 
-### Admin Dashboard
-- **Question Management**: Review and approve AI-generated questions
-- **Quality Control**: Monitor question performance metrics
-- **User Analytics**: Track platform usage and outcomes
+# Deployment
+firebase deploy --only functions    # Deploy backend
+firebase deploy --only hosting      # Deploy frontend
+```
 
-## 📈 Performance Metrics
+## 🧪 Testing
 
-- **Question Generation**: ~6 seconds per question
-- **Quality Score Target**: ≥20/25 for approval
-- **Knowledge Base**: 1,692 high-quality entities
-- **AI Model**: Gemini 2.5 Pro (Google's most intelligent model)
+The platform includes comprehensive testing infrastructure:
+
+- **Unit Tests**: Individual component and function testing
+- **Integration Tests**: Cross-service interaction testing
+- **End-to-End Tests**: Complete user journey validation
+- **Performance Tests**: Load and stress testing
+- **Admin Interface**: Manual testing tools at `/admin/testing`
+
+```bash
+# Run all tests
+npm run test
+
+# Run specific test suites
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+```
 
 ## 🔐 Security
 
-- **Authentication**: Firebase Auth with custom claims
-- **Authorization**: Role-based access control (Student/Admin)
-- **Data Protection**: Firestore security rules
-- **API Security**: Cloud Function authentication
+- **Firebase Authentication** with role-based access control
+- **Input sanitization** and validation on all endpoints
+- **Rate limiting** to prevent abuse
+- **Secure API key management** with environment variables
+- **Private repository** for sensitive medical content
 
-## 📝 Documentation
+## 📈 Performance
 
-- [Product Architecture](./product_architecture.md)
-- [System Analysis](./COMPREHENSIVE_SYSTEM_ANALYSIS.md)
-- [Project Plan](./project_plan.md)
-- [Change Logs](./change_logs.md)
+Current performance metrics:
+- **Question Generation**: 24.15s average (87% improvement from baseline)
+- **Multi-Agent Pipeline**: 60-70s typical response time
+- **Cache Hit Rate**: Two-tier caching with L1/L2 optimization
+- **Success Rate**: 66% in production (continuously improving)
 
 ## 🤝 Contributing
 
-This is a proprietary medical education platform. For contribution guidelines, please contact the development team.
+This is a private repository for medical education purposes. If you have access and would like to contribute:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
+3. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
+4. **Push** to the branch (`git push origin feature/AmazingFeature`)
+5. **Open** a Pull Request
+
+## 📋 Roadmap
+
+### Phase 1: Core Platform ✅
+- [x] Multi-agent question generation
+- [x] Taxonomy-based organization  
+- [x] User authentication and roles
+- [x] Basic quiz functionality
+
+### Phase 2: Advanced Features ✅
+- [x] Performance optimization
+- [x] Enhanced caching system
+- [x] Admin dashboard
+- [x] Deployment automation
+
+### Phase 3: Intelligence & Analytics 🚧
+- [ ] Advanced personalization algorithms
+- [ ] Predictive performance modeling
+- [ ] Enhanced question analytics
+- [ ] Mobile application
+
+## 🆘 Support
+
+For technical issues or questions:
+
+1. **Check** the [CLAUDE.md](./CLAUDE.md) development guide
+2. **Review** existing GitHub issues
+3. **Contact** the development team for private repository access
 
 ## 📄 License
 
-Proprietary - All Rights Reserved
+This project is proprietary software for medical education. All rights reserved.
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini 2.5 Pro** - Powering our AI agents
-- **Firebase** - Backend infrastructure
-- **American Board of Dermatology** - Guidelines and standards
+- **Medical Experts** who provided domain knowledge and validation
+- **Firebase Team** for the robust infrastructure platform
+- **Google AI** for the Gemini language models
+- **Open Source Community** for the foundational tools and libraries
 
 ---
 
-**Built with ❤️ for medical education excellence** 
+**Built with ❤️ for medical education**
+
+*Last updated: August 2025*

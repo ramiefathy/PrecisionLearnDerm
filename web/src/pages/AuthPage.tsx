@@ -3,19 +3,20 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { auth } from '../lib/firebase';
-import { useAppStore } from '../app/store';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
+import { handleError } from '../lib/errorHandler';
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { authUser } = useAppStore();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
-  if (authUser) {
+  if (user) {
     return <Navigate to="/app" replace />;
   }
 
@@ -40,7 +41,11 @@ export default function AuthPage() {
         }, 500);
       }
     } catch (error: any) {
-      toast.error('Authentication Failed', error.message);
+      handleError(error, {
+        title: 'Authentication Failed',
+        message: 'Please check your credentials and try again',
+        context: 'Auth',
+      });
       setLoading(false);
     }
     // Don't set loading to false on success - let the navigation handle it
@@ -193,13 +198,6 @@ export default function AuthPage() {
             )}
           </div>
 
-          {/* Demo credentials hint */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Demo Access</h4>
-            <p className="text-sm text-blue-700">
-              Use <code className="bg-blue-100 px-1 rounded">ramiefathy@gmail.com</code> for admin access
-            </p>
-          </div>
         </motion.div>
       </div>
     </div>

@@ -1,0 +1,132 @@
+PrecisionLearnDerm – Always-On Engineering Rules & Docs
+Mindset
+Never assume existing code, structure, or configuration is correct. Always verify against the most recent upstream documentation (linked below).
+
+All code, PRs, and agent responses must treat UI, auth, state, and infra as if misconfig or subtle errors may exist.
+
+Do not shortcut any of the guidance below—even “standard” or “generated” code may not meet best practices.
+
+1. Official Documentation Reference (Required Reading & Cross-check, use Context7 tool to review latest documentation for each of these)
+React 19 (Main Docs)
+TypeScript Handbook
+Tailwind CSS Docs
+Vite.js Docs
+Zustand State (Official)
+Vitest Testing Docs
+Framer Motion Docs
+Firebase Docs (Web)
+Auth
+Firestore
+Cloud Functions
+Security Rules
+App Check
+Hosting
+
+ABD Standards
+
+2. Universal Principles
+Never blindly trust the current implementation; always align with the latest docs, and test assumptions against canonical examples.
+
+If the rule below conflicts with new official best practices, prompt a discussion and propose the new approach—with citation to docs.
+
+3. Best Practice Rules (Stack-wide, Error-Preventing)
+Design/UI
+
+Mobile-first—Designs must originate from mobile, then scale with Tailwind responsive classes. All screens/components must visually match the provided example UI images.
+
+Consistency—Derive all colors, typography, and radii from tailwind.config.js tokens. Never introduce magic numbers or custom inline styles.
+
+A11y—Validate every page/component with axe, Lighthouse, and WCAG tools for color contrast, tab-index order, ARIA, and label coverage.
+
+React/TypeScript
+
+.tsx only for components—never mix with .js/.jsx. Always use named exports; avoid default exports except for page entrypoints.
+
+Components must: explicitly type all props/returns, validate children, and avoid mutable shared state.
+
+Never use any, @ts-ignore, or suppress type errors—fix at root or annotate with rationale and reference to relevant TypeScript docs.
+
+Optimize for code splitting and tree-shaking. Import only what is used.
+
+Vite
+
+Ensure Vite config uses aliases for all root-level imports—no relative hell.
+
+Always check and enforce plugin compatibility with TypeScript/React version.
+
+Use Vite env variables for all build-time values; never leak secrets.
+
+Zustand (State)
+
+Each store must be atomic to a single domain. Avoid monolithic stores.
+
+State selectors in Zustand should be minimized using shallow comparison, to avoid wasteful re-renders.
+
+Document state and actions in each store using TSDoc.
+
+Vitest (Testing)
+
+All logic, UI, and utility code must have Vitest tests as first-class citizens. Include coverage thresholds in CI.
+
+Prioritize tests for:
+
+Data validation
+
+Auth flows (protected vs. public)
+
+Regression/e2e critical paths
+
+Async state transitions
+
+Use Vitest mocking and setup docs.
+
+Framer Motion (Anim/FX)
+
+Use only for microinteractions, page transitions, or feedback—never for large, persistent animation.
+
+All animations must respect OS-level prefers-reduced-motion.
+
+Firebase
+
+All rules (Firestore/Storage) must be programmatically tested using the emulator before merge (see rules testing).
+
+Use App Check for all function/database endpoints in production.
+
+Never expose server-side keys (GEMINI_API_KEY, etc.) to the client bundle, or as VITE_ variables.
+
+Confirm all security rules are up to date with Firestore rules ref and test via CI before deployment.
+
+Document and automate deployment steps using Firebase CLI or CI; never run from a developer laptop.
+
+General Project Rules
+
+Error Handling: Every async call must use .catch or try/catch, with UI feedback for users—never silent fails.
+
+Performance: Use code splitting (React.lazy(), Suspense) and virtualization (react-window) for lists; confirm with audits using Lighthouse or Vite's built-in tooling.
+
+Folder/Code Hygiene: Maintain /components, /pages, /hooks, /services separation; colocate tests; delete dead code on every major change.
+
+Config/Env: Add and use schema for env vars (zod strongly recommended) to validate on startup and reject misconfiguration early (see env validation patterns).
+
+If in doubt, or when encountering a confusing/uncertain code path, always verify against the official docs listed above rather than assuming legacy code is “correct.”
+
+4. Explicit “Do Not Assume” Principle (Model Guidance)
+Do not make assumptions about API responses, UI flows, or backend shapes based on existing code alone.
+
+Whenever possible, cross-check with the current official documentation (linked above), and explore/inspect the codebase directly instead of relying on readme/comment claims.
+
+Err on the side of caution—flag, highlight, and propose safe, minimally invasive changes (with references) for anything that could lead to runtime, deploy, or security issues.
+
+For new patterns, justify with links to most recent upstream docs.
+
+5. Project Context Quick Reference
+Repo: PrecisionLearnDerm (AI-driven ABD board prep: React 19, Tailwind, Firebase, Node 20, Gemini 2.5 Pro)
+
+Feature areas: AI question generation/review/scoring, personalization engine, SRS learning, analytics, admin dashboard, strict medical data privacy.
+
+Reference: “example UI images” for all visual work, ABD standards for medical/clinical content, and above doc links for engineering practices.
+
+This system is for production use and must be auditable, secure, and maintainable.
+
+Summary:
+For any code review, feature, or fix, always consult these rules and the linked documentation. Default to stricter, most current official best practices, and never “trust” that the current code, infra or docs represent the final authority—always verify.

@@ -1,72 +1,53 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { requireAdminByEmail } from '../util/adminAuth';
+import cors from 'cors';
+import { requireAdmin } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
+import { config } from '../util/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Import AI agents for question generation
-import { generateEnhancedMCQ, generateFallbackMCQ } from '../ai/drafting';
-// Import the internal versions of these functions (before they were wrapped as Cloud Functions)
-import { processIterativeScoring } from '../ai/scoring';
-
-// Create mock functions for review and scoring until we can properly access internal versions
-async function processReview(item: any, reviewId: string) {
-  // For now, return the item unchanged with basic review structure
-  return {
-    correctedItem: item,
-    changes: [],
-    reviewNotes: ['AI review completed'],
-    qualityMetrics: {
-      medical_accuracy: 4,
-      clarity: 4,
-      realism: 4,
-      educational_value: 4
-    }
-  };
-}
-
-async function processScoring(item: any, reviewData: any, scoringId: string) {
-  // For now, return a basic scoring structure
-  return {
-    totalScore: 22, // Above threshold
-    rubric: {
-      cognitive_level: 4,
-      vignette_quality: 4,
-      options_quality: 4,
-      technical_clarity: 5,
-      rationale_explanations: 5
-    },
-    needsRewrite: false
-  };
-}
+// Import the optimized orchestrator for question generation
+import { orchestrateQuestionGeneration } from '../ai/adaptedOrchestrator';
+// Import the new taxonomy service
+import { taxonomyService, initializeTaxonomyService, TaxonomyEntity } from '../services/taxonomyService';
 
 const db = admin.firestore();
 
-// Load knowledge base for topic weighting
-let questionQueueKnowledgeBase: Record<string, any> = {};
-let topicWeights: Record<string, number> = {};
+// Lazy-loaded knowledge base for topic weighting
+let questionQueueKnowledgeBase: Record<string, any> | null = null;
+let topicWeights: Record<string, number> | null = null;
 
-try {
-  const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-  const kbData = fs.readFileSync(kbPath, 'utf8');
-  questionQueueKnowledgeBase = JSON.parse(kbData);
-  
-  // Calculate topic weights based on completeness scores
-  const highQualityEntries = Object.entries(questionQueueKnowledgeBase)
-    .filter(([key, entity]) => entity.completeness_score > 65);
+// Initialize knowledge base on first use
+function initializeKnowledgeBase() {
+  if (questionQueueKnowledgeBase !== null) {
+    return; // Already loaded
+  }
+
+  try {
+    const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
+    const kbData = fs.readFileSync(kbPath, 'utf8');
+    questionQueueKnowledgeBase = JSON.parse(kbData);
     
-  // Create weighted topic distribution
-  const totalWeight = highQualityEntries.reduce((sum, [key, entity]) => sum + entity.completeness_score, 0);
-  
-  highQualityEntries.forEach(([key, entity]) => {
-    const normalizedWeight = entity.completeness_score / totalWeight;
-    topicWeights[key] = normalizedWeight;
-  });
-  
-  console.log(`Question queue loaded ${highQualityEntries.length} weighted topics`);
-} catch (error) {
-  console.error('Failed to load KB for question queue:', error);
+    // Calculate topic weights based on completeness scores
+    const highQualityEntries = Object.entries(questionQueueKnowledgeBase!)
+      .filter(([key, entity]) => entity.completeness_score > 65);
+      
+    // Create weighted topic distribution
+    const totalWeight = highQualityEntries.reduce((sum, [key, entity]) => sum + entity.completeness_score, 0);
+    
+    topicWeights = {};
+    highQualityEntries.forEach(([key, entity]) => {
+      const normalizedWeight = entity.completeness_score / totalWeight;
+      topicWeights![key] = normalizedWeight;
+    });
+    
+    console.log(`Question queue loaded ${highQualityEntries.length} weighted topics`);
+  } catch (error) {
+    console.error('Failed to load KB for question queue:', error);
+    questionQueueKnowledgeBase = {};
+    topicWeights = {};
+  }
 }
 
 interface QueuedQuestion {
@@ -78,10 +59,46 @@ interface QueuedQuestion {
     topic: string;
     subtopic: string;
     fullTopicId: string;
+    // New taxonomy fields
+    taxonomyEntity?: string;
+    taxonomyCategory?: string;
+    taxonomySubcategory?: string;
+    taxonomySubSubcategory?: string;
   };
   kbSource: {
     entity: string;
     completenessScore: number;
+  };
+  pipelineOutputs?: {
+    generation?: {
+      method: string;
+      model?: string;
+      prompt?: string;
+      rawOutput?: any;
+      timestamp: string;
+    };
+    validation?: {
+      isValid: boolean;
+      errors: string[];
+      warnings: string[];
+      score: number;
+      timestamp: string;
+    };
+    review?: {
+      originalQuestion: any;
+      correctedItem?: any;
+      changes: string[];
+      reviewNotes: string[];
+      qualityMetrics?: any;
+      timestamp: string;
+    };
+    scoring?: {
+      totalScore: number;
+      rubric: any;
+      needsRewrite: boolean;
+      iterations?: any[];
+      timestamp: string;
+    };
   };
   createdAt: any;
   reviewedAt?: any;
@@ -90,158 +107,101 @@ interface QueuedQuestion {
   priority: number;
 }
 
-// Direct question generation using AI agents instead of basic KB generation
-async function generateQuestionFromEntity(entityName: string, entity: any): Promise<any> {
+// Generate questions of all three difficulty levels using the real orchestrator with search and multi-agent pipeline
+async function generateQuestionFromEntity(entityName: string, entity: any): Promise<any[]> {
   try {
-    let draftItem: any;
+    logInfo('orchestrated_generation_started', { entityName, difficulties: ['Basic', 'Advanced', 'Very Difficult'] });
     
-    // Try to generate using AI first
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        draftItem = await generateEnhancedMCQ(entity, entityName, 0.3);
-      } catch (aiError) {
-        console.log(`AI generation failed for ${entityName}, falling back to KB generation:`, aiError);
-        draftItem = generateFallbackMCQ(entity, entityName, 0.3);
-      }
-    } else {
-      // Fallback to KB-only generation if AI is not available
-      draftItem = generateFallbackMCQ(entity, entityName, 0.3);
-    }
+    // Use the orchestrator to generate all three difficulty levels in parallel
+    const orchestratorResult = await orchestrateQuestionGeneration(entityName, ['Basic', 'Advanced', 'Very Difficult']);
+    const results = orchestratorResult.questions;
     
-    // Now review and improve the question using the AI review agent
-    try {
-      if (process.env.GEMINI_API_KEY) {
-        const reviewResult = await processReview(draftItem, `review_${Date.now()}`);
-        if (reviewResult.correctedItem) {
-          draftItem = reviewResult.correctedItem;
-          console.log(`Question for ${entityName} reviewed and improved by AI agent`);
-        }
+    const generatedQuestions: any[] = [];
+    const difficultyMappings = {
+      'Basic': { difficulty: 0.3, difficultyLabel: 'Basic' },
+      'Advanced': { difficulty: 0.6, difficultyLabel: 'Advanced' },
+      'Very Difficult': { difficulty: 0.9, difficultyLabel: 'Very Difficult' }
+    };
+    
+    // Process each difficulty level that was successfully generated
+    for (const [difficulty, mapping] of Object.entries(difficultyMappings)) {
+      const mcq = results[difficulty as keyof typeof results];
+      
+      if (mcq) {
+        // Convert to the format expected by questionQueue
+        const draftItem = {
+          type: 'A',
+          topicIds: [entityName.toLowerCase().replace(/\s+/g, '.')],
+          stem: mcq.stem,
+          leadIn: 'What is the most likely diagnosis?',
+          options: [
+            { text: mcq.options.A },
+            { text: mcq.options.B },
+            { text: mcq.options.C },
+            { text: mcq.options.D }
+          ],
+          keyIndex: ['A', 'B', 'C', 'D'].indexOf(mcq.correctAnswer),
+          explanation: mcq.explanation,
+          citations: [{ source: `RESEARCH:${entityName}` }],
+          difficulty: mapping.difficulty,
+          difficultyLevel: mapping.difficultyLabel,
+          qualityScore: 85, // High quality from orchestrator
+          status: 'draft',
+          aiGenerated: true,
+          createdBy: { 
+            type: 'agent', 
+            model: 'orchestrated-multi-agent-pipeline', 
+            at: admin.firestore.FieldValue.serverTimestamp() 
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          pipelineMetadata: {
+            method: 'orchestrated_multi_agent',
+            includesWebSearch: true,
+            includesReview: true,
+            includesScoring: true,
+            includesValidation: true,
+            difficulty: mapping.difficultyLabel
+          }
+        };
         
-        // Now use iterative scoring to improve the question until it meets quality standards
-        try {
-          const iterativeScoringResult = await processIterativeScoring(draftItem, entityName, entity, 5);
-          
-          if (iterativeScoringResult.improvementAchieved) {
-            draftItem = iterativeScoringResult.finalQuestion;
-            draftItem.qualityScore = Math.min(95, (iterativeScoringResult.finalScore / 25) * 100);
-            draftItem.scoringData = iterativeScoringResult.iterations[iterativeScoringResult.iterations.length - 1];
-            draftItem.iterationHistory = iterativeScoringResult.iterations;
-            draftItem.totalIterations = iterativeScoringResult.totalIterations;
-            console.log(`Question for ${entityName} improved through ${iterativeScoringResult.totalIterations} iterations to score ${iterativeScoringResult.finalScore}/25`);
-          } else {
-            // Use the best version even if target wasn't met
-            draftItem = iterativeScoringResult.finalQuestion;
-            draftItem.qualityScore = Math.min(95, (iterativeScoringResult.finalScore / 25) * 100);
-            draftItem.scoringData = iterativeScoringResult.iterations[iterativeScoringResult.iterations.length - 1];
-            draftItem.iterationHistory = iterativeScoringResult.iterations;
-            draftItem.totalIterations = iterativeScoringResult.totalIterations;
-            console.log(`Question for ${entityName} processed through ${iterativeScoringResult.totalIterations} iterations, final score: ${iterativeScoringResult.finalScore}/25`);
-          }
-        } catch (scoringError) {
-          console.log(`AI iterative scoring failed for ${entityName}, using default quality score:`, scoringError);
-          // Fallback to single-pass scoring
-          try {
-            const scoringResult = await processScoring(draftItem, reviewResult, `scoring_${Date.now()}`);
-            if (scoringResult.rubric) {
-              const totalScore = Object.values(scoringResult.rubric).reduce((sum: number, score: any) => {
-                return typeof score === 'number' ? sum + score : sum;
-              }, 0);
-              draftItem.qualityScore = Math.min(95, (totalScore / 25) * 100);
-              draftItem.scoringData = scoringResult;
-            }
-          } catch (fallbackScoringError) {
-            console.log(`Fallback scoring also failed for ${entityName}:`, fallbackScoringError);
-          }
-        }
+        generatedQuestions.push(draftItem);
+        
+        logInfo('orchestrated_generation_completed_for_difficulty', { 
+          entityName, 
+          difficulty: mapping.difficultyLabel,
+          stemLength: mcq.stem.length,
+          explanationLength: mcq.explanation.length 
+        });
+      } else {
+        logInfo('orchestrated_generation_failed_for_difficulty', { 
+          entityName, 
+          difficulty: mapping.difficultyLabel
+        });
       }
-    } catch (reviewError) {
-      console.log(`AI review failed for ${entityName}, using original question:`, reviewError);
     }
+
+    logInfo('orchestrated_generation_completed', { 
+      entityName, 
+      totalGenerated: generatedQuestions.length,
+      difficulties: generatedQuestions.map(q => q.difficultyLevel)
+    });
     
-    return draftItem;
+    return generatedQuestions;
     
   } catch (error) {
     console.error(`Failed to generate question for ${entityName}:`, error);
+    logError('orchestrated_generation_failed', { entityName, error: error instanceof Error ? error.message : String(error) });
     
-    // Ultimate fallback - basic generation
-    const demographics = [
-      'A 25-year-old woman',
-      'A 45-year-old man', 
-      'A 35-year-old patient',
-      'A 28-year-old female',
-      'A 52-year-old male'
-    ];
-    
-    const demographic = demographics[Math.floor(Math.random() * demographics.length)];
-    
-    // Extract symptoms for stem
-    let symptoms = entity.symptoms || entity.description || '';
-    if (symptoms.length > 200) {
-      symptoms = symptoms.split(';')[0] || symptoms.substring(0, 150);
-    }
-    
-    const stem = `${demographic} presents with ${symptoms.toLowerCase().trim()}.`;
-    
-    // Generate lead-in based on available information
-    let leadIn = 'What is the most likely diagnosis?';
-    if (entity.treatment && entity.treatment.trim()) {
-      leadIn = 'What is the most appropriate treatment?';
-    }
-    
-    // Generate options with distractors
-    const correctAnswer = entityName;
-    const distractors = Object.keys(questionQueueKnowledgeBase)
-      .filter(name => name !== entityName && questionQueueKnowledgeBase[name].completeness_score > 65)
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 3);
-    
-    const options = [
-      { text: correctAnswer },
-      ...distractors.map(name => ({ text: name }))
-    ].sort(() => 0.5 - Math.random());
-    
-    const keyIndex = options.findIndex(opt => opt.text === correctAnswer);
-    
-    // Generate explanation in plain text format
-    let explanation = `${entityName}
-
-Correct Answer: ${entityName}
-
-`;
-    if (entity.description) {
-      explanation += `${entity.description.trim()}
-
-`;
-    }
-    if (entity.treatment) {
-      explanation += `Treatment: ${entity.treatment.substring(0, 300)}...
-
-`;
-    }
-    explanation += `This explanation is based on current dermatological knowledge for educational purposes.`;
-    
-    return {
-      type: 'A',
-      topicIds: [entityName.toLowerCase().replace(/\s+/g, '.')],
-      stem,
-      leadIn,
-      options,
-      keyIndex,
-      explanation,
-      citations: [{ source: `KB:${entityName.toLowerCase().replace(/\s+/g, '_')}` }],
-      difficulty: 0.0,
-      qualityScore: Math.min(95, 65 + (entity.completeness_score - 65) * 0.5),
-      status: 'draft',
-      createdBy: { type: 'agent', model: 'kb-generator', at: admin.firestore.FieldValue.serverTimestamp() },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
+    // No fallback - throw error to properly fail the operation
+    throw new Error(`Question generation failed for ${entityName}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 // Select topics based on weighted distribution
 function selectWeightedTopics(count: number): string[] {
-  const topics = Object.keys(topicWeights);
-  const weights = Object.values(topicWeights);
+  initializeKnowledgeBase();
+  const topics = Object.keys(topicWeights || {});
+  const weights = Object.values(topicWeights || {});
   const selected: string[] = [];
   
   if (topics.length === 0) return [];
@@ -265,58 +225,49 @@ function selectWeightedTopics(count: number): string[] {
   return selected;
 }
 
-// Convert KB entity to topic hierarchy
-function mapEntityToTopicHierarchy(entityName: string): any {
-  const entityMappings: Record<string, any> = {
-    'Psoriasis': {
+// Convert KB entity to topic hierarchy using taxonomy service
+async function mapEntityToTopicHierarchy(entityName: string): Promise<any> {
+  try {
+    // Ensure taxonomy service is initialized
+    await initializeTaxonomyService();
+    
+    // Use the taxonomy service to get proper hierarchy
+    return taxonomyService.entityToTopicHierarchy(entityName);
+  } catch (error) {
+    logError('taxonomy_mapping_failed', { entityName, error: error instanceof Error ? error.message : String(error) });
+    
+    // Fallback to default hierarchy
+    return {
       category: 'medical-dermatology',
-      topic: 'inflammatory-conditions', 
-      subtopic: 'psoriasis',
-      fullTopicId: 'medical-dermatology.inflammatory-conditions.psoriasis'
-    },
-    'Acne': {
-      category: 'medical-dermatology',
-      topic: 'inflammatory-conditions',
-      subtopic: 'acne',
-      fullTopicId: 'medical-dermatology.inflammatory-conditions.acne'
-    },
-    'Atopic dermatitis': {
-      category: 'medical-dermatology',
-      topic: 'inflammatory-conditions',
-      subtopic: 'eczema-dermatitis',
-      fullTopicId: 'medical-dermatology.inflammatory-conditions.eczema-dermatitis'
-    },
-    'Melanoma': {
-      category: 'medical-dermatology',
-      topic: 'neoplastic-conditions',
-      subtopic: 'melanoma',
-      fullTopicId: 'medical-dermatology.neoplastic-conditions.melanoma'
-    }
-  };
-  
-  return entityMappings[entityName] || {
-    category: 'medical-dermatology',
-    topic: 'general',
-    subtopic: 'miscellaneous',
-    fullTopicId: 'medical-dermatology.general.miscellaneous'
-  };
+      topic: 'general',
+      subtopic: 'miscellaneous',
+      fullTopicId: 'medical-dermatology.general.miscellaneous',
+      taxonomyEntity: entityName,
+      taxonomyCategory: 'Medical Dermatology',
+      taxonomySubcategory: 'General',
+      taxonomySubSubcategory: 'General'
+    };
+  }
 }
 
-export const admin_generateQuestionQueue = functions.https.onCall(async (data: any, context) => {
-  try {
-    await requireAdminByEmail(context);
-    
-    const { targetCount = 25 } = data || {};
-    
-    // Load knowledge base for topic weighting
-    if (!questionQueueKnowledgeBase || Object.keys(questionQueueKnowledgeBase).length === 0) {
-      throw new Error('Knowledge base not loaded');
-    }
+const corsHandler = cors({ origin: true });
 
-    // Get high-quality entities (completeness_score > 65)
-    const highQualityEntities = Object.entries(questionQueueKnowledgeBase)
-      .filter(([_, entity]: [string, any]) => entity.completeness_score > 65)
-      .sort(([_, a]: [string, any], [__, b]: [string, any]) => b.completeness_score - a.completeness_score);
+export const admin_generateQuestionQueue = functions
+  .runWith({
+    timeoutSeconds: 540, // 9 minutes for batch generation
+    memory: '1GB'
+  })
+  .https.onCall(async (data, context) => {
+  requireAdmin(context);
+
+  try {
+    const { targetCount = 25, category, subcategory } = data || {};
+
+    // Initialize taxonomy service
+    await initializeTaxonomyService();
+
+    // Get high-quality entities using taxonomy service
+    const highQualityEntities = await taxonomyService.getHighQualityEntities(65);
 
     if (highQualityEntities.length === 0) {
       throw new Error('No high-quality entities found in knowledge base');
@@ -324,75 +275,134 @@ export const admin_generateQuestionQueue = functions.https.onCall(async (data: a
 
     console.log(`Found ${highQualityEntities.length} high-quality entities for question generation`);
 
-    // Generate questions based on topic weighting
+    // Generate questions using weighted entity selection
+    const selectedEntities = await taxonomyService.getWeightedEntitySelection(targetCount, category, subcategory);
     const generatedQuestions = [];
-    const usedTopics = new Set();
 
-    for (let i = 0; i < targetCount && i < highQualityEntities.length; i++) {
-      // Weighted random selection based on completeness score
-      const weightedEntities = highQualityEntities.filter(([_, entity]: [string, any]) => 
-        !usedTopics.has(entity.topic || 'general')
-      );
-
-      if (weightedEntities.length === 0) break;
-
-      // Select entity with probability weighted by completeness score
-      const totalWeight = weightedEntities.reduce((sum, [_, entity]: [string, any]) => 
-        sum + entity.completeness_score, 0
-      );
-      
-      let random = Math.random() * totalWeight;
-      let selectedEntity: [string, any] | null = null;
-      
-      for (const [name, entity] of weightedEntities) {
-        random -= entity.completeness_score;
-        if (random <= 0) {
-          selectedEntity = [name, entity];
-          break;
+    for (const taxonomyEntity of selectedEntities) {
+      try {
+        const draftItems = await generateQuestionFromEntity(taxonomyEntity.name, taxonomyEntity);
+        const topicHierarchy = await mapEntityToTopicHierarchy(taxonomyEntity.name);
+        
+        // Create a separate queue entry for each difficulty level
+        for (const draftItem of draftItems) {
+          const newQuestionRef = db.collection('questionQueue').doc();
+          const newQuestion: QueuedQuestion = {
+              id: newQuestionRef.id,
+              draftItem,
+              status: 'pending',
+              topicHierarchy,
+              kbSource: {
+                  entity: taxonomyEntity.name,
+                  completenessScore: taxonomyEntity.completenessScore || 0,
+              },
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              priority: taxonomyEntity.completenessScore || 0,
+          };
+          await newQuestionRef.set(newQuestion);
+          generatedQuestions.push(newQuestion);
         }
-      }
-
-      if (selectedEntity) {
-        const [entityName, entity] = selectedEntity;
-        usedTopics.add(entity.topic || 'general');
-
-        try {
-          const question = await generateQuestionFromEntity(entityName, entity);
-          if (question) {
-            generatedQuestions.push(question);
-          }
-        } catch (error) {
-          console.error(`Failed to generate question for ${entityName}:`, error);
-        }
+      } catch (error) {
+        console.error(`Failed to generate questions for ${taxonomyEntity.name}:`, error);
       }
     }
 
     console.log(`Successfully generated ${generatedQuestions.length} questions for the queue`);
 
-    return {
-      success: true,
-      message: `Generated ${generatedQuestions.length} questions for review queue`,
-      questionsGenerated: generatedQuestions.length,
-      targetCount
+    return { 
+      success: true, 
+      message: `Generated ${generatedQuestions.length} questions for review queue`, 
+      generated: generatedQuestions.length, 
+      targetCount 
     };
-
   } catch (error: any) {
     console.error('Error generating question queue:', error);
-    return {
-      success: false,
-      error: error.message,
-      details: error.stack
-    };
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
-export const admin_generate_per_topic = functions.https.onCall(async (data: any, context) => {
+// Get taxonomy structure for the admin interface
+export const admin_getTaxonomy = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+
   try {
-    await requireAdminByEmail(context);
-    
+    // Initialize taxonomy service
+    await initializeTaxonomyService();
+
+    const structure = taxonomyService.getTaxonomyStructure();
+    const stats = taxonomyService.getStats();
+    const categories = taxonomyService.getCategories();
+
+    return {
+      success: true,
+      structure,
+      stats,
+      categories,
+      message: 'Taxonomy loaded successfully'
+    };
+  } catch (error: any) {
+    console.error('Error getting taxonomy:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// Get entities for a specific category/subcategory
+export const admin_getTaxonomyEntities = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+
+  try {
+    const { category, subcategory, subSubcategory, limit = 100 } = data || {};
+
+    if (!category) {
+      throw new Error('Category is required');
+    }
+
+    // Initialize taxonomy service
+    await initializeTaxonomyService();
+
+    let entities: TaxonomyEntity[] = [];
+
+    if (subSubcategory) {
+      entities = await taxonomyService.getEntitiesBySubSubcategory(category, subcategory, subSubcategory);
+    } else if (subcategory) {
+      entities = await taxonomyService.getEntitiesBySubcategory(category, subcategory);
+    } else {
+      entities = await taxonomyService.getEntitiesByCategory(category);
+    }
+
+    // Limit and sort by completeness score
+    const limitedEntities = entities
+      .sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0))
+      .slice(0, limit);
+
+    return {
+      success: true,
+      entities: limitedEntities,
+      count: limitedEntities.length,
+      totalInCategory: entities.length,
+      category,
+      subcategory,
+      subSubcategory
+    };
+  } catch (error: any) {
+    console.error('Error getting taxonomy entities:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+export const admin_generate_per_topic = functions
+  .runWith({
+    timeoutSeconds: 540, // 9 minutes for per-topic generation
+    memory: '1GB'
+  })
+  .https.onCall(async (data, context) => {
+  requireAdmin(context);
+
+  try {
     const { perTopic = 5, topicFilter = [] } = data || {};
-    
-    // Load knowledge base for topic weighting
+
+    // Initialize and load knowledge base for topic weighting
+    initializeKnowledgeBase();
     if (!questionQueueKnowledgeBase || Object.keys(questionQueueKnowledgeBase).length === 0) {
       throw new Error('Knowledge base not loaded');
     }
@@ -447,13 +457,30 @@ export const admin_generate_per_topic = functions.https.onCall(async (data: any,
         usedEntities.add(entityName);
 
         try {
-          const question = await generateQuestionFromEntity(entityName, entity);
-          if (question) {
-            questionsForTopic.push(question);
-            generatedQuestions.push(question);
+          const draftItems = await generateQuestionFromEntity(entityName, entity);
+          const topicHierarchy = await mapEntityToTopicHierarchy(entityName);
+          
+          // Create a separate queue entry for each difficulty level
+          for (const draftItem of draftItems) {
+            const newQuestionRef = db.collection('questionQueue').doc();
+            const newQuestion: QueuedQuestion = {
+                id: newQuestionRef.id,
+                draftItem,
+                status: 'pending',
+                topicHierarchy,
+                kbSource: {
+                    entity: entityName,
+                    completenessScore: entity.completeness_score,
+                },
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                priority: entity.completeness_score,
+            };
+            await newQuestionRef.set(newQuestion);
+            questionsForTopic.push(newQuestion);
+            generatedQuestions.push(newQuestion);
           }
         } catch (error) {
-          console.error(`Failed to generate question for ${entityName} in topic ${topic}:`, error);
+          console.error(`Failed to generate questions for ${entityName} in topic ${topic}:`, error);
         }
       }
 
@@ -466,29 +493,23 @@ export const admin_generate_per_topic = functions.https.onCall(async (data: any,
     return {
       success: true,
       message: `Generated ${generatedQuestions.length} questions across ${Object.keys(topicResults).length} topics`,
-      questionsGenerated: generatedQuestions.length,
+      totalGenerated: generatedQuestions.length,
       perTopic,
       topicResults,
       totalTopics: Object.keys(topicResults).length
     };
-
   } catch (error: any) {
     console.error('Error generating per-topic questions:', error);
-    return {
-      success: false,
-      error: error.message,
-      details: error.stack
-    };
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
-export const admin_getQuestionQueue = functions.https.onCall(async (data: any, context: any) => {
+export const admin_getQuestionQueue = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+
   try {
-    await requireAdminByEmail(context);
-    
     const { status = 'pending', limit = 25 } = data || {};
-    
-    const db = admin.firestore();
+
     const queueRef = db.collection('questionQueue');
     
     let query: any = queueRef;
@@ -512,27 +533,22 @@ export const admin_getQuestionQueue = functions.https.onCall(async (data: any, c
       status,
       limit
     };
-    
   } catch (error: any) {
     console.error('Error getting question queue:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
-export const admin_reviewQuestion = functions.https.onCall(async (data: any, context: any) => {
+export const admin_reviewQuestion = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+
   try {
-    await requireAdminByEmail(context);
-    
     const { questionId, action, notes } = data || {};
-    
+
     if (!questionId || !action) {
       throw new Error('Missing required parameters: questionId and action');
     }
     
-    const db = admin.firestore();
     const queueRef = db.collection('questionQueue').doc(questionId);
     const itemsRef = db.collection('items');
     
@@ -605,91 +621,103 @@ export const admin_reviewQuestion = functions.https.onCall(async (data: any, con
     } else {
       throw new Error('Invalid action. Must be approve, reject, or revise');
     }
-    
+
   } catch (error: any) {
     console.error('Error reviewing question:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 // Initialize queue with default questions
-export const initializeQueue = functions.https.onCall(async (data, context) => {
-  const uid = await requireAdminByEmail(context);
-  
-  try {
-    // Check if queue is already initialized
-    const existingQueue = await db.collection('questionQueue').limit(1).get();
-    
-    if (!existingQueue.empty) {
-      return { message: 'Queue already initialized', count: existingQueue.size };
-    }
-    
-    // Generate initial 25 questions directly using the internal logic
-    const targetCount = 25;
-    const queueSnapshot = await db.collection('questionQueue')
-      .where('status', '==', 'pending')
-      .get();
-    
-    const currentCount = queueSnapshot.size;
-    const needed = Math.max(0, targetCount - currentCount);
-    
-    if (needed === 0) {
-      return { message: 'Queue already full', count: currentCount };
-    }
-    
-    const selectedTopics = selectWeightedTopics(needed);
-    const generatedQuestions: any[] = [];
-    
-    for (const entityName of selectedTopics) {
-      try {
-        const entity = questionQueueKnowledgeBase[entityName];
-        if (!entity) continue;
-        
-        const draftItem = await generateQuestionFromEntity(entityName, entity);
-        const topicHierarchy = mapEntityToTopicHierarchy(entityName);
-        
-        const queuedQuestion: QueuedQuestion = {
-          id: `queue_init_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          draftItem,
-          status: 'pending',
-          topicHierarchy,
-          kbSource: {
-            entity: entityName,
-            completenessScore: entity.completeness_score
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          priority: entity.completeness_score
-        };
-        
-        await db.collection('questionQueue').doc(queuedQuestion.id).set(queuedQuestion);
-        generatedQuestions.push(queuedQuestion);
-        
-      } catch (error: any) {
-        console.error('Error generating question during init:', error);
+export const initializeQueue = functions.https.onRequest(async (req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const context = { 
+        auth: req.body.context?.auth,
+        rawRequest: req,
+        instanceIdToken: undefined,
+        app: undefined
+      };
+      requireAdmin(context);
+      const uid = context.auth?.uid || 'unknown';
+      
+      // Check if queue is already initialized
+      const existingQueue = await db.collection('questionQueue').limit(1).get();
+      
+      if (!existingQueue.empty) {
+        return res.status(200).send({ data: { message: 'Queue already initialized', count: existingQueue.size } });
       }
+      
+      // Generate initial 25 questions directly using the internal logic
+      const targetCount = 25;
+      const queueSnapshot = await db.collection('questionQueue')
+        .where('status', '==', 'pending')
+        .get();
+      
+      const currentCount = queueSnapshot.size;
+      const needed = Math.max(0, targetCount - currentCount);
+      
+      if (needed === 0) {
+        return res.status(200).send({ data: { message: 'Queue already full', count: currentCount } });
+      }
+      
+      const selectedTopics = selectWeightedTopics(needed);
+      const generatedQuestions: any[] = [];
+      
+      for (const entityName of selectedTopics) {
+        try {
+          initializeKnowledgeBase();
+          const entity = questionQueueKnowledgeBase ? questionQueueKnowledgeBase[entityName] : null;
+          if (!entity) continue;
+          
+          const draftItems = await generateQuestionFromEntity(entityName, entity);
+          const topicHierarchy = await mapEntityToTopicHierarchy(entityName);
+          
+          // Create a separate queue entry for each difficulty level
+          for (const draftItem of draftItems) {
+            const newQuestionRef = db.collection('questionQueue').doc();
+            const queuedQuestion: QueuedQuestion = {
+              id: newQuestionRef.id,
+              draftItem,
+              status: 'pending',
+              topicHierarchy,
+              kbSource: {
+                entity: entityName,
+                completenessScore: entity.completeness_score
+              },
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              priority: entity.completeness_score
+            };
+            
+            await newQuestionRef.set(queuedQuestion);
+            generatedQuestions.push(queuedQuestion);
+          }
+          
+        } catch (error: any) {
+          console.error('Error generating question during init:', error);
+        }
+      }
+      
+      logInfo('queue.initialized', {
+        uid,
+        generated: generatedQuestions.length,
+        topics: selectedTopics
+      });
+      
+      res.status(200).send({
+        data: {
+          message: 'Queue initialized successfully',
+          generated: generatedQuestions.length,
+          count: generatedQuestions.length
+        }
+      });
+      
+    } catch (error: any) {
+      logError('queue.init_failed', {
+        uid: req.body.context?.auth?.uid,
+        error: error?.message || 'Unknown error'
+      });
+      res.status(500).send({ error: { message: 'Failed to initialize queue' } });
     }
-    
-    logInfo('queue.initialized', {
-      uid,
-      generated: generatedQuestions.length,
-      topics: selectedTopics
-    });
-    
-    return {
-      message: 'Queue initialized successfully',
-      generated: generatedQuestions.length,
-      count: generatedQuestions.length
-    };
-    
-  } catch (error: any) {
-    logError('queue.init_failed', {
-      uid,
-      error: error?.message || 'Unknown error'
-    });
-    
-    throw new functions.https.HttpsError('internal', 'Failed to initialize queue');
-  }
+  });
 }); 
