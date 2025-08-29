@@ -139,6 +139,16 @@ async function executeWithRetry<T>(
   let lastError: Error | undefined;
   let retryCount = 0;
 
+  // Use operation's timeout if specified, otherwise use config default
+  const effectiveTimeout = operation.timeout || config.timeout;
+  
+  logInfo(`[TIMEOUT_DEBUG] Operation '${operation.name}' timeout configuration`, {
+    operationName: operation.name,
+    effectiveTimeout: effectiveTimeout,
+    operationTimeout: operation.timeout,
+    configTimeout: config.timeout
+  });
+
   for (let attempt = 0; attempt <= config.retries; attempt++) {
     try {
       // Add exponential backoff for retries
@@ -148,11 +158,11 @@ async function executeWithRetry<T>(
         retryCount++;
       }
 
-      // Execute with timeout
+      // Execute with timeout - use the effective timeout, not config.timeout
       const result = await withTimeout(
         operation.operation(),
-        config.timeout,
-        `Operation ${operation.name} timed out after ${config.timeout}ms`
+        effectiveTimeout,
+        `Operation ${operation.name} timed out after ${effectiveTimeout}ms`
       );
 
       return {

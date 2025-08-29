@@ -82,21 +82,105 @@ export function parseGeminiResponse(
       };
     }
 
-    if (!responseData.candidates) {
+    // PRIORITY 1: NEW @google/genai library format - GenerateContentResponse class with .text getter
+    // This is the primary response format for the current library
+    if (responseData && typeof responseData.text !== 'undefined') {
+      try {
+        const text = responseData.text; // Call the getter property
+        if (text && typeof text === 'string' && text.length > 0) {
+          logInfo('gemini.using_new_genai_library_format', {
+            operation: operationName,
+            textLength: text.length,
+            responseType: 'GenerateContentResponse_class',
+            timestamp: new Date().toISOString()
+          });
+          
+          return {
+            success: true,
+            text
+          };
+        } else if (text === null || text === undefined) {
+          // Text getter exists but returned empty - this indicates a real issue
+          logError('gemini.new_format_empty_response', {
+            operation: operationName,
+            textValue: text,
+            textType: typeof text,
+            responseKeys: Object.keys(responseData),
+            hasResponse: !!responseData,
+            timestamp: new Date().toISOString()
+          });
+          
+          return {
+            success: false,
+            error: 'Empty response from Gemini API - no generated content'
+          };
+        }
+      } catch (error) {
+        logError('gemini.new_format_text_access_error', {
+          operation: operationName,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        });
+        
+        return {
+          success: false,
+          error: `Failed to access response text: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
+    }
+
+    // PRIORITY 2: LEGACY FORMATS - Ensure backwards compatibility
+    // Handle both old @google/generative-ai and new @google/genai library response formats  
+    // Old library: responseData has candidates directly
+    // New library: responseData might have different structure
+    let candidates = responseData.candidates;
+    
+    // Check if this is the new library format where response might be nested differently
+    if (!candidates && responseData.response && responseData.response.candidates) {
+      candidates = responseData.response.candidates;
+      logInfo('gemini.using_legacy_response_format', {
+        operation: operationName,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Alternative: new library might have content directly in response
+    if (!candidates && responseData.content && typeof responseData.content === 'string') {
+      logInfo('gemini.using_direct_content_format', {
+        operation: operationName,
+        contentLength: responseData.content.length,
+        timestamp: new Date().toISOString()
+      });
+      
+      return {
+        success: true,
+        text: responseData.content
+      };
+    }
+
+    if (!candidates) {
+      // Enhanced debugging: Log the actual response structure when candidates is missing
+      logError('gemini.missing_candidates_debug', {
+        operation: operationName,
+        responseStructure: JSON.stringify(responseData, null, 2),
+        responseKeys: Object.keys(responseData),
+        timestamp: new Date().toISOString()
+      });
+      
       return {
         success: false,
         error: 'No candidates array in Gemini API response'
       };
     }
 
-    if (!Array.isArray(responseData.candidates) || responseData.candidates.length === 0) {
+    if (!Array.isArray(candidates) || candidates.length === 0) {
       return {
         success: false,
         error: 'Candidates array is empty or invalid'
       };
     }
 
-    const candidate = responseData.candidates[0];
+    const candidate = candidates[0];
 
     // Check for candidate-level blocking
     if (candidate.finishReason === 'SAFETY') {
@@ -114,14 +198,30 @@ export function parseGeminiResponse(
       };
     }
 
+    // Check for content truncation due to token limits
+    if (candidate.finishReason === 'MAX_TOKENS' || candidate.finishReason === 'LENGTH') {
+      logError('gemini.content_truncated', {
+        operation: operationName,
+        finishReason: candidate.finishReason,
+        timestamp: new Date().toISOString()
+      });
+      return {
+        success: false,
+        error: `Content truncated due to ${candidate.finishReason} limit.`,
+        blockReason: candidate.finishReason
+      };
+    }
+
     // Validate content structure (this is where the original bug was)
     if (!candidate.content) {
       // Enhanced debugging: Log the actual candidate structure when content is missing
+      // CRITICAL: Log full raw responseData for Google support if issue persists
       logError('gemini.missing_content_debug', {
         operation: operationName,
         candidateStructure: JSON.stringify(candidate, null, 2),
         candidateKeys: Object.keys(candidate),
         finishReason: candidate.finishReason,
+        fullResponseData: JSON.stringify(responseData, null, 2),
         timestamp: new Date().toISOString()
       });
       
@@ -149,10 +249,12 @@ export function parseGeminiResponse(
       }
       
       // If still no text, log the structure for debugging
+      // CRITICAL: Log full raw responseData for Google support if issue persists
       logError('gemini.missing_parts_debug', {
         operation: operationName,
         candidateStructure: JSON.stringify(candidate, null, 2),
         contentKeys: candidate.content ? Object.keys(candidate.content) : 'no content',
+        fullResponseData: JSON.stringify(responseData, null, 2),
         timestamp: new Date().toISOString()
       });
       
@@ -270,12 +372,13 @@ export function extractSafetyInfo(responseData: any): {
     }
   }
 
-  // Check candidate-level blocking
-  if (responseData?.candidates?.[0]?.finishReason === 'SAFETY') {
+  // Check candidate-level blocking - handle both response formats
+  const candidates = responseData?.candidates || responseData?.response?.candidates;
+  if (candidates?.[0]?.finishReason === 'SAFETY') {
     result.contentBlocked = true;
     result.blockReasons.push('SAFETY');
-    if (responseData.candidates[0].safetyRatings) {
-      result.safetyRatings.push(...responseData.candidates[0].safetyRatings);
+    if (candidates[0].safetyRatings) {
+      result.safetyRatings.push(...candidates[0].safetyRatings);
     }
   }
 

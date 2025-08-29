@@ -1,17 +1,20 @@
 {
   "compilerOptions": {
-    "lib": ["ES2022"],
+    "lib": ["ES2018"],
     "module": "commonjs",
-    "target": "ES2022",
+    "target": "ES2018",
     "outDir": "lib",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "moduleResolution": "node",
     "skipLibCheck": true,
     "sourceMap": true,
     "resolveJsonModule": true,
     "incremental": true,
-    "tsBuildInfoFile": "lib/.tsbuildinfo"
+    "tsBuildInfoFile": "lib/.tsbuildinfo",
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
   "exclude": [

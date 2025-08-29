@@ -291,6 +291,11 @@ export interface AdminUserRequest {
   email: string;
 }
 
+export interface GrantAdminRoleRequest {
+  email: string;
+  setupKey: string;
+}
+
 export interface QuestionQueueResponse extends APIResponse {
   questions?: Array<{
     id: string;

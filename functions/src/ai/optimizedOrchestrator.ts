@@ -5,10 +5,12 @@
  */
 
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
-import { getStreamingGeminiClient, StreamingGeminiClient } from '../util/streamingGeminiClient';
+// import { getStreamingGeminiClient, StreamingGeminiClient } from '../util/streamingGeminiClient';
 import { searchNCBI, searchOpenAlex } from '../util/externalSearch';
 import { reviewMCQInternal } from './review';
+import { performReviewInternal } from './reviewAgentV2';
 import { scoreMCQInternal } from './scoring';
+import { scoreMCQWithABDRubric } from './enhancedScoring';
 import { 
   getCachedWebSearch, 
   setCachedWebSearch, 
@@ -60,8 +62,20 @@ const CONFIG = {
   OPTION_COUNT: Number(process.env.MCQ_OPTION_COUNT) || 5,
   WEB_SEARCH_TIMEOUT: Number(process.env.WEB_SEARCH_TIMEOUT) || 10000,
   CIRCUIT_BREAKER_THRESHOLD: Number(process.env.CIRCUIT_BREAKER_THRESHOLD) || 3,
-  CIRCUIT_BREAKER_RESET_TIME: Number(process.env.CIRCUIT_BREAKER_RESET_TIME) || 60000
+  CIRCUIT_BREAKER_RESET_TIME: Number(process.env.CIRCUIT_BREAKER_RESET_TIME) || 60000,
+  REVIEW_TIMEOUT: Number(process.env.REVIEW_TIMEOUT) || 130000, // 130 seconds for review agent (allows Gemini client 120s + buffer)
+  SCORING_TIMEOUT: Number(process.env.SCORING_TIMEOUT) || 130000, // 130 seconds for scoring agent (allows Gemini client 120s + buffer)
+  USE_REVIEW_V2: true, // FORCE ENABLE - bypassing env var completely
+  REVIEW_V2_MIN_SCORE: Number(process.env.REVIEW_V2_MIN_SCORE) || 6 // Minimum score out of 10 for Review Agent V2
 };
+
+// Debug logging for Review Agent V2 configuration
+logger.info('[CONFIG_DEBUG] Review Agent V2 Configuration:', {
+  USE_REVIEW_V2_ENV: process.env.USE_REVIEW_V2,
+  USE_REVIEW_V2_RESOLVED: CONFIG.USE_REVIEW_V2,
+  REVIEW_V2_MIN_SCORE: CONFIG.REVIEW_V2_MIN_SCORE,
+  NODE_ENV: process.env.NODE_ENV
+});
 
 /**
  * OPTIMIZATION 1: Parallel Web Search Execution
@@ -156,7 +170,7 @@ async function performParallelWebSearch(
  * Before: Sequential Review → Scoring (4-6 seconds)
  * After: Parallel Review + Scoring (2-3 seconds)
  */
-async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutputs?: any[], addAgentOutput?: (agent: any) => void): Promise<{ reviewFeedback: string; scoreDetails: Score }> {
+async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutputs?: any[], addAgentOutput?: (agent: any) => void): Promise<{ reviewFeedback: string; scoreDetails: Score; reviewV2Data?: any; reviewScore?: number }> {
   logger.info('Starting parallel question validation...');
   
   const startTime = Date.now();
@@ -190,38 +204,66 @@ async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutp
   
   // Execute review and scoring in parallel with timeout protection
   // Use Promise.all with individual timeout wrapping since they return different types
+  logger.info(`[TIMEOUT_DEBUG] Using review timeout: ${CONFIG.REVIEW_TIMEOUT}ms, scoring timeout: ${CONFIG.SCORING_TIMEOUT}ms`);
+  
   const validationOperations: ConcurrentOperation<any>[] = [
     {
       name: 'review_mcq',
-      operation: () => reviewMCQInternal(mcq),
-      timeout: 60000,  // 60 seconds for review
+      operation: () => {
+        logger.info(`[VALIDATION_START] Starting ${CONFIG.USE_REVIEW_V2 ? 'Review Agent V2' : 'legacy review'} operation with ${CONFIG.REVIEW_TIMEOUT}ms timeout`);
+        if (CONFIG.USE_REVIEW_V2) {
+          return performReviewInternal(mcq);
+        } else {
+          return reviewMCQInternal(mcq);
+        }
+      },
+      timeout: CONFIG.REVIEW_TIMEOUT,
       retries: 1,
       required: false,
-      fallback: () => 'Review validation failed, proceeding with generation'
+      fallback: () => {
+        logger.info(`[VALIDATION_FALLBACK] Review operation fallback triggered`);
+        if (CONFIG.USE_REVIEW_V2) {
+          return {
+            success: false,
+            error: 'Review Agent V2 validation failed',
+            data: {
+              score: 5,
+              feedback: 'Review Agent V2 validation failed, proceeding with generation'
+            }
+          };
+        }
+        return 'Review validation failed, proceeding with generation';
+      }
     },
     {
       name: 'score_mcq',
-      operation: () => scoreMCQInternal(mcq),
-      timeout: 60000,  // 60 seconds for scoring
+      operation: () => {
+        logger.info(`[VALIDATION_START] Starting score_mcq operation with ${CONFIG.SCORING_TIMEOUT}ms timeout`);
+        return scoreMCQInternal(mcq);
+      },
+      timeout: CONFIG.SCORING_TIMEOUT,
       retries: 1,
       required: false,
-      fallback: () => ({
-        scores: {
-          clinicalRelevance: 3,
-          clarity: 3,
-          singleBestAnswer: 3,
-          difficulty: 3,
-          educationalValue: 3
-        },
-        totalScore: 15,
-        feedback: 'Scoring validation failed'
-      })
+      fallback: () => {
+        logger.info(`[VALIDATION_FALLBACK] Scoring operation fallback triggered`);
+        return {
+          scores: {
+            clinicalRelevance: 3,
+            clarity: 3,
+            singleBestAnswer: 3,
+            difficulty: 3,
+            educationalValue: 3
+          },
+          totalScore: 15,
+          feedback: 'Scoring validation failed'
+        };
+      }
     }
   ];
 
   const validationResults = await executeConcurrently(validationOperations, {
     maxConcurrency: 2,
-    defaultTimeout: 60000,
+    defaultTimeout: 130000, // 130 seconds to align with individual operation timeouts
     defaultRetries: 1,
     circuitBreakerThreshold: 3,
     circuitBreakerResetTime: 60000,
@@ -232,10 +274,64 @@ async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutp
   const reviewResult = validationResults.find(r => r.name === 'review_mcq');
   const scoreResult = validationResults.find(r => r.name === 'score_mcq');
 
+  // DEBUG: Log the actual validation results
+  logger.info(`[VALIDATION_RESULTS_DEBUG] Review result:`, {
+    found: !!reviewResult,
+    status: reviewResult?.status,
+    hasResult: !!reviewResult?.result,
+    hasError: !!reviewResult?.error,
+    name: reviewResult?.name,
+    duration: reviewResult?.duration,
+    retryCount: reviewResult?.retryCount
+  });
+
+  logger.info(`[VALIDATION_RESULTS_DEBUG] Score result:`, {
+    found: !!scoreResult,
+    status: scoreResult?.status,
+    hasResult: !!scoreResult?.result,
+    hasError: !!scoreResult?.error,
+    name: scoreResult?.name,
+    duration: scoreResult?.duration,
+    retryCount: scoreResult?.retryCount
+  });
+
   // Extract results with proper type handling and fallbacks
   let reviewFeedback = 'Review validation failed, proceeding with generation';
+  let reviewV2Data: any = null;
+  let reviewScore = 5; // Default middle score
+  
   if (reviewResult?.status === 'success') {
-    reviewFeedback = reviewResult.result || reviewFeedback;
+    const result = reviewResult.result;
+    
+    if (CONFIG.USE_REVIEW_V2 && result && typeof result === 'object' && result.success) {
+      // Handle Review Agent V2 response format
+      reviewV2Data = result.data;
+      reviewFeedback = reviewV2Data?.feedback || 'Review Agent V2 completed successfully';
+      reviewScore = reviewV2Data?.score || 5;
+      
+      logger.info(`[VALIDATION_SUCCESS] Review Agent V2 succeeded:`, {
+        score: reviewScore,
+        medicalAccuracy: reviewV2Data?.medicalAccuracy,
+        clarity: reviewV2Data?.clarity,
+        clinicalRealism: reviewV2Data?.clinicalRealism,
+        educationalValue: reviewV2Data?.educationalValue,
+        suggestionsCount: reviewV2Data?.suggestions?.length || 0,
+        correctionsCount: reviewV2Data?.corrections?.length || 0
+      });
+    } else {
+      // Handle legacy review agent string response
+      reviewFeedback = typeof result === 'string' ? result : (result?.feedback || reviewFeedback);
+      logger.info(`[VALIDATION_SUCCESS] Legacy review agent succeeded with feedback:`, {
+        feedbackLength: reviewFeedback.length,
+        feedbackPreview: reviewFeedback.substring(0, 200) + '...'
+      });
+    }
+  } else {
+    logger.info(`[VALIDATION_FAILED] Review agent failed:`, {
+      status: reviewResult?.status,
+      error: reviewResult?.error?.message || reviewResult?.error || 'Unknown error',
+      fallbackUsed: true
+    });
   }
   
   // Update Review Agent status
@@ -245,7 +341,17 @@ async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutp
   reviewAgent.result = {
     feedback: reviewFeedback.substring(0, 200) + '...',
     success: reviewResult?.status === 'success',
-    retries: reviewResult?.retryCount || 0
+    retries: reviewResult?.retryCount || 0,
+    // Add Review Agent V2 specific data
+    ...(reviewV2Data && {
+      score: reviewScore,
+      medicalAccuracy: reviewV2Data.medicalAccuracy,
+      clarity: reviewV2Data.clarity,
+      clinicalRealism: reviewV2Data.clinicalRealism,
+      educationalValue: reviewV2Data.educationalValue,
+      suggestions: reviewV2Data.suggestions,
+      corrections: reviewV2Data.corrections
+    })
   };
   
   const defaultScore: Score = {
@@ -295,7 +401,7 @@ async function validateQuestionParallel(mcq: MCQ, difficulty?: string, agentOutp
   const validationTime = Date.now() - startTime;
   logger.info(`Parallel validation completed in ${validationTime}ms. Score: ${scoreDetails.totalScore}/25`);
 
-  return { reviewFeedback, scoreDetails };
+  return { reviewFeedback, scoreDetails, reviewV2Data, reviewScore };
 }
 
 /**
@@ -365,16 +471,18 @@ async function generateSingleQuestionOptimized(
   let refinementAttempts = 0;
   let bestScore = 0;
   let bestMCQ: MCQ | null = null;
+  let previousScoringDetails: any = null; // Store detailed scoring feedback for iterations
 
   while (refinementAttempts < CONFIG.MAX_REFINEMENT_ATTEMPTS) {
     const isRefinement = refinementAttempts > 0;
     
     logger.info(`${isRefinement ? 'Refining' : 'Generating'} ${difficulty} question (Attempt ${refinementAttempts + 1}/${CONFIG.MAX_REFINEMENT_ATTEMPTS}`);
     
-    // Generate the MCQ
-    const reviewFeedback = refinementAttempts > 0 && bestMCQ 
-      ? `Previous attempt scored ${bestScore}/25. Please improve based on: low clinical relevance, unclear options, or educational gaps.`
-      : '';
+    // Generate enhanced feedback from scoring details
+    let reviewFeedback = '';
+    if (refinementAttempts > 0 && bestMCQ && previousScoringDetails) {
+      reviewFeedback = generateDetailedFeedback(bestScore, previousScoringDetails);
+    }
     
     // Track Drafting Agent
     const draftingAgent: any = {
@@ -412,17 +520,40 @@ async function generateSingleQuestionOptimized(
     }
 
     // PARALLEL VALIDATION - This is the key optimization
-    const { reviewFeedback: currentReviewFeedback, scoreDetails } = await validateQuestionParallel(currentMCQ, difficulty, agentOutputs, addAgentOutput);
+    const { reviewFeedback: currentReviewFeedback, scoreDetails, reviewV2Data, reviewScore } = await validateQuestionParallel(currentMCQ, difficulty, agentOutputs, addAgentOutput);
     
-    // Track best attempt
+    // Track best attempt and detailed scoring feedback
     if (scoreDetails.totalScore > bestScore) {
       bestScore = scoreDetails.totalScore;
       bestMCQ = currentMCQ;
+      previousScoringDetails = scoreDetails; // Store detailed scoring for feedback loop
     }
 
-    // Check if we meet quality threshold
-    if (scoreDetails.totalScore >= CONFIG.MINIMUM_SCORE_THRESHOLD) {
-      logger.info(`Quality threshold met for ${difficulty} question: ${scoreDetails.totalScore}/25`);
+    // Check if we meet quality threshold using appropriate scoring system
+    let qualityThresholdMet = false;
+    let qualityMetrics = '';
+    
+    if (CONFIG.USE_REVIEW_V2 && reviewV2Data && reviewScore) {
+      // Use Review Agent V2 scoring (0-10 scale)
+      qualityThresholdMet = reviewScore >= CONFIG.REVIEW_V2_MIN_SCORE;
+      qualityMetrics = `Review Agent V2 score: ${reviewScore}/10 (threshold: ${CONFIG.REVIEW_V2_MIN_SCORE})`;
+      logger.info(`Review Agent V2 quality check:`, {
+        score: reviewScore,
+        threshold: CONFIG.REVIEW_V2_MIN_SCORE,
+        passed: qualityThresholdMet,
+        medicalAccuracy: reviewV2Data.medicalAccuracy,
+        clarity: reviewV2Data.clarity,
+        clinicalRealism: reviewV2Data.clinicalRealism,
+        educationalValue: reviewV2Data.educationalValue
+      });
+    } else {
+      // Use traditional scoring (0-25 scale)
+      qualityThresholdMet = scoreDetails.totalScore >= CONFIG.MINIMUM_SCORE_THRESHOLD;
+      qualityMetrics = `Traditional score: ${scoreDetails.totalScore}/25 (threshold: ${CONFIG.MINIMUM_SCORE_THRESHOLD})`;
+    }
+    
+    if (qualityThresholdMet) {
+      logger.info(`Quality threshold met for ${difficulty} question: ${qualityMetrics}`);
       
       // Track Final Validation Agent
       const validationAgent: any = {
@@ -430,8 +561,9 @@ async function generateSingleQuestionOptimized(
         status: 'running',
         startTime: Date.now(),
         input: {
-          qualityScore: scoreDetails.totalScore,
-          threshold: CONFIG.MINIMUM_SCORE_THRESHOLD
+          qualityScore: CONFIG.USE_REVIEW_V2 && reviewV2Data ? reviewScore : scoreDetails.totalScore,
+          threshold: CONFIG.USE_REVIEW_V2 && reviewV2Data ? CONFIG.REVIEW_V2_MIN_SCORE : CONFIG.MINIMUM_SCORE_THRESHOLD,
+          scoringSystem: CONFIG.USE_REVIEW_V2 && reviewV2Data ? 'Review Agent V2' : 'Traditional'
         }
       };
       
@@ -801,26 +933,28 @@ async function enhancedDraftingAgent(
     
     // Use streaming if enabled for better visibility
     if (useStreaming && sessionId) {
-      logger.info('using_streaming_for_drafting', {
+      logger.info('streaming_disabled_temporarily', {
         topic,
         difficulty,
-        contextLength: context.length
+        contextLength: context.length,
+        reason: 'StreamingGeminiClient temporarily disabled during API migration'
       });
       
-      const streamingClient = new StreamingGeminiClient({
-        timeout: 120000, // 2 minutes for streaming per user guidance
-        maxRetries: 2,
-        fallbackToFlash: true,
-        onChunk: (chunk) => {
-          // Log streaming progress for visibility
-          logger.info('streaming_chunk', {
-            chunkLength: chunk.length,
-            preview: chunk.substring(0, 50) + '...'
-          });
-        }
-      }, sessionId);
+      // TODO: Re-enable streaming once GoogleGenAI API migration is complete
+      // const streamingClient = new StreamingGeminiClient({
+      //   timeout: 120000, // 2 minutes for streaming per user guidance
+      //   maxRetries: 2,
+      //   fallbackToFlash: true,
+      //   onChunk: (chunk) => {
+      //     // Log streaming progress for visibility
+      //     logger.info('streaming_chunk', {
+      //       chunkLength: chunk.length,
+      //       preview: chunk.substring(0, 50) + '...'
+      //     });
+      //   }
+      // }, sessionId);
       
-      streamingClient.setSessionId(sessionId);
+      // streamingClient.setSessionId(sessionId);
 
       const DIFFICULTY_INSTRUCTIONS: Record<Difficulty, string> = {
         'Basic': 'A foundational, high-yield question suitable for a board certification exam. Focus on first-line treatments, classic presentations, and key diagnostic features.',
@@ -873,30 +1007,21 @@ KEY_TAKEAWAYS:
 1. [Main learning point - specific clinical pearl or diagnostic tip]
 2. [Secondary learning point - management principle or pathophysiology concept]`;
 
-      const result = await streamingClient.generateTextStream({
-        prompt,
-        operation: 'enhanced_drafting_streaming',
-        preferredModel: 'gemini-2.0-flash-exp'
+      // Fallback to regular client instead of streaming during API migration
+      logger.info('using_fallback_client', {
+        reason: 'Streaming disabled during API migration'
       });
-
-      if (!result.success || !result.text) {
-        throw new Error(`Streaming generation failed: ${result.error || 'No text generated'}`);
-      }
-
-      const mcq = parseStructuredTextResponse(result.text, topic, difficulty);
       
-      if (!mcq.stem || !mcq.options || !mcq.correctAnswer || !mcq.explanation) {
-        throw new Error('Invalid MCQ structure from streaming response');
-      }
-
-      // Update progress on successful drafting
-      await progressTracker?.updateStage('drafting', 'complete', {
-        difficulty,
-        responseLength: result.text.length
-      });
-
-      return mcq;
+      // Fall through to use regular robust client instead
     }
+    
+    // Use regular client (both for fallback and normal cases)
+    logger.info('using_regular_client_for_drafting', {
+      topic,
+      difficulty,
+      contextLength: context.length,
+      usingStreaming: useStreaming && sessionId
+    });
     
     // Original non-streaming implementation
     const client = getRobustGeminiClient({
@@ -1185,3 +1310,48 @@ export const PERFORMANCE_METRICS = {
     improvement: '60-75% faster overall'
   }
 };
+
+/**
+ * Generate detailed feedback from scoring results for question refinement
+ */
+function generateDetailedFeedback(score: number, scoringDetails: any): string {
+  if (!scoringDetails || !scoringDetails.scores) {
+    return `Previous attempt scored ${score}/25. Please improve the overall quality.`;
+  }
+
+  const { scores } = scoringDetails;
+  const feedback: string[] = [];
+  
+  // Add overall score context
+  feedback.push(`Previous attempt scored ${score}/25. Areas needing improvement:`);
+
+  // Generate specific feedback based on low scores
+  if (scores.clinicalRelevance < 4) {
+    feedback.push('🔬 Clinical Relevance: Ensure question tests high-yield, board-relevant concepts. Use current guidelines and evidence-based medicine.');
+  }
+  
+  if (scores.clarity < 4) {
+    feedback.push('📝 Question Clarity: Improve vignette clarity, remove ambiguity, ensure all necessary information is provided in stem.');
+  }
+  
+  if (scores.singleBestAnswer < 4) {
+    feedback.push('🎯 Best Answer Quality: Make the correct answer definitively correct and clearly superior to distractors.');
+  }
+  
+  if (scores.difficulty < 4) {
+    feedback.push('⚖️ Difficulty Calibration: Adjust complexity to match target difficulty level. Balance between too easy and too difficult.');
+  }
+  
+  if (scores.educationalValue < 4) {
+    feedback.push('📚 Educational Value: Strengthen explanation with pathophysiology, key learning points, and clinical pearls.');
+  }
+
+  // Add overall guidance
+  if (score < 15) {
+    feedback.push('🚨 Priority: This question needs significant improvement before it meets board standards.');
+  } else if (score < 18) {
+    feedback.push('⚠️ Focus: Address the specific areas above to reach quality threshold.');
+  }
+
+  return feedback.join('\n');
+}

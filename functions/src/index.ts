@@ -9,7 +9,10 @@ admin.initializeApp();
 // AI functions
 export { generateMcq as ai_generate_mcq } from './ai/drafting';
 export { processReview as ai_review_mcq } from './ai/review';
+export { processReviewV2 as ai_review_mcq_v2 } from './ai/reviewAgentV2';
 export { processScoring as ai_score_mcq, processScoring as scoreMcq } from './ai/scoring';
+// Enhanced scoring with ABD-specific 20-criterion rubric
+export { enhancedScoring as ai_enhanced_scoring } from './ai/enhancedScoring';
 // Tutor still disabled due to KB dependencies - export { tutorQuery as ai_tutor_query } from './ai/tutor';
 // REMOVED: adaptedPipeline.ts - Obsolete experimental variant
 // export { generateEnhancedMcq as ai_generate_enhanced_mcq } from './ai/adaptedPipeline';
@@ -55,16 +58,16 @@ export { itemsPropose as items_propose } from './items/propose';
 export { itemsPromote as items_promote } from './items/promote';
 export { itemsRevise as items_revise } from './items/revise';
 
-// Admin functions - Temporarily commented out to test deployment timeout fix
-// export { admin_generateQuestionQueue as admin_generate_question_queue } from './admin/questionQueue';
-// export { admin_generate_per_topic as admin_generate_per_topic } from './admin/questionQueue';
-// export { admin_getQuestionQueue as admin_get_question_queue } from './admin/questionQueue';
-// export { admin_reviewQuestion as admin_review_question } from './admin/questionQueue';
+// Admin functions - Re-enabling essential admin panel functions
+export { admin_generateQuestionQueue as admin_generate_question_queue } from './admin/questionQueue';
+export { admin_generate_per_topic as admin_generate_per_topic } from './admin/questionQueue';
+export { admin_getQuestionQueue as admin_get_question_queue } from './admin/questionQueue';
+export { admin_reviewQuestion as admin_review_question } from './admin/questionQueue';
 export { admin_listUncategorized as admin_list_uncategorized } from './admin/taxonomy';
 export { admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
-// Temporarily commented out to avoid deployment timeout due to KB loading
-// export { admin_getTaxonomy as admin_get_taxonomy } from './admin/questionQueue';
-// export { admin_getTaxonomyEntities as admin_get_taxonomy_entities } from './admin/questionQueue';
+// Re-enabled after taxonomy filtering optimization (categories 8-9 filtered out)
+export { admin_getTaxonomy } from './admin/questionQueue';
+export { admin_getTaxonomyEntities } from './admin/questionQueue';
 // Temporarily commented out to avoid deployment timeout due to KB loading
 // export { 
 //   admin_migrateTaxonomy as admin_migrate_taxonomy,
@@ -75,13 +78,18 @@ export { importLegacyQuestions as storage_import_legacy_questions } from './admi
 export { getQuestionBankStats as admin_get_question_bank_stats } from './admin/importQuestions';
 
 // User Management - Admin Functions
-export { grantAdminRole as admin_grant_role } from './admin/userManagement';
-export { revokeAdminRole as admin_revoke_role } from './admin/userManagement';
-export { listAdminUsers as admin_list_admins } from './admin/userManagement';
+export { grantAdminRole as admin_grant_role, revokeAdminRole as admin_revoke_role, listAdminUsers as admin_list_admins } from './admin/grantAdminRole';
 
 // Admin Question Generation - Dedicated pipeline with ABD guidelines
 export { adminGenerateQuestions as admin_generate_questions } from './admin/adminQuestionGeneration';
 export { adminBatchGenerateQuestions as admin_batch_generate_questions } from './admin/adminQuestionGeneration';
+
+// Admin AI Question Review System - AI-powered review and feedback
+export { 
+  aiReviewQuestion as admin_ai_review_question,
+  regenerateQuestionWithFeedback as admin_regenerate_question,
+  validateClinical as admin_validate_clinical
+} from './admin/aiQuestionReview';
 
 // Initial Setup Functions (disable after setup)
 export { grantInitialAdminRole as setup_grant_admin } from './admin/initialSetup';
@@ -146,13 +154,13 @@ export { orchestrateQuestionGenerationFunction as orchestrateQuestionGeneration 
 //   testImplementations 
 // } from './test/performanceBenchmark';
 
-// HTTP Streaming Endpoints (Bypass 70-second timeout)
-export { 
-  streamGenerateQuestions,
-  checkGenerationProgress,
-  submitGenerationJob,
-  checkGenerationJob
-} from './ai/httpStreamingEndpoint';
+// HTTP Streaming Endpoints (Temporarily disabled during API migration)
+// export { 
+//   streamGenerateQuestions,
+//   checkGenerationProgress,
+//   submitGenerationJob,
+//   checkGenerationJob
+// } from './ai/httpStreamingEndpoint';
 
 // Public test endpoint (remove in production)
 export { testGenerateQuestions } from './test/publicTestEndpoint';

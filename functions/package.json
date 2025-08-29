@@ -7,7 +7,7 @@
     "node": "20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp -r src/kb/*.json lib/kb/ 2>/dev/null || true",
     "build-dev": "tsc -p tsconfig.json",
     "build-prod": "tsc -p tsconfig.json && cp -r src/kb/*.json lib/kb/ 2>/dev/null || true",
     "watch": "tsc -w -p tsconfig.json",
@@ -34,7 +34,6 @@
   },
   "dependencies": {
     "@google/genai": "1.15.0",
-    "@google/generative-ai": "0.24.1",
     "dotenv": "17.2.1",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "5.1.1",

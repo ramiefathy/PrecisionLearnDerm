@@ -83,6 +83,13 @@ export default function AdminTestingPage() {
       category: 'ai'
     },
     {
+      id: 'reviewV2',
+      name: 'Review Agent V2',
+      description: 'Test the redesigned review agent with simplified architecture',
+      endpoint: 'reviewMcqV2',
+      category: 'ai'
+    },
+    {
       id: 'scoring',
       name: 'Scoring Agent',
       description: 'Test the scoring agent independently',
@@ -193,9 +200,10 @@ export default function AdminTestingPage() {
           case 'simple':
             return {
               topicIds: [topic.toLowerCase().replace(/\s+/g, '_')],
-              difficultyTarget: selectedDifficulties.has('Basic') ? 0.3 : selectedDifficulties.has('Advanced') ? 0.6 : 0.9
+              difficulty: selectedDifficulties.has('Basic') ? 0.3 : selectedDifficulties.has('Advanced') ? 0.6 : 0.9
             };
           case 'review':
+          case 'reviewV2':
             return {
               question: {
                 stem: "A 45-year-old patient presents with a pigmented lesion...",

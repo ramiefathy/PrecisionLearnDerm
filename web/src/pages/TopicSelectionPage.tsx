@@ -2,40 +2,55 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../app/store';
-import { listCategoryOptions, listTopicOptions, listSubtopicOptions } from '../lib/taxonomy';
+import MultiSelectTaxonomy from '../components/MultiSelectTaxonomy';
+
+interface TaxonomySelection {
+  category: string;
+  subcategories: string[];
+  subSubcategories: Record<string, string[]>; // subcategory -> sub-subcategories
+}
 
 export default function TopicSelectionPage() {
-  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
   const setQuizConfig = useAppStore(s => s.setActiveQuiz);
-
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [topicId, setTopicId] = useState<string>('');
-
-  const categories = listCategoryOptions();
-  const topics = categoryId ? listTopicOptions(categoryId) : [];
-  const subtopics = topicId ? listSubtopicOptions(topicId) : [];
-
-  function toggleSubtopic(id: string) {
-    setSelectedSubtopics(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }
+  const [taxonomySelections, setTaxonomySelections] = useState<TaxonomySelection[]>([]);
 
   function proceedToConfig() {
+    // Create quiz config with taxonomy filters
     setQuizConfig({
       startedAt: 0,
       items: [],
       answers: {},
       config: {
-        numQuestions: 10,
+        numQuestions: 25,
         timed: false,
         durationMins: 30,
-        progressionMode: 'batch',
+        progressionMode: 'one-by-one',
         captureConfidence: true,
-        topicIds: selectedSubtopics
+        topicIds: [], // Clear legacy topics
+        taxonomyFilter: taxonomySelections
       },
       currentIndex: 0,
       schemaVersion: 1
     });
   }
+
+  const getTotalSelections = () => {
+    return taxonomySelections.reduce((total, selection) => {
+      const subcategoryCount = selection.subcategories.length;
+      const subSubcategoryCount = Object.values(selection.subSubcategories)
+        .reduce((sum, subSubs) => sum + subSubs.length, 0);
+      
+      // If no specific subcategories/sub-subcategories are selected, count as 1 (whole category)
+      if (subcategoryCount === 0 && subSubcategoryCount === 0) {
+        return total + 1;
+      }
+      
+      // Count specific selections
+      return total + Math.max(subcategoryCount, subSubcategoryCount);
+    }, 0);
+  };
+
+  const totalSelections = getTotalSelections();
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -51,12 +66,12 @@ export default function TopicSelectionPage() {
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Choose Your Topics</h1>
-                <p className="text-sm text-gray-500">Organized by Category → Topic → Subtopic</p>
+                <p className="text-sm text-gray-500">Organized by Category → Subcategory → Sub-subcategory</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">{selectedSubtopics.length} selected</span>
-              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm text-gray-500">{totalSelections} selected</span>
+              <div className={`w-2 h-2 rounded-full ${totalSelections > 0 ? 'bg-green-500' : 'bg-gray-300'}`} />
             </div>
           </div>
         </div>
@@ -70,65 +85,25 @@ export default function TopicSelectionPage() {
           className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mb-8"
         />
 
-        {/* Taxonomy selectors */}
-        <div className="grid sm:grid-cols-3 gap-3 mb-6">
-          <select value={categoryId} onChange={(e)=>{ setCategoryId(e.target.value); setTopicId(''); }} className="w-full p-3 rounded-xl border-2 bg-white/80">
-            <option value="">Select Category</option>
-            {categories.map((c: { value: string; label: string }) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-          <select value={topicId} onChange={(e)=> setTopicId(e.target.value)} disabled={!categoryId} className="w-full p-3 rounded-xl border-2 bg-white/80 disabled:opacity-50">
-            <option value="">Select Topic</option>
-            {topics.map((t: { value: string; label: string }) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-          <button onClick={()=> setSelectedSubtopics([])} className="p-3 rounded-xl border-2 bg-white/80">Clear Selected</button>
-        </div>
-
-        {/* Subtopic Grid */}
-        <motion.div 
+        {/* Taxonomy Selection */}
+        <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8"
+          className="bg-white/90 backdrop-blur rounded-2xl p-6 shadow-lg border border-gray-100 mb-8"
         >
-          {subtopics.map((s: { value: string; label: string }, index: number) => {
-            const isSelected = selectedSubtopics.includes(s.value);
-            const colorClass = 'from-blue-500 to-indigo-500';
-            const icon = '📚';
-            const description = 'Subtopic';
-            return (
-              <motion.div
-                key={s.value}
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.6, delay: index * 0.03 }}
-                whileHover={{ scale: 1.02, y: -4 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <button
-                  onClick={() => toggleSubtopic(s.value)}
-                  className={`w-full p-6 rounded-3xl border-2 transition-all text-left ${isSelected ? `bg-gradient-to-br ${colorClass} text-white border-transparent shadow-xl` : 'bg-white/80 backdrop-blur border-gray-200 hover:border-gray-300 shadow-soft hover:shadow-lg'}`}
-                >
-                  <div className={`text-3xl mb-3 ${isSelected ? '' : 'grayscale'}`}>{icon}</div>
-                  <h3 className={`font-bold text-lg mb-2 ${isSelected ? 'text-white' : 'text-gray-900'}`}>{s.label}</h3>
-                  <p className={`text-sm ${isSelected ? 'text-white/90' : 'text-gray-600'}`}>{description}</p>
-                  <div className={`mt-4 flex items-center justify-between`}>
-                    <span className={`text-xs font-medium ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>Taxonomy</span>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-gray-300'}`}>
-                      {isSelected && (
-                        <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </motion.div>
-            );
-          })}
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Select Medical Categories</h2>
+            <p className="text-sm text-gray-600">
+              Choose from our structured dermatology knowledge base. You can select entire categories, specific subcategories, or individual topics to customize your quiz content.
+            </p>
+          </div>
+
+          <MultiSelectTaxonomy
+            value={taxonomySelections}
+            onChange={setTaxonomySelections}
+            showEntityCount={true}
+          />
         </motion.div>
 
         {/* Continue button */}
@@ -141,10 +116,14 @@ export default function TopicSelectionPage() {
           <Link
             to="/quiz/config"
             onClick={proceedToConfig}
-            className={`px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 ${selectedSubtopics.length > 0 ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white shadow-xl hover:shadow-2xl hover:scale-105' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-            style={{ pointerEvents: selectedSubtopics.length > 0 ? 'auto' : 'none' }}
+            className={`px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 ${
+              totalSelections > 0 
+                ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white shadow-xl hover:shadow-2xl hover:scale-105' 
+                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+            }`}
+            style={{ pointerEvents: totalSelections > 0 ? 'auto' : 'none' }}
           >
-            Continue with {selectedSubtopics.length} subtopic{selectedSubtopics.length !== 1 ? 's' : ''}
+            Continue with {totalSelections} selection{totalSelections !== 1 ? 's' : ''}
             <svg className="w-5 h-5 ml-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
@@ -159,7 +138,7 @@ export default function TopicSelectionPage() {
           className="mt-12 text-center"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 text-sm">
-            💡 <span>Pick multiple subtopics within a topic for a focused session.</span>
+            💡 <span>Expand categories to select specific subcategories and topics for focused learning.</span>
           </div>
         </motion.div>
       </div>

@@ -329,15 +329,17 @@ export const admin_getTaxonomy = functions.https.onCall(async (data, context) =>
     // Initialize taxonomy service
     await initializeTaxonomyService();
 
-    const structure = taxonomyService.getTaxonomyStructure();
-    const stats = taxonomyService.getStats();
-    const categories = taxonomyService.getCategories();
+    const structure = await taxonomyService.getTaxonomyStructure();
+    const stats = await taxonomyService.getStats();
+    const categories = await taxonomyService.getCategories();
+    const entityCounts = await taxonomyService.getEntityCounts();
 
     return {
       success: true,
       structure,
       stats,
       categories,
+      entityCounts,
       message: 'Taxonomy loaded successfully'
     };
   } catch (error: any) {

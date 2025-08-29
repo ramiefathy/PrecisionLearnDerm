@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getSharedKB } from '../util/sharedCache';
 import { config } from '../util/config';
+import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 
 const GEMINI_MODEL = config.gemini.model;
 
@@ -370,7 +371,8 @@ Remember: Create an ORIGINAL clinical scenario. Use the KB context for accuracy 
 export const generateBoardStyleMcq = functions
   .runWith({
     timeoutSeconds: 300, // 5 minutes for board-style generation
-    memory: '1GB'
+    memory: '1GB',
+    secrets: [GEMINI_API_KEY]
   })
   .https.onCall(async (data, context) => {
   try {

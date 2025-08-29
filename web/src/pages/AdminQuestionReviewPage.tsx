@@ -49,6 +49,33 @@ interface QueueStats {
   total: number;
 }
 
+interface AIReviewResult {
+  success: boolean;
+  overallRating: string;
+  overallScore: number;
+  abdCompliance: {
+    score: number;
+    recommendations: string[];
+  };
+  clinicalAccuracy: {
+    score: number;
+    issues: string[];
+  };
+  questionQuality: {
+    score: number;
+    strengths: string[];
+    improvements: string[];
+  };
+  clinicalValidation?: {
+    validationStatus: string;
+    keyFindings: string[];
+    relevantSources: number;
+  };
+  recommendedAction: string;
+  detailedFeedback: string;
+  error?: string;
+}
+
 export default function AdminQuestionReviewPage() {
   const [questions, setQuestions] = useState<QueuedQuestion[]>([]);
   const [stats, setStats] = useState<QueueStats>({ pending: 0, approved: 0, rejected: 0, total: 0 });
@@ -58,6 +85,14 @@ export default function AdminQuestionReviewPage() {
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showPipelineDetails, setShowPipelineDetails] = useState(false);
+  
+  // AI Review state
+  const [aiReviewResult, setAiReviewResult] = useState<AIReviewResult | null>(null);
+  const [performingAiReview, setPerformingAiReview] = useState(false);
+  const [adminFeedback, setAdminFeedback] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
+  const [showAiReview, setShowAiReview] = useState(false);
+  const [validatingClinical, setValidatingClinical] = useState(false);
 
   useEffect(() => {
     loadQuestionQueue();
@@ -155,6 +190,107 @@ export default function AdminQuestionReviewPage() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  // AI Review Functions
+  const handleAiReview = async (questionId: string, question: QueuedQuestion) => {
+    if (!question.draftItem) return;
+    
+    try {
+      setPerformingAiReview(true);
+      setAiReviewResult(null);
+      
+      const result = await api.admin.aiReviewQuestion({
+        questionId,
+        questionData: question.draftItem,
+        performClinicalValidation: true,
+        focusAreas: ['clinical_accuracy', 'abd_compliance', 'question_quality']
+      }) as any;
+      
+      if (result.success) {
+        setAiReviewResult(result.review);
+        setShowAiReview(true);
+        toast.success('AI Review Complete', 'Question analyzed with ABD guidelines and clinical validation');
+      } else {
+        toast.error('AI Review Failed', result.error || 'Failed to perform AI review');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'perform AI review');
+    } finally {
+      setPerformingAiReview(false);
+    }
+  };
+
+  const handleClinicalValidation = async (question: QueuedQuestion) => {
+    if (!question.draftItem) return;
+    
+    try {
+      setValidatingClinical(true);
+      
+      const result = await api.admin.validateClinical({
+        questionData: question.draftItem,
+        searchTerms: [] // Let the backend extract medical terms
+      }) as any;
+      
+      if (result.success) {
+        // Update the AI review result with clinical validation data
+        if (aiReviewResult) {
+          setAiReviewResult({
+            ...aiReviewResult,
+            clinicalValidation: result.validation
+          });
+        }
+        toast.success('Clinical Validation Complete', `Found ${result.validation.relevantSources || 0} relevant sources`);
+      } else {
+        toast.error('Clinical Validation Failed', result.error || 'Failed to validate clinical information');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'validate clinical information');
+    } finally {
+      setValidatingClinical(false);
+    }
+  };
+
+  const handleRegenerateQuestion = async (questionId: string, originalQuestion: QueuedQuestion) => {
+    if (!originalQuestion.draftItem || !adminFeedback.trim()) {
+      toast.error('Feedback Required', 'Please provide specific feedback for question regeneration');
+      return;
+    }
+    
+    try {
+      setRegenerating(true);
+      
+      const result = await api.admin.regenerateQuestion({
+        questionId,
+        questionData: originalQuestion.draftItem,
+        adminFeedback: adminFeedback.trim(),
+        preserveCorrectAnswer: false,
+        focusArea: 'clinical_accuracy'
+      }) as any;
+      
+      if (result.success) {
+        // Refresh the question queue to show updated question
+        await loadQuestionQueue();
+        setAdminFeedback('');
+        setAiReviewResult(null);
+        setShowAiReview(false);
+        toast.success('Question Regenerated', 'Question updated based on your feedback');
+      } else {
+        toast.error('Regeneration Failed', result.error || 'Failed to regenerate question');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'regenerate question');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  // Reset AI review state when selecting a different question
+  const handleQuestionSelect = (question: QueuedQuestion) => {
+    setSelectedQuestion(question);
+    setAiReviewResult(null);
+    setShowAiReview(false);
+    setAdminFeedback('');
   };
 
 
@@ -273,7 +409,7 @@ export default function AdminQuestionReviewPage() {
                       ? 'border-purple-300 shadow-lg'
                       : 'border-gray-200/50 hover:border-purple-200'
                   }`}
-                  onClick={() => setSelectedQuestion(question)}
+                  onClick={() => handleQuestionSelect(question)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className={`px-2 py-1 rounded text-xs font-semibold ${getQualityColor(question.kbSource?.completenessScore || 0)}`}>
@@ -429,9 +565,176 @@ export default function AdminQuestionReviewPage() {
                       </div>
                     )}
 
+                    {/* AI Review Section */}
+                    <div className="border-t pt-6 mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                          <span>🤖</span> AI-Powered Review
+                        </h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleAiReview(selectedQuestion.id, selectedQuestion)}
+                            disabled={performingAiReview || reviewing !== null}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50 text-sm"
+                          >
+                            {performingAiReview ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Analyzing...
+                              </div>
+                            ) : '🔬 AI Review'}
+                          </button>
+                          <button
+                            onClick={() => handleClinicalValidation(selectedQuestion)}
+                            disabled={validatingClinical || reviewing !== null}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50 text-sm"
+                          >
+                            {validatingClinical ? 'Validating...' : '📚 Clinical Check'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* AI Review Results */}
+                      {showAiReview && aiReviewResult && (
+                        <AnimatePresence>
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="mb-6"
+                          >
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                                  🎯 AI Review Results
+                                </h4>
+                                <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                                  aiReviewResult.overallScore >= 80 ? 'bg-green-100 text-green-800' :
+                                  aiReviewResult.overallScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {aiReviewResult.overallRating} ({aiReviewResult.overallScore}/100)
+                                </div>
+                              </div>
+
+                              <div className="grid md:grid-cols-3 gap-4 mb-4">
+                                <div className="bg-white/80 rounded-lg p-4">
+                                  <h5 className="font-medium text-gray-900 mb-2">ABD Compliance</h5>
+                                  <div className="text-2xl font-bold text-blue-600 mb-1">{aiReviewResult.abdCompliance.score}/100</div>
+                                  {aiReviewResult.abdCompliance.recommendations.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {aiReviewResult.abdCompliance.recommendations[0]}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="bg-white/80 rounded-lg p-4">
+                                  <h5 className="font-medium text-gray-900 mb-2">Clinical Accuracy</h5>
+                                  <div className="text-2xl font-bold text-teal-600 mb-1">{aiReviewResult.clinicalAccuracy.score}/100</div>
+                                  {aiReviewResult.clinicalAccuracy.issues.length > 0 && (
+                                    <div className="text-xs text-gray-600">
+                                      {aiReviewResult.clinicalAccuracy.issues.length} issues found
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="bg-white/80 rounded-lg p-4">
+                                  <h5 className="font-medium text-gray-900 mb-2">Question Quality</h5>
+                                  <div className="text-2xl font-bold text-purple-600 mb-1">{aiReviewResult.questionQuality.score}/100</div>
+                                  <div className="text-xs text-gray-600">
+                                    {aiReviewResult.questionQuality.strengths.length} strengths
+                                  </div>
+                                </div>
+                              </div>
+
+                              {aiReviewResult.clinicalValidation && (
+                                <div className="bg-white/80 rounded-lg p-4 mb-4">
+                                  <h5 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                                    📚 Clinical Validation
+                                  </h5>
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                      <span className="text-sm text-gray-600">Status:</span>
+                                      <div className="font-medium">{aiReviewResult.clinicalValidation.validationStatus}</div>
+                                    </div>
+                                    <div>
+                                      <span className="text-sm text-gray-600">Sources Found:</span>
+                                      <div className="font-medium">{aiReviewResult.clinicalValidation.relevantSources}</div>
+                                    </div>
+                                  </div>
+                                  {aiReviewResult.clinicalValidation.keyFindings.length > 0 && (
+                                    <div className="mt-2">
+                                      <span className="text-sm text-gray-600">Key Findings:</span>
+                                      <ul className="list-disc list-inside text-sm mt-1">
+                                        {aiReviewResult.clinicalValidation.keyFindings.map((finding, idx) => (
+                                          <li key={idx} className="text-gray-700">{finding}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="bg-white/80 rounded-lg p-4 mb-4">
+                                <h5 className="font-medium text-gray-900 mb-2">Recommended Action</h5>
+                                <div className={`inline-block px-3 py-1 rounded-lg text-sm font-medium ${
+                                  aiReviewResult.recommendedAction.toLowerCase().includes('approve') ? 'bg-green-100 text-green-800' :
+                                  aiReviewResult.recommendedAction.toLowerCase().includes('reject') ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {aiReviewResult.recommendedAction}
+                                </div>
+                              </div>
+
+                              <div className="bg-white/80 rounded-lg p-4">
+                                <h5 className="font-medium text-gray-900 mb-2">Detailed Feedback</h5>
+                                <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                                  {aiReviewResult.detailedFeedback}
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </AnimatePresence>
+                      )}
+
+                      {/* Admin Feedback Chat Interface */}
+                      {showAiReview && (
+                        <div className="mb-6">
+                          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                            💬 Admin Feedback & Regeneration
+                          </h4>
+                          <div className="bg-gray-50 rounded-xl p-4">
+                            <div className="mb-3">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Specific Feedback for Question Improvement
+                              </label>
+                              <textarea
+                                value={adminFeedback}
+                                onChange={(e) => setAdminFeedback(e.target.value)}
+                                placeholder="Provide specific feedback about what needs to be improved (e.g., 'The stem lacks sufficient clinical detail about the patient's presentation' or 'Option B is too obviously incorrect')..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                rows={4}
+                              />
+                            </div>
+                            <button
+                              onClick={() => handleRegenerateQuestion(selectedQuestion.id, selectedQuestion)}
+                              disabled={regenerating || !adminFeedback.trim()}
+                              className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50"
+                            >
+                              {regenerating ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  Regenerating...
+                                </div>
+                              ) : '🔄 Regenerate Question'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Review Actions */}
                     <div className="border-t pt-6 mt-6">
-                      <h3 className="font-semibold text-gray-900 mb-4">Review Decision</h3>
+                      <h3 className="font-semibold text-gray-900 mb-4">Final Review Decision</h3>
 
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">

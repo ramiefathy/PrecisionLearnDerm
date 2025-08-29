@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions';
 import { requireAdmin } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
+import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 
 const db = admin.firestore();
 
@@ -32,24 +33,51 @@ interface ReviewResult {
  * Use robust Gemini client with consistent safety settings and retry logic
  */
 async function callGeminiAPI(prompt: string): Promise<string> {
-  const client = getRobustGeminiClient({
-    maxRetries: 3,
-    fallbackToFlash: true,
-    timeout: 120000 // 2 minutes for review operations
-  });
+  try {
+    logInfo('review.client_init', { message: 'Attempting to initialize GoogleGenAI client for review operation' });
+    
+    // Check if we have API key configured
+    const hasApiKey = getGeminiApiKey();
+    if (!hasApiKey) {
+      logError('review.api_key_missing', { message: 'No Gemini API key found in configuration' });
+      throw new Error('GEMINI_API_KEY is not configured. Please set the Firebase secret.');
+    } else {
+      logInfo('review.api_key_found', { message: 'Gemini API key appears to be set' });
+    }
+    
+    const client = getRobustGeminiClient({
+      maxRetries: 3,
+      fallbackToFlash: true,
+      timeout: 120000 // 2 minutes for review operations
+    });
+    
+    logInfo('review.client_ready', { message: 'GoogleGenAI client initialized successfully, making API call' });
 
-  const result = await client.generateText({
-    prompt,
-    operation: 'review_mcq_structured', // Uses structured text format to avoid truncation
-    preferredModel: 'gemini-2.5-pro',
-    temperature: 0.3 // Lower temperature for consistent medical content
-  });
+    const result = await client.generateText({
+      prompt,
+      operation: 'review_mcq_structured', // Uses structured text format to avoid truncation
+      preferredModel: 'gemini-2.5-pro',
+      temperature: 0.3 // Lower temperature for consistent medical content
+    });
 
-  if (result.success && result.text) {
-    return result.text;
+    if (result.success && result.text) {
+      logInfo('review.api_success', { message: 'Gemini API call completed successfully', responseLength: result.text.length });
+      return result.text;
+    }
+
+    logError('review.api_failed', { message: 'Gemini API call failed', error: result.error, success: result.success });
+    throw new Error(result.error || 'Review API call failed');
+    
+  } catch (error) {
+    logError('review.gemini_error', { 
+      message: 'callGeminiAPI error',
+      error,
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    throw error; // Re-throw to preserve the original error
   }
-
-  throw new Error(result.error || 'Review API call failed');
 }
 
 function generateReviewPrompt(draftItem: any): string {
@@ -341,18 +369,50 @@ async function processReviewCore(draftItem: any, draftId: string): Promise<Revie
 export const processReview = functions
   .runWith({
     timeoutSeconds: 180, // 3 minutes for review
-    memory: '1GB'
+    memory: '1GB',
+    secrets: [GEMINI_API_KEY]
   })
   .https.onCall(async (data: any, context) => {
   try {
+    logInfo('review.function_start', { 
+      message: 'Review Agent function started',
+      hasData: !!data,
+      dataKeys: data ? Object.keys(data) : [],
+      contextAuth: !!context?.auth,
+      contextUid: context?.auth?.uid
+    });
+    
     requireAdmin(context);
     const { item } = data || {};
     
     if (!item || typeof item !== 'object' || !item.stem || !item.options || !item.explanation) {
+      logError('review.invalid_item', { 
+        message: 'Invalid item provided to processReview',
+        hasItem: !!item,
+        itemType: typeof item,
+        hasStem: !!(item && item.stem),
+        hasOptions: !!(item && item.options),
+        hasExplanation: !!(item && item.explanation),
+        itemKeys: item ? Object.keys(item) : []
+      });
       throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid "item" object.');
     }
     
+    logInfo('review.process_start', {
+      message: 'Processing review with valid item',
+      stemLength: item.stem?.length || 0,
+      optionsCount: Array.isArray(item.options) ? item.options.length : 0,
+      explanationLength: item.explanation?.length || 0
+    });
+    
     const reviewResult = await processReviewInternal(item, `review_${Date.now()}`);
+    
+    logInfo('review.function_success', {
+      message: 'Review Agent function completed successfully',
+      hasResult: !!reviewResult,
+      reviewNotesCount: reviewResult?.reviewNotes?.length || 0,
+      changesCount: reviewResult?.changes?.length || 0
+    });
     
     return {
       success: true,
@@ -360,12 +420,26 @@ export const processReview = functions
     };
     
   } catch (error: any) {
-    console.error('Error reviewing question:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      details: error.stack
-    };
+    logError('review.function_error', {
+      message: 'Review Agent function failed with an unhandled error',
+      error,
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : 'No stack trace',
+      isHttpsError: error instanceof functions.https.HttpsError,
+      httpsErrorCode: error instanceof functions.https.HttpsError ? error.code : 'N/A'
+    });
+    
+    // Re-throw HttpsError as-is for proper client handling
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    // Wrap other errors in HttpsError for proper client handling
+    throw new functions.https.HttpsError('internal', 'Review validation failed due to an internal server error.', {
+      originalError: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -377,18 +451,55 @@ async function processReviewInternal(draftItem: any, draftId: string): Promise<R
 export async function reviewMCQInternal(draftItem: any): Promise<string> {
   const draftId = `review_${Date.now()}`;
   try {
+    logInfo('[REVIEW_DEBUG] Starting reviewMCQInternal', { 
+      draftId, 
+      hasItem: !!draftItem,
+      itemKeys: draftItem ? Object.keys(draftItem) : []
+    });
+    
     const reviewResult = await processReviewCore(draftItem, draftId);
     
+    logInfo('[REVIEW_DEBUG] processReviewCore completed successfully', {
+      draftId,
+      hasResult: !!reviewResult,
+      reviewNotesCount: reviewResult.reviewNotes?.length || 0,
+      recommendationsCount: reviewResult.recommendations?.length || 0,
+      hasQualityMetrics: !!reviewResult.qualityMetrics
+    });
+    
     // Return structured feedback as a string for orchestrator
+    // Safely handle potentially undefined arrays
+    const reviewNotes = Array.isArray(reviewResult.reviewNotes) ? reviewResult.reviewNotes : [];
+    const recommendations = Array.isArray(reviewResult.recommendations) ? reviewResult.recommendations : [];
+    const qualityMetrics = reviewResult.qualityMetrics || {};
+    
+    logInfo('[REVIEW_DEBUG] Feedback components check', {
+      draftId,
+      reviewNotesType: typeof reviewResult.reviewNotes,
+      reviewNotesIsArray: Array.isArray(reviewResult.reviewNotes),
+      reviewNotesLength: reviewNotes.length,
+      recommendationsType: typeof reviewResult.recommendations,
+      recommendationsIsArray: Array.isArray(reviewResult.recommendations),
+      recommendationsLength: recommendations.length,
+      hasQualityMetrics: !!qualityMetrics,
+      qualityMetricsKeys: Object.keys(qualityMetrics)
+    });
+    
     const feedback = [
-      ...reviewResult.reviewNotes,
-      `Quality Scores: Medical Accuracy: ${reviewResult.qualityMetrics.medical_accuracy}, Clarity: ${reviewResult.qualityMetrics.clarity}, Realism: ${reviewResult.qualityMetrics.realism}, Educational Value: ${reviewResult.qualityMetrics.educational_value}`,
-      ...reviewResult.recommendations
+      ...reviewNotes,
+      `Quality Scores: Medical Accuracy: ${qualityMetrics.medical_accuracy || 'N/A'}, Clarity: ${qualityMetrics.clarity || 'N/A'}, Realism: ${qualityMetrics.realism || 'N/A'}, Educational Value: ${qualityMetrics.educational_value || 'N/A'}`,
+      ...recommendations
     ].join('\n');
+    
+    logInfo('[REVIEW_DEBUG] Feedback generated successfully', {
+      draftId,
+      feedbackLength: feedback.length,
+      feedbackPreview: feedback.substring(0, 200)
+    });
     
     return feedback;
   } catch (error) {
-    logError('reviewMCQInternal error', { error, draftId });
+    logError('[REVIEW_DEBUG] reviewMCQInternal error', { error, draftId, errorMessage: error instanceof Error ? error.message : String(error) });
     throw new Error(`Review failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

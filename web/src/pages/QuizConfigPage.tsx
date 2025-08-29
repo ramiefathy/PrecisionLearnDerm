@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../app/store';
 import type { QuizConfig } from '../app/store';
-import { SimpleTaxonomySelector } from '../components/SimpleTaxonomySelector';
+import MultiSelectTaxonomy from '../components/MultiSelectTaxonomy';
+
+interface TaxonomySelection {
+  category: string;
+  subcategories: string[];
+  subSubcategories: Record<string, string[]>; // subcategory -> sub-subcategories
+}
 
 const ALL_TOPICS = [
   'Acne and Related Disorders',
@@ -48,7 +54,7 @@ export default function QuizConfigPage() {
   
   // New taxonomy selection state
   const [useTaxonomy, setUseTaxonomy] = useState(true);
-  const [taxonomySelection, setTaxonomySelection] = useState<any>(null);
+  const [taxonomySelections, setTaxonomySelections] = useState<TaxonomySelection[]>([]);
 
   const handleTopicToggle = (topic: string) => {
     setSelectedTopics(prev => 
@@ -74,8 +80,8 @@ export default function QuizConfigPage() {
       progressionMode,
       captureConfidence: true,
       // Use taxonomy filtering if enabled, otherwise fall back to topics
-      ...(useTaxonomy && taxonomySelection ? {
-        taxonomyFilter: taxonomySelection,
+      ...(useTaxonomy && taxonomySelections.length > 0 ? {
+        taxonomyFilter: taxonomySelections,
         topicIds: [] // Clear legacy topics when using taxonomy
       } : {
         topicIds: selectedTopics.length > 0 ? selectedTopics : ALL_TOPICS,
@@ -97,7 +103,7 @@ export default function QuizConfigPage() {
   };
 
   const canStart = useTaxonomy ? 
-    (taxonomySelection !== null) : // For taxonomy, require selection
+    (taxonomySelections.length > 0) : // For taxonomy, require at least one selection
     true; // For topics, always allow (will use all topics if none selected)
 
   return (
@@ -274,13 +280,13 @@ export default function QuizConfigPage() {
                 <div>
                   <div className="mb-4">
                     <p className="text-sm text-gray-600">
-                      Select questions from our structured knowledge base organized by medical categories.
+                      Select questions from our structured knowledge base organized by medical categories. You can mix and match multiple categories and subcategories for personalized quizzes.
                     </p>
                   </div>
-                  <SimpleTaxonomySelector
-                    value={taxonomySelection}
-                    onChange={setTaxonomySelection}
-                    showStats={true}
+                  <MultiSelectTaxonomy
+                    value={taxonomySelections}
+                    onChange={setTaxonomySelections}
+                    showEntityCount={true}
                   />
                 </div>
               ) : (
@@ -361,9 +367,9 @@ export default function QuizConfigPage() {
                   <span className="text-sm text-gray-600">Content</span>
                   <span className="text-sm font-semibold text-gray-900">
                     {useTaxonomy ? 
-                      (taxonomySelection ? 
-                        `${taxonomySelection.category}${taxonomySelection.subcategory ? ' > ' + taxonomySelection.subcategory : ''}` : 
-                        'Select Category'
+                      (taxonomySelections.length > 0 ? 
+                        `${taxonomySelections.length} categories selected` : 
+                        'Select Categories'
                       ) : 
                       (selectedTopics.length > 0 ? `${selectedTopics.length} topics` : 'All Topics')
                     }

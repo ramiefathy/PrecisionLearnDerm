@@ -56,16 +56,98 @@ class TaxonomyService {
     try {
       logInfo('taxonomy_service_init_started', {});
       
-      // Load the knowledge base backup file
-      const kbPath = path.join(__dirname, '../../../GraphRAG/knowledgeBaseUpdating/backups/kb_backup_20250824_015634.json');
+      // Add timeout protection for initialization
+      const initWithTimeout = this.loadKnowledgeBase();
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Taxonomy service initialization timeout (30s)')), 30000)
+      );
+      
+      await Promise.race([initWithTimeout, timeout]);
+      
+    } catch (error) {
+      logError('taxonomy_service_init_failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw new Error(`Failed to initialize taxonomy service: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async loadKnowledgeBase(): Promise<void> {
+    try {
+      
+      // Load the knowledge base file from kb directory
+      const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
+      const backupPath = path.join(__dirname, '../../../GraphRAG/knowledgeBaseUpdating/backups/kb_backup_20250824_015634.json');
+      
+      logInfo('taxonomy_service_debug_paths', {
+        kbPath,
+        backupPath,
+        kbExists: fs.existsSync(kbPath),
+        backupExists: fs.existsSync(backupPath),
+        cwd: process.cwd(),
+        dirname: __dirname
+      });
+      
+      let kbData: any;
+      let rawData: string;
+      let filePath: string;
       
       if (!fs.existsSync(kbPath)) {
-        throw new Error(`Knowledge base file not found at: ${kbPath}`);
+        // Fallback to backup file if main file doesn't exist
+        if (!fs.existsSync(backupPath)) {
+          logError('taxonomy_service_no_files', {
+            kbPath,
+            backupPath,
+            kbExists: fs.existsSync(kbPath),
+            backupExists: fs.existsSync(backupPath)
+          });
+          throw new Error(`Knowledge base file not found at: ${kbPath} or ${backupPath}`);
+        }
+        filePath = backupPath;
+        rawData = await fs.promises.readFile(backupPath, 'utf8');
+        logInfo('taxonomy_service_using_backup', { filePath, dataLength: rawData.length });
+      } else {
+        filePath = kbPath;
+        rawData = await fs.promises.readFile(kbPath, 'utf8');
+        logInfo('taxonomy_service_using_main', { filePath, dataLength: rawData.length });
       }
-
-      const kbData = JSON.parse(fs.readFileSync(kbPath, 'utf8'));
       
+      try {
+        kbData = JSON.parse(rawData);
+        logInfo('taxonomy_service_json_parsed', { 
+          success: true, 
+          filePath,
+          dataLength: rawData.length,
+          objectType: typeof kbData,
+          topLevelKeys: Object.keys(kbData).slice(0, 10)
+        });
+      } catch (parseError) {
+        logError('taxonomy_service_json_parse_error', {
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+          filePath,
+          dataLength: rawData.length,
+          firstChars: rawData.slice(0, 100)
+        });
+        throw new Error(`Failed to parse knowledge base JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
+      
+      // Debug logging for knowledge base structure
+      logInfo('taxonomy_service_debug_kb_structure', {
+        hasEntities: !!kbData.entities,
+        entitiesType: typeof kbData.entities,
+        isArray: Array.isArray(kbData.entities),
+        topLevelKeys: Object.keys(kbData).slice(0, 10),
+        kbDataType: typeof kbData,
+        fileSize: JSON.stringify(kbData).length
+      });
+
       if (!kbData.entities || !Array.isArray(kbData.entities)) {
+        logError('taxonomy_service_invalid_format', {
+          hasEntities: !!kbData.entities,
+          entitiesType: typeof kbData.entities,
+          isArray: Array.isArray(kbData.entities),
+          topLevelKeys: Object.keys(kbData)
+        });
         throw new Error('Invalid knowledge base format: missing entities array');
       }
 
@@ -151,10 +233,10 @@ class TaxonomyService {
       });
 
     } catch (error) {
-      logError('taxonomy_service_init_failed', {
+      logError('taxonomy_service_load_knowledge_base_failed', {
         error: error instanceof Error ? error.message : String(error)
       });
-      throw new Error(`Failed to initialize taxonomy service: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -283,6 +365,36 @@ class TaxonomyService {
     }
 
     return entities.sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0));
+  }
+
+  /**
+   * Get entity counts for UI display
+   */
+  async getEntityCounts(): Promise<Record<string, number>> {
+    await this.ensureInitialized();
+    const counts: Record<string, number> = {};
+    
+    // Count entities at each level
+    for (const [categoryName, categoryData] of Object.entries(this.taxonomyData!)) {
+      let categoryCount = 0;
+      
+      for (const [subcategoryName, subcategoryData] of Object.entries(categoryData)) {
+        let subcategoryCount = 0;
+        
+        for (const [subSubcategoryName, entities] of Object.entries(subcategoryData)) {
+          const subSubcategoryCount = entities.length;
+          counts[`${categoryName}::${subcategoryName}::${subSubcategoryName}`] = subSubcategoryCount;
+          subcategoryCount += subSubcategoryCount;
+        }
+        
+        counts[`${categoryName}::${subcategoryName}`] = subcategoryCount;
+        categoryCount += subcategoryCount;
+      }
+      
+      counts[categoryName] = categoryCount;
+    }
+    
+    return counts;
   }
 
   /**

@@ -4,7 +4,7 @@ import { requireAuth } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
 import { validateInput, GenerateMCQSchema } from '../util/validation';
-import { getGeminiApiKey } from '../util/config';
+import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 // KB imports removed - no longer using knowledge base
 
 const db = admin.firestore();
@@ -246,6 +246,13 @@ function parseStructuredMCQResponse(text: string): any {
     };
     
   } catch (error) {
+    // CRITICAL: Log raw text input for debugging parsing failures
+    logError('structured_mcq_parsing_failed', {
+      error: error instanceof Error ? error.message : String(error),
+      rawTextInput: text.substring(0, 1000), // Log first 1000 chars to avoid log size issues
+      textLength: text.length,
+      timestamp: new Date().toISOString()
+    });
     console.error('Failed to parse structured MCQ response:', error);
     throw new Error(`Structured text parsing failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -258,6 +265,19 @@ async function generateEnhancedMCQ(topic: string, context: string, difficultyTar
     
     // Parse the structured text response instead of JSON
     const mcqData = parseStructuredMCQResponse(geminiResponse);
+    
+    // CRITICAL: Post-parsing content validation - ensure semantic content exists
+    if (!mcqData.clinical_vignette || mcqData.answer_options.length === 0 || !mcqData.comprehensive_explanation?.correct_answer_rationale) {
+      logError('ai_generation_semantically_empty', { 
+        topic, 
+        mcqData,
+        hasVignette: !!mcqData.clinical_vignette,
+        hasOptions: mcqData.answer_options.length > 0,
+        hasRationale: !!mcqData.comprehensive_explanation?.correct_answer_rationale,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error('AI generation produced an empty or incomplete question structure after parsing.');
+    }
     
     // Extract correct answer index
     const correctIndex = mcqData.answer_options.findIndex((opt: any) => opt.is_correct);
@@ -339,7 +359,8 @@ export async function generateMCQInternal(topic: string, context: string, diffic
 export const generateMcq = functions
   .runWith({
     timeoutSeconds: 300, // 5 minutes for question drafting
-    memory: '1GB'
+    memory: '1GB',
+    secrets: [GEMINI_API_KEY]
   })
   .https.onCall(async (data: any, callContext) => {
   try {

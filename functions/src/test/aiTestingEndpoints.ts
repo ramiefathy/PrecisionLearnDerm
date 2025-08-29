@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import { generateEnhancedMCQ } from '../ai/drafting';
+import { reviewMCQInternal } from '../ai/review';
 import { config } from '../util/config';
 import { withCORS } from '../util/corsConfig';
 import { getSharedKB } from '../util/sharedCache';
@@ -53,8 +54,18 @@ export const test_generate_question = functions.https.onRequest(
       const [entityName, entity] = relevantEntities[0];
       console.log(`TEST: Found entity "${entityName}" for topic "${searchTerm}"`);
       
-      // Generate MCQ with correct parameters
-      result = await generateEnhancedMCQ(entity, entityName, difficultyTarget);
+      // Generate context from entity information
+      const context = `Generate a dermatology board exam question about ${entityName}. 
+Entity information:
+- Description: ${entity.description || 'N/A'}
+- Symptoms: ${entity.symptoms || 'N/A'}
+- Treatment: ${entity.treatment || 'N/A'}
+- Diagnosis: ${entity.diagnosis || 'N/A'}
+
+Use your medical knowledge to create clinically accurate, educational questions that test understanding of diagnosis, treatment, and pathophysiology.`;
+
+      // Generate MCQ with correct parameters (topic, context, difficulty)
+      result = await generateEnhancedMCQ(entityName, context, difficultyTarget);
     } else {
       throw new Error('TEST: AI generation is required but API key is not available. No fallback generation allowed.');
     }
@@ -98,37 +109,27 @@ export const test_review_question = functions.https.onRequest(
       throw new Error('Missing required parameter: item');
     }
     
-    // For testing, return a mock review result
-    const mockReview = {
-      correctedItem: {
-        ...item,
-        reviewApplied: true,
-        lastModified: new Date().toISOString()
-      },
-      changes: [
-        'Improved medical terminology precision',
-        'Enhanced distractors for better discrimination',
-        'Clarified clinical scenario'
-      ],
-      reviewNotes: [
-        'Medical accuracy verified',
-        'Question stem is clear and unambiguous',
-        'All answer choices are plausible',
-        'Correct answer is definitively correct'
-      ],
-      qualityMetrics: {
-        medical_accuracy: 4.5,
-        clarity: 4.2,
-        realism: 4.8,
-        educational_value: 4.6
-      },
+    // Call the actual Review Agent with detailed error logging
+    console.log('TEST: Calling reviewMCQInternal with item:', JSON.stringify(item, null, 2));
+    
+    const startTime = Date.now();
+    const reviewFeedback = await reviewMCQInternal(item);
+    const duration = Date.now() - startTime;
+    
+    console.log('TEST: reviewMCQInternal completed successfully in', duration, 'ms');
+    console.log('TEST: Review feedback:', reviewFeedback);
+    
+    const reviewResult = {
+      success: true,
+      feedback: reviewFeedback,
+      duration,
       timestamp: new Date().toISOString()
     };
     
     console.log('TEST: Review completed successfully');
     res.json({
       success: true,
-      data: mockReview,
+      data: reviewResult,
       timestamp: new Date().toISOString()
     });
     

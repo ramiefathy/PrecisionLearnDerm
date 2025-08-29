@@ -4,7 +4,7 @@
  * to fix malformed JSON responses and 500 errors
  */
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { getGeminiApiKey } from './config';
 import { logInfo, logError } from './logging';
 import { parseGeminiResponse } from './geminiResponseParser';
@@ -39,12 +39,12 @@ export interface GeminiResult {
  * Robust Gemini API client with retry logic and fallback mechanisms
  */
 export class RobustGeminiClient {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenAI;
   private options: Required<GeminiClientOptions>;
 
   constructor(options: GeminiClientOptions = {}) {
     const apiKey = getGeminiApiKey();
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.genAI = new GoogleGenAI({ apiKey });
     
     // Fast mode: Aggressive settings for speed
     if (options.fastMode) {
@@ -77,9 +77,12 @@ export class RobustGeminiClient {
     
     logInfo('robust_gemini_request_started', {
       operation,
+      operationLength: operation.length,
+      operationOriginal: request.operation, // Track original operation name
       preferredModel,
       promptLength: prompt.length,
-      maxRetries: this.options.maxRetries
+      maxRetries: this.options.maxRetries,
+      timestamp: new Date().toISOString()
     });
 
     // Fast mode: Start with Flash model for speed
@@ -162,9 +165,12 @@ export class RobustGeminiClient {
       try {
         logInfo('robust_gemini_attempt', {
           operation,
+          operationFull: operation, // Full operation name for comparison
+          operationTruncated: operation.substring(0, 10), // First 10 chars for comparison
           model: modelName,
           attempt,
-          maxRetries: this.options.maxRetries
+          maxRetries: this.options.maxRetries,
+          timestamp: new Date().toISOString()
         });
 
         const result = await this.makeSingleRequest(prompt, modelName, operation);
@@ -248,62 +254,90 @@ export class RobustGeminiClient {
       const timeoutId = setTimeout(() => {
         logError('robust_gemini_timeout', {
           operation,
+          operationName: operation, // Explicit operation name tracking
+          operationLength: operation.length,
           model: modelName,
-          timeout: this.options.timeout
+          timeout: this.options.timeout,
+          timeoutSource: 'robustGeminiClient',
+          timestamp: new Date().toISOString()
         });
         resolve({
           success: false,
-          error: `Request timed out after ${this.options.timeout}ms`
+          error: `Request timed out after ${this.options.timeout}ms for operation: ${operation}`
         });
       }, this.options.timeout);
 
       try {
-        // Configure model with JSON mode if operation expects JSON
+        // Configure model with optimal parameters for medical content generation
         const isJsonOperation = operation.includes('json') || operation.includes('structured');
-        const generationConfig: any = {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192
+        
+        // Optimal parameters for different operations
+        const getOptimalConfig = (operation: string) => {
+          // Review operations need high consistency 
+          if (operation.includes('review')) {
+            return {
+              temperature: 0.3,  // Low for consistent medical accuracy
+              topK: 20,         // Focused responses
+              topP: 0.85,       // Balanced diversity
+              maxOutputTokens: 8192
+            };
+          }
+          
+          // Scoring operations need very high consistency
+          if (operation.includes('scoring') || operation.includes('score')) {
+            return {
+              temperature: 0.2,  // Very low for consistent scoring
+              topK: 15,         // Highly focused
+              topP: 0.8,        // Conservative diversity
+              maxOutputTokens: 4096
+            };
+          }
+          
+          // Drafting operations need moderate creativity
+          if (operation.includes('drafting') || operation.includes('generate')) {
+            return {
+              temperature: 0.7,  // Moderate creativity for diverse questions
+              topK: 40,         // Good variety
+              topP: 0.9,        // Higher diversity for creative content
+              maxOutputTokens: 8192
+            };
+          }
+          
+          // Default balanced configuration
+          return {
+            temperature: 0.5,   // Balanced
+            topK: 30,          // Moderate focus
+            topP: 0.9,         // Good diversity
+            maxOutputTokens: 8192
+          };
         };
         
-        // Configure safety settings separately (critical for medical content)
+        const generationConfig = getOptimalConfig(operation);
+        
+        // Configure safety settings separately (critical for medical content)  
+        // Using OFF rather than BLOCK_NONE for complete safety filter disabling per official docs
         const safetySettings = [
           {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE
+            threshold: HarmBlockThreshold.OFF // Completely turn off safety filter for medical content
           },
           {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, 
+            threshold: HarmBlockThreshold.OFF // Medical discussions require unfiltered content
           },
           {
             category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE
+            threshold: HarmBlockThreshold.OFF // Medical content may include anatomical references
           },
           {
             category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE
+            threshold: HarmBlockThreshold.OFF // Medical procedures may be flagged as dangerous
           }
         ];
         
         // Enable JSON mode for operations that explicitly request it
         // Operations with '_json' in the name expect JSON responses
         const useJsonMode = operation.includes('_json');
-        if (useJsonMode) {
-          generationConfig.responseMimeType = 'application/json';
-          logInfo('json_mode_enabled', {
-            operation,
-            model: modelName,
-            reason: 'Operation name contains _json suffix'
-          });
-        }
-
-        const model = this.genAI.getGenerativeModel({ 
-          model: modelName,
-          generationConfig,
-          safetySettings
-        });
 
         // Log request details for debugging
         logInfo('gemini_request_details', {
@@ -325,12 +359,36 @@ export class RobustGeminiClient {
           isStreaming: false,
           timeoutMs: this.options.timeout
         });
+
+        // Use new @google/genai library format - configuration directly in config
+        const config: any = {
+          temperature: generationConfig.temperature,
+          topK: generationConfig.topK,
+          topP: generationConfig.topP,
+          maxOutputTokens: generationConfig.maxOutputTokens,
+          safetySettings
+        };
         
-        const response = await model.generateContent(prompt);
+        // Add JSON mode if needed
+        if (useJsonMode) {
+          config.responseMimeType = 'application/json';
+          logInfo('json_mode_enabled', {
+            operation,
+            model: modelName,
+            reason: 'Operation name contains _json suffix'
+          });
+        }
+        
+        const response = await this.genAI.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config
+        });
         const requestDuration = Date.now() - requestStartTime;
         
         clearTimeout(timeoutId);
         
+        // DEBUG: Log the actual response structure from new library
         logInfo('robust_gemini_api_response', {
           operation,
           model: modelName,
@@ -339,8 +397,16 @@ export class RobustGeminiClient {
           completedWithinTimeout: requestDuration < this.options.timeout
         });
 
-        // Use centralized response parser
-        const parseResult = parseGeminiResponse(response.response, operation);
+        logInfo('robust_gemini_response_structure_debug', {
+          operation,
+          model: modelName,
+          responseKeys: response ? Object.keys(response) : [],
+          responseType: typeof response,
+          fullResponseStructure: JSON.stringify(response, null, 2)
+        });
+
+        // Use centralized response parser - new library returns response directly
+        const parseResult = parseGeminiResponse(response, operation);
         
         if (parseResult.success && parseResult.text) {
           // Additional JSON validation for operations expecting JSON
@@ -390,12 +456,54 @@ export class RobustGeminiClient {
 
   /**
    * Extract meaningful error message from various error types
+   * Compatible with both old and new @google/genai library error formats
    */
   private extractErrorMessage(error: any): string {
+    // Handle new @google/genai library ApiError class
+    if (error.status && error.message) {
+      // ApiError from @google/genai has status property
+      switch (error.status) {
+        case 500:
+          return 'Gemini API server error (500) - service temporarily unavailable';
+        case 503:
+          return 'Gemini API service unavailable (503) - temporary overload';
+        case 429:
+          return 'Gemini API rate limit exceeded - too many requests';
+        case 400:
+          return 'Invalid request format or content policy violation';
+        case 404:
+          return 'Gemini API endpoint not found - check model name';
+        default:
+          return `Gemini API error (${error.status}): ${error.message}`;
+      }
+    }
+    
+    // Handle HTTP status codes directly (new library format)
+    if (typeof error.status === 'number' && !error.message) {
+      switch (error.status) {
+        case 500:
+          return 'Gemini API server error (500) - service temporarily unavailable';
+        case 503:
+          return 'Gemini API service unavailable (503) - temporary overload'; 
+        case 429:
+          return 'Gemini API rate limit exceeded - too many requests';
+        case 400:
+          return 'Invalid request format or content policy violation';
+        case 404:
+          return 'Gemini API endpoint not found - check model name';
+        default:
+          return `Gemini API error (${error.status})`;
+      }
+    }
+    
+    // Fallback for legacy error formats
     if (error.message) {
-      // Handle GoogleGenerativeAIFetchError
+      // Handle legacy GoogleGenerativeAIFetchError
       if (error.message.includes('[500 Internal Server Error]')) {
         return 'Gemini API server error (500) - service temporarily unavailable';
+      }
+      if (error.message.includes('[503 Service Unavailable]')) {
+        return 'Gemini API service unavailable (503) - temporary overload';
       }
       if (error.message.includes('[429 Too Many Requests]')) {
         return 'Gemini API rate limit exceeded - too many requests';
@@ -503,13 +611,20 @@ export function getRobustGeminiClient(options?: GeminiClientOptions): RobustGemi
 
 /**
  * Convenience function for simple text generation with robust handling
+ * Maintains backwards compatibility with all existing agents
  */
 export async function generateTextRobustly(
   prompt: string,
   operation: string,
   preferredModel: 'gemini-2.5-pro' | 'gemini-2.5-flash' = 'gemini-2.5-pro'
 ): Promise<string> {
-  const client = getRobustGeminiClient();
+  const client = getRobustGeminiClient({
+    // Use default settings optimized for reliability
+    maxRetries: 3,
+    fallbackToFlash: true,
+    timeout: 120000 // 2 minutes
+  });
+  
   const result = await client.generateText({
     prompt,
     operation,

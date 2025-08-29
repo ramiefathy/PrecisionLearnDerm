@@ -2,13 +2,11 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { requireAdmin } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
-import * as https from 'https';
-import { URL } from 'url';
+import { getRobustGeminiClient } from '../util/robustGeminiClient';
+import { parseGeminiResponse } from '../util/geminiResponseParser';
+import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 
 const db = admin.firestore();
-
-// Gemini AI configuration
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.5-pro'; // Using Gemini 2.5 Pro - Google's most intelligent AI model
 
 interface ScoringResult {
@@ -48,73 +46,7 @@ interface IterativeScoringResult {
   improvementAchieved: boolean;
 }
 
-async function callGeminiAPI(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  
-  const requestBody = {
-    contents: [{
-      parts: [{
-        text: prompt
-      }]
-    }],
-    generationConfig: {
-      temperature: 0.2,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 2048,
-      responseMimeType: "application/json"
-    }
-  };
-
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(JSON.stringify(requestBody))
-      } as any
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            const responseData = JSON.parse(data);
-            if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
-              reject(new Error('Invalid Gemini API response structure'));
-              return;
-            }
-            resolve(responseData.candidates[0].content.parts[0].text);
-          } catch (e) {
-            reject(new Error(`Failed to parse Gemini API response: ${e}`));
-          }
-        } else {
-          reject(new Error(`Gemini API error: ${res.statusCode} ${res.statusMessage}`));
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      reject(new Error(`Request failed: ${error.message}`));
-    });
-
-    req.write(JSON.stringify(requestBody));
-    req.end();
-  });
-}
+// Use robust Gemini client instead of direct API calls
 
 function generateScoringPrompt(questionItem: any, reviewData?: any): string {
   // Format options for display - handle both array and object formats
@@ -136,14 +68,19 @@ function generateScoringPrompt(questionItem: any, reviewData?: any): string {
     explanation: questionItem.explanation || ''
   };
 
-  return `You are Dr. Michael Rodriguez, MD, a senior dermatology board item reviewer and psychometrician with 15 years of experience evaluating board examination questions. Score the question using this 5-criterion rubric (1–5 each; 25 max), then predict difficulty.
+  return `You are Dr. Michael Rodriguez, MD, a senior dermatology board item reviewer and psychometrician with 15 years of experience evaluating board examination questions for the American Board of Dermatology (ABD). You have personally scored over 3,000 board questions and are recognized as an expert in medical question psychometrics.
 
-QUESTION:
+CRITICAL SCORING INSTRUCTIONS:
+🎯 It is ESSENTIAL that you use the FULL RANGE of the 1-5 scale for each criterion. Do NOT default to middle scores (e.g., 3) unless truly justified by the evidence.
+🎯 Provide scores of 1 or 5 when appropriate, backed by specific clinical and psychometric evidence.
+🎯 Your 15 years of experience demands rigorous evaluation standards - be decisive in your scoring.
+
+QUESTION TO EVALUATE:
 \n\n${JSON.stringify(formattedQuestion, null, 2)}
 
 ${reviewData ? `REVIEW_FEEDBACK:\n\n${JSON.stringify(reviewData, null, 2)}` : ''}
 
-RUBRIC CRITERIA (score 1–5 each):
+RUBRIC CRITERIA (score 1–5 each - USE FULL RANGE):
 1. cognitive_level: 
    - 1: Basic recall, no clinical reasoning required
    - 2: Simple application, minimal reasoning
@@ -179,39 +116,178 @@ RUBRIC CRITERIA (score 1–5 each):
    - 4: Good explanations, comprehensive detail
    - 5: Excellent explanations, comprehensive with educational pearls
 
-Also perform a cover-the-options check by attempting to answer using the stem only. Indicate pass/fail in feedback.
+SCORING EXAMPLES (to calibrate your evaluation):
 
-OUTPUT JSON EXACTLY:
-{
-  "rubric": {
-    "cognitive_level": 3,
-    "vignette_quality": 3,
-    "options_quality": 3,
-    "technical_clarity": 3,
-    "rationale_explanations": 3,
-    "feedback": {
-      "cognitive_level": ["..."],
-      "vignette_quality": ["..."],
-      "options_quality": ["..."],
-      "technical_clarity": ["..."],
-      "rationale_explanations": ["..."],
-      "overall": ["cover-the-options: pass|fail", "actionable #1", "actionable #2"]
-    }
-  },
-  "difficulty_prediction": {
-    "predicted_difficulty": 0.35,
-    "confidence_interval": [0.30, 0.40],
-    "difficulty_justification": "..."
-  }
-}
+📚 COGNITIVE LEVEL 5 Example: "Based on the clinical presentation of papulosquamous lesions on extensor surfaces with nail pitting and family history, integrate these findings to determine the most likely diagnosis among systemic inflammatory conditions."
+
+📚 COGNITIVE LEVEL 1 Example: "Acne vulgaris typically presents in which age group?"
+
+📚 VIGNETTE QUALITY 5 Example: "A 45-year-old construction worker presents with a 6-month history of progressive, well-demarcated erythematous plaques with silvery scale on bilateral elbows and knees. Physical exam reveals nail pitting in 8/10 fingernails, and the patient reports morning stiffness lasting 45 minutes. Family history reveals psoriasis in his mother and paternal uncle."
+
+📚 VIGNETTE QUALITY 1 Example: "Patient has a rash. What is the diagnosis?"
+
+📚 OPTIONS QUALITY 5 Example: All five diagnostic options are inflammatory dermatoses with overlapping presentations (psoriasis, eczema, lichen planus, seborrheic dermatitis, pityriasis rosea) - homogeneous and plausible.
+
+📚 OPTIONS QUALITY 1 Example: Mixed categories (A) Psoriasis B) Antihistamine C) Age 25-35 D) Biopsy E) Topical steroid) - not homogeneous, obvious technical flaws.
+
+📚 TECHNICAL CLARITY 5 Example: Clear, unambiguous medical terminology, no grammatical errors, no cueing words, consistent option structure, precise language throughout.
+
+📚 TECHNICAL CLARITY 1 Example: "The best treatment for the patient's condition is..." when all options are diagnostic tests (grammatical inconsistency), or using "always" and "never" inappropriately.
+
+📚 RATIONALE EXPLANATIONS 5 Example: Comprehensive explanation citing specific clinical features from the vignette, detailed pathophysiology, clear reasoning for why each distractor is incorrect with specific differentiating features, includes educational pearls about diagnostic pitfalls and management principles.
+
+📚 RATIONALE EXPLANATIONS 1 Example: "The correct answer is A because it is the best option." with no medical reasoning or distractor analysis.
+
+COVER-THE-OPTIONS TEST: A qualified dermatologist should be able to answer the question correctly using ONLY the clinical vignette, without seeing the answer choices. If the stem lacks sufficient information for diagnosis/management, mark as FAIL and provide specific feedback on what clinical details are missing. If FAIL, provide actionable feedback on how to make the stem self-contained.
+
+PROVIDE YOUR RESPONSE IN THIS STRUCTURED FORMAT:
+
+=== SCORING RUBRIC ===
+COGNITIVE_LEVEL: [1-5]
+VIGNETTE_QUALITY: [1-5]
+OPTIONS_QUALITY: [1-5]
+TECHNICAL_CLARITY: [1-5]
+RATIONALE_EXPLANATIONS: [1-5]
+
+=== FEEDBACK ===
+COGNITIVE_LEVEL_FEEDBACK:
+- [Specific feedback point 1]
+- [Specific feedback point 2]
+
+VIGNETTE_QUALITY_FEEDBACK:
+- [Specific feedback point 1]
+- [Specific feedback point 2]
+
+OPTIONS_QUALITY_FEEDBACK:
+- [Specific feedback point 1]
+- [Specific feedback point 2]
+
+TECHNICAL_CLARITY_FEEDBACK:
+- [Specific feedback point 1]
+- [Specific feedback point 2]
+
+RATIONALE_EXPLANATIONS_FEEDBACK:
+- [Specific feedback point 1]
+- [Specific feedback point 2]
+
+OVERALL_FEEDBACK:
+- COVER_THE_OPTIONS: [PASS|FAIL]
+- [Actionable improvement point 1]
+- [Actionable improvement point 2]
+- [Actionable improvement point 3]
+
+=== DIFFICULTY PREDICTION ===
+PREDICTED_DIFFICULTY: [0.0-1.0]
+CONFIDENCE_INTERVAL_MIN: [0.0-1.0]
+CONFIDENCE_INTERVAL_MAX: [0.0-1.0]
+DIFFICULTY_JUSTIFICATION: [Detailed justification for difficulty prediction]
 `;
+}
+
+// Helper function to parse structured scoring response
+function parseStructuredScoringResponse(text: string): any {
+  const result: any = {
+    rubric: {},
+    difficulty_prediction: {}
+  };
+
+  try {
+    // Extract scoring values
+    const cognitiveMatch = text.match(/COGNITIVE_LEVEL:\s*(\d+)/);
+    const vignetteMatch = text.match(/VIGNETTE_QUALITY:\s*(\d+)/);
+    const optionsMatch = text.match(/OPTIONS_QUALITY:\s*(\d+)/);
+    const clarityMatch = text.match(/TECHNICAL_CLARITY:\s*(\d+)/);
+    const rationaleMatch = text.match(/RATIONALE_EXPLANATIONS:\s*(\d+)/);
+
+    result.rubric.cognitive_level = cognitiveMatch ? parseInt(cognitiveMatch[1]) : 3;
+    result.rubric.vignette_quality = vignetteMatch ? parseInt(vignetteMatch[1]) : 3;
+    result.rubric.options_quality = optionsMatch ? parseInt(optionsMatch[1]) : 3;
+    result.rubric.technical_clarity = clarityMatch ? parseInt(clarityMatch[1]) : 3;
+    result.rubric.rationale_explanations = rationaleMatch ? parseInt(rationaleMatch[1]) : 3;
+
+    // Extract feedback sections
+    result.rubric.feedback = {};
+    
+    const extractFeedback = (section: string, key: string) => {
+      const pattern = new RegExp(`${section}:(.*?)(?=\\n[A-Z_]+_FEEDBACK:|\\n=== |$)`, 's');
+      const match = text.match(pattern);
+      if (match) {
+        const feedbackLines = match[1].split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('-'))
+          .map(line => line.substring(1).trim())
+          .filter(line => line.length > 0);
+        result.rubric.feedback[key] = feedbackLines;
+      } else {
+        result.rubric.feedback[key] = [];
+      }
+    };
+
+    extractFeedback('COGNITIVE_LEVEL_FEEDBACK', 'cognitive_level');
+    extractFeedback('VIGNETTE_QUALITY_FEEDBACK', 'vignette_quality');
+    extractFeedback('OPTIONS_QUALITY_FEEDBACK', 'options_quality');
+    extractFeedback('TECHNICAL_CLARITY_FEEDBACK', 'technical_clarity');
+    extractFeedback('RATIONALE_EXPLANATIONS_FEEDBACK', 'rationale_explanations');
+    
+    // Extract overall feedback
+    const overallPattern = /OVERALL_FEEDBACK:(.*?)(?=\n=== |$)/s;
+    const overallMatch = text.match(overallPattern);
+    if (overallMatch) {
+      const overallLines = overallMatch[1].split('\n')
+        .map(line => line.trim())
+        .filter(line => line.startsWith('-'))
+        .map(line => line.substring(1).trim())
+        .filter(line => line.length > 0);
+      result.rubric.feedback.overall = overallLines;
+    } else {
+      result.rubric.feedback.overall = [];
+    }
+
+    // Extract difficulty prediction
+    const difficultyMatch = text.match(/PREDICTED_DIFFICULTY:\s*([\d.]+)/);
+    const minMatch = text.match(/CONFIDENCE_INTERVAL_MIN:\s*([\d.]+)/);
+    const maxMatch = text.match(/CONFIDENCE_INTERVAL_MAX:\s*([\d.]+)/);
+    const justificationMatch = text.match(/DIFFICULTY_JUSTIFICATION:\s*(.*?)$/s);
+
+    result.difficulty_prediction.predicted_difficulty = difficultyMatch ? parseFloat(difficultyMatch[1]) : 0.5;
+    result.difficulty_prediction.confidence_interval = [
+      minMatch ? parseFloat(minMatch[1]) : 0.4,
+      maxMatch ? parseFloat(maxMatch[1]) : 0.6
+    ];
+    result.difficulty_prediction.difficulty_justification = justificationMatch ? justificationMatch[1].trim() : 'No justification provided';
+
+    return result;
+  } catch (error) {
+    logError('scoring.structured_parse_error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      textLength: text.length,
+      timestamp: new Date().toISOString()
+    });
+    return result;
+  }
 }
 
 async function processScoringInternal(questionItem: any, reviewData: any, draftId: string, iterationCount: number = 0): Promise<ScoringResult> {
   const scoringPrompt = generateScoringPrompt(questionItem, reviewData);
   try {
-    const geminiResponse = await callGeminiAPI(scoringPrompt);
-    const parsed = JSON.parse(geminiResponse);
+    // Use robust Gemini client with structured text parsing
+    const client = getRobustGeminiClient({
+      maxRetries: 3,
+      fallbackToFlash: true,
+      timeout: 120000
+    });
+
+    const response = await client.generateText({
+      prompt: scoringPrompt,
+      operation: 'enhanced_scoring_structured',
+      preferredModel: 'gemini-2.5-pro'
+    });
+
+    if (!response.success || !response.text) {
+      throw new Error(`Scoring failed: ${response.error || 'No response text'}`);
+    }
+
+    const parsed = parseStructuredScoringResponse(response.text);
 
     const r = parsed.rubric || {};
     const total = [r.cognitive_level, r.vignette_quality, r.options_quality, r.technical_clarity, r.rationale_explanations]
@@ -338,8 +414,23 @@ PROVIDE YOUR RESPONSE IN THIS EXACT JSON FORMAT:
 }`;
 
   try {
-    const geminiResponse = await callGeminiAPI(rewritePrompt);
-    const mcqData = JSON.parse(geminiResponse);
+    const client = getRobustGeminiClient({
+      maxRetries: 3,
+      fallbackToFlash: true,
+      timeout: 120000
+    });
+
+    const response = await client.generateText({
+      prompt: rewritePrompt,
+      operation: 'question_rewrite',
+      preferredModel: 'gemini-2.5-pro'
+    });
+
+    if (!response.success || !response.text) {
+      throw new Error(`Question rewrite failed: ${response.error || 'No response text'}`);
+    }
+
+    const mcqData = JSON.parse(response.text);
     
     // Extract correct answer index
     const correctIndex = mcqData.answer_options.findIndex((opt: any) => opt.is_correct);

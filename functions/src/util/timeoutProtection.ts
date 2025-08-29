@@ -26,18 +26,54 @@ export function withTimeout<T>(
   timeoutMs: number,
   operationName: string
 ): Promise<T> {
+  const startTime = Date.now();
+  
+  // Enhanced timeout tracking
+  logInfo('timeout.operation_started', {
+    operationName,
+    timeoutMs,
+    startTime,
+    timeoutSource: 'timeoutProtection.withTimeout',
+    timestamp: new Date().toISOString()
+  });
+
   return Promise.race([
-    promise,
+    promise.then(result => {
+      const duration = Date.now() - startTime;
+      logInfo('timeout.operation_completed', {
+        operationName,
+        duration,
+        timeoutMs,
+        completedWithinTimeout: duration < timeoutMs,
+        timestamp: new Date().toISOString()
+      });
+      return result;
+    }).catch(error => {
+      const duration = Date.now() - startTime;
+      logError('timeout.operation_failed', {
+        operationName,
+        duration,
+        timeoutMs,
+        error: error.message || String(error),
+        isTimeoutError: (error as any)?.isTimeout || false,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }),
     new Promise<T>((_, reject) => {
       setTimeout(() => {
         const error = new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`);
         (error as any).isTimeout = true;
         (error as any).operationName = operationName;
         (error as any).timeoutMs = timeoutMs;
+        (error as any).timeoutSource = 'timeoutProtection.withTimeout';
         
         logError('timeout.operation_exceeded', {
           operationName,
+          operationNameLength: operationName.length,
           timeoutMs,
+          timeoutSource: 'timeoutProtection.withTimeout',
+          actualDuration: timeoutMs,
           timestamp: new Date().toISOString()
         });
         
@@ -68,23 +104,50 @@ export async function executeWithTimeoutProtection<T>(
   
   logInfo('timeout.batch_operation_started', {
     operationCount: operations.length,
+    operationNames: operations.map(op => op.name).join(', '),
     config: finalConfig,
+    individualTimeouts: operations.map(op => `${op.name}:${finalConfig.operationTimeout}ms`).join(', '),
+    totalTimeout: finalConfig.totalTimeout,
     timestamp: new Date().toISOString()
   });
 
   // Wrap each operation with timeout protection
-  const protectedOperations = operations.map(op => ({
-    name: op.name,
-    required: op.required ?? true,
-    promise: withTimeout(op.promise, finalConfig.operationTimeout, op.name)
-      .then(result => ({ name: op.name, result, success: true }))
-      .catch(error => ({ 
-        name: op.name, 
-        error, 
-        success: false,
-        timedOut: error.isTimeout || false
-      }))
-  }));
+  const protectedOperations = operations.map(op => {
+    logInfo('timeout.operation_wrapped', {
+      operationName: op.name,
+      operationTimeout: finalConfig.operationTimeout,
+      required: op.required ?? true,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      name: op.name,
+      required: op.required ?? true,
+      promise: withTimeout(op.promise, finalConfig.operationTimeout, op.name)
+        .then(result => {
+          logInfo('timeout.batch_operation_success', {
+            operationName: op.name,
+            timestamp: new Date().toISOString()
+          });
+          return { name: op.name, result, success: true };
+        })
+        .catch(error => {
+          logError('timeout.batch_operation_error', {
+            operationName: op.name,
+            error: error.message || String(error),
+            isTimeout: error.isTimeout || false,
+            timeoutSource: error.timeoutSource || 'unknown',
+            timestamp: new Date().toISOString()
+          });
+          return { 
+            name: op.name, 
+            error, 
+            success: false,
+            timedOut: error.isTimeout || false
+          };
+        })
+    };
+  });
 
   // Execute all operations with total timeout protection
   const batchPromise = Promise.allSettled(

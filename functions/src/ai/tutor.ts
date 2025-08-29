@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions';
 import { requireAuth } from '../util/auth';
 import { enforcePerUserRateLimit } from '../util/rateLimit';
 import { logInfo, logError } from '../util/logging';
+import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -182,7 +183,8 @@ function searchKnowledgeBase(query: string) {
 export const tutorQuery = functions
   .runWith({
     timeoutSeconds: 180, // 3 minutes for tutoring
-    memory: '1GB'
+    memory: '1GB',
+    secrets: [GEMINI_API_KEY]
   })
   .https.onCall(async (data: any, context) => {
   try {

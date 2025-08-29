@@ -9,12 +9,16 @@ export interface QuizConfig {
   progressionMode: 'one-by-one' | 'batch';
   captureConfidence: boolean;
   topicIds: string[];
-  taxonomyFilter?: { // New taxonomy filtering
+  taxonomyFilter?: { // Legacy single taxonomy filtering
     category?: string;
     subcategory?: string;
     subSubcategory?: string;
     entity?: string;
-  };
+  } | Array<{ // New multi-select taxonomy filtering
+    category: string;
+    subcategories: string[];
+    subSubcategories: Record<string, string[]>;
+  }>;
 }
 
 export interface ActiveQuizState {

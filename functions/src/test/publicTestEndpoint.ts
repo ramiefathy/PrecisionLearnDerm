@@ -4,11 +4,9 @@
  */
 
 import * as functions from 'firebase-functions';
-import * as corsLib from 'cors';
+import cors from 'cors';
 import { generateQuestionsOptimized } from '../ai/optimizedOrchestrator';
 import { logInfo, logError } from '../util/logging';
-
-const cors = corsLib.default || corsLib;
 const corsHandler = cors({ origin: true });
 
 export const testGenerateQuestions = functions

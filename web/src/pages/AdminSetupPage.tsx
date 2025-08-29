@@ -18,6 +18,13 @@ interface DashboardStats {
   recentActivity: string;
 }
 
+interface AdminUser {
+  uid: string;
+  email: string;
+  adminGrantedAt: Date | null;
+  adminGrantedBy: string;
+}
+
 export default function AdminSetupPage() {
   const [seeding, setSeeding] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -33,9 +40,18 @@ export default function AdminSetupPage() {
     recentActivity: 'Loading...'
   });
   const [loading, setLoading] = useState(true);
+  
+  // Admin user management state
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [grantingAdmin, setGrantingAdmin] = useState(false);
+  const [revokingAdmin, setRevokingAdmin] = useState<string | null>(null);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [setupKey, setSetupKey] = useState('');
 
   useEffect(() => {
     loadDashboardData();
+    loadAdminUsers();
   }, []);
 
   const loadDashboardData = async () => {
@@ -118,6 +134,77 @@ export default function AdminSetupPage() {
       handleAdminError(error, 'seed database');
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const loadAdminUsers = async () => {
+    try {
+      setLoadingAdmins(true);
+      const result = await api.admin.listAdmins();
+      
+      if (result.success && result.data?.admins) {
+        setAdminUsers(result.data.admins);
+      }
+    } catch (error: any) {
+      console.error('Error loading admin users:', error);
+      // Don't show error toast for this since it might fail on first admin setup
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
+  const handleGrantAdminRole = async () => {
+    if (!newAdminEmail.trim()) {
+      toast.error('Email required', 'Please enter an email address');
+      return;
+    }
+
+    if (!setupKey.trim()) {
+      toast.error('Setup key required', 'Please enter the setup key');
+      return;
+    }
+
+    setGrantingAdmin(true);
+    try {
+      const result = await api.admin.grantAdminRole({
+        email: newAdminEmail.trim(),
+        setupKey: setupKey.trim()
+      });
+
+      if (result.success) {
+        toast.success('Admin role granted!', `${newAdminEmail} now has admin access`);
+        setNewAdminEmail('');
+        setSetupKey('');
+        await loadAdminUsers();
+      } else {
+        toast.error('Failed to grant admin role', result.message || 'Unknown error');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'grant admin role');
+    } finally {
+      setGrantingAdmin(false);
+    }
+  };
+
+  const handleRevokeAdminRole = async (email: string) => {
+    if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) {
+      return;
+    }
+
+    setRevokingAdmin(email);
+    try {
+      const result = await api.admin.revokeAdminRole({ email });
+
+      if (result.success) {
+        toast.success('Admin role revoked', `${email} no longer has admin access`);
+        await loadAdminUsers();
+      } else {
+        toast.error('Failed to revoke admin role', result.message || 'Unknown error');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'revoke admin role');
+    } finally {
+      setRevokingAdmin(null);
     }
   };
 
@@ -318,6 +405,117 @@ export default function AdminSetupPage() {
                 <p className="text-sm text-gray-600">Items & drafts</p>
               </div>
             </Link>
+          </div>
+        </motion.div>
+
+        {/* Admin User Management */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-xl p-8 shadow-lg border border-gray-100"
+        >
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Admin User Management</h2>
+          
+          {/* Grant Admin Role Section */}
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-semibold text-orange-900 mb-3">🔑 Grant Admin Access</h3>
+            <p className="text-orange-800 mb-4">
+              Grant admin privileges to a registered user. Requires the setup key for security.
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                <input
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Setup Key</label>
+                <input
+                  type="password"
+                  value={setupKey}
+                  onChange={(e) => setSetupKey(e.target.value)}
+                  placeholder="Enter setup key"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleGrantAdminRole}
+              disabled={grantingAdmin || !newAdminEmail.trim() || !setupKey.trim()}
+              className="w-full px-6 py-3 rounded-xl font-semibold text-lg transition-all duration-300 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {grantingAdmin ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Granting Admin Role...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  🔑 Grant Admin Role
+                </div>
+              )}
+            </button>
+          </div>
+
+          {/* Current Admin Users */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-blue-900">👥 Current Admin Users</h3>
+              <button
+                onClick={loadAdminUsers}
+                disabled={loadingAdmins}
+                className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+              >
+                {loadingAdmins ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+
+            {loadingAdmins ? (
+              <div className="text-center py-4">
+                <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-blue-700">Loading admin users...</p>
+              </div>
+            ) : adminUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 grid place-items-center text-blue-600 text-2xl mx-auto mb-4">
+                  👤
+                </div>
+                <h4 className="font-semibold text-blue-900 mb-2">No Admin Users Found</h4>
+                <p className="text-blue-700 text-sm">Grant admin access to the first user to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {adminUsers.map((admin) => (
+                  <div
+                    key={admin.uid}
+                    className="bg-white/60 rounded-lg p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">{admin.email}</div>
+                      <div className="text-xs text-gray-500">
+                        {admin.adminGrantedAt ? `Admin since ${admin.adminGrantedAt.toLocaleDateString()}` : 'Admin'}
+                        {admin.adminGrantedBy && ` • Granted by ${admin.adminGrantedBy}`}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRevokeAdminRole(admin.email)}
+                      disabled={revokingAdmin === admin.email}
+                      className="px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
+                    >
+                      {revokingAdmin === admin.email ? 'Revoking...' : 'Revoke'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </motion.div>
 
