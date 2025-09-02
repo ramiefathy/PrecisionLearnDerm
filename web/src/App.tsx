@@ -27,6 +27,7 @@ const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage')
 const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
 const AdminLogsPage = lazy(() => import('./pages/AdminLogsPage.tsx'));
+const AdminEvaluationPage = lazy(() => import('./pages/AdminEvaluationPage.tsx'));
 
 // --- UI COMPONENTS (Loading, Error) ---
 
@@ -167,6 +168,7 @@ function AppRoutes() {
                   <Route path="/admin/question-bank" element={<AdminQuestionBankPage />} />
                   <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
                   <Route path="/admin/logs" element={<AdminLogsPage />} />
+                  <Route path="/admin/evaluation" element={<AdminEvaluationPage />} />
                   <Route path="/admin" element={<Navigate to="/admin/setup" replace />} />
                 </Route>
               </Route>

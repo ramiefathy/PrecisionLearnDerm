@@ -1,6 +1,20 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { logInfo, logError } from '../util/logging';
+/**
+ * Taxonomy Service V2 - Lazy-loaded version
+ * 
+ * This version uses the knowledge base singleton to avoid deployment timeouts
+ * by loading the knowledge base only when needed, not at module level.
+ */
+
+import { getKnowledgeBaseSingleton } from './knowledgeBaseSingleton';
+
+// Use simple console logging to avoid circular dependencies
+const logInfo = (message: string, data?: any) => {
+  console.log(`[TaxonomyServiceV2] ${message}`, data || '');
+};
+
+const logError = (message: string, data?: any) => {
+  console.error(`[TaxonomyServiceV2] ERROR: ${message}`, data || '');
+};
 
 export interface TaxonomyEntity {
   name: string;
@@ -28,183 +42,119 @@ export interface TaxonomyStats {
   categoryDistribution: Record<string, number>;
 }
 
-class TaxonomyService {
-  private static instance: TaxonomyService;
+class TaxonomyServiceV2 {
+  private static instance: TaxonomyServiceV2;
   private taxonomyData: TaxonomyStructure | null = null;
   private entityLookup: Map<string, TaxonomyEntity> = new Map();
   private stats: TaxonomyStats | null = null;
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Private constructor - do NOT load anything here
+  }
 
-  static getInstance(): TaxonomyService {
-    if (!TaxonomyService.instance) {
-      TaxonomyService.instance = new TaxonomyService();
+  static getInstance(): TaxonomyServiceV2 {
+    if (!TaxonomyServiceV2.instance) {
+      TaxonomyServiceV2.instance = new TaxonomyServiceV2();
     }
-    return TaxonomyService.instance;
+    return TaxonomyServiceV2.instance;
   }
 
   /**
    * Initialize the taxonomy service by loading the knowledge base
+   * This is now truly lazy - only called when needed
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
       return;
     }
 
+    // Prevent concurrent initialization
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+
     try {
-      logInfo('taxonomy_service_init_started', {});
+      logInfo('Initialization started');
       
-      // Add timeout protection for initialization
-      const initWithTimeout = this.loadKnowledgeBase();
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Taxonomy service initialization timeout (30s)')), 30000)
-      );
+      this.initializationPromise = this.loadKnowledgeBase();
+      await this.initializationPromise;
       
-      await Promise.race([initWithTimeout, timeout]);
+      this.initialized = true;
+      logInfo('Initialization completed', {
+        categories: this.stats?.categories,
+        totalEntities: this.stats?.totalEntities
+      });
       
     } catch (error) {
-      logError('taxonomy_service_init_failed', {
+      logError('Initialization failed', {
         error: error instanceof Error ? error.message : String(error)
       });
       throw new Error(`Failed to initialize taxonomy service: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.initializationPromise = null;
     }
   }
 
   private async loadKnowledgeBase(): Promise<void> {
     try {
+      // Use the singleton to get TAXONOMY-ONLY data (much faster!)
+      const kbSingleton = getKnowledgeBaseSingleton();
+      const taxonomyData = await kbSingleton.getTaxonomyOnly();
       
-      // Load the knowledge base file from kb directory
-      const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-      const backupPath = path.join(__dirname, '../../../GraphRAG/knowledgeBaseUpdating/backups/kb_backup_20250824_015634.json');
-      
-      logInfo('taxonomy_service_debug_paths', {
-        kbPath,
-        backupPath,
-        kbExists: fs.existsSync(kbPath),
-        backupExists: fs.existsSync(backupPath),
-        cwd: process.cwd(),
-        dirname: __dirname
+      logInfo('Loading taxonomy data from singleton', {
+        entityCount: taxonomyData.taxonomy?.entityCount || 0,
+        categories: Object.keys(taxonomyData.taxonomy?.categories || {}).length
       });
       
-      let kbData: any;
-      let rawData: string;
-      let filePath: string;
-      
-      if (!fs.existsSync(kbPath)) {
-        // Fallback to backup file if main file doesn't exist
-        if (!fs.existsSync(backupPath)) {
-          logError('taxonomy_service_no_files', {
-            kbPath,
-            backupPath,
-            kbExists: fs.existsSync(kbPath),
-            backupExists: fs.existsSync(backupPath)
-          });
-          throw new Error(`Knowledge base file not found at: ${kbPath} or ${backupPath}`);
-        }
-        filePath = backupPath;
-        rawData = await fs.promises.readFile(backupPath, 'utf8');
-        logInfo('taxonomy_service_using_backup', { filePath, dataLength: rawData.length });
-      } else {
-        filePath = kbPath;
-        rawData = await fs.promises.readFile(kbPath, 'utf8');
-        logInfo('taxonomy_service_using_main', { filePath, dataLength: rawData.length });
-      }
-      
-      try {
-        kbData = JSON.parse(rawData);
-        logInfo('taxonomy_service_json_parsed', { 
-          success: true, 
-          filePath,
-          dataLength: rawData.length,
-          objectType: typeof kbData,
-          topLevelKeys: Object.keys(kbData).slice(0, 10)
-        });
-      } catch (parseError) {
-        logError('taxonomy_service_json_parse_error', {
-          error: parseError instanceof Error ? parseError.message : String(parseError),
-          filePath,
-          dataLength: rawData.length,
-          firstChars: rawData.slice(0, 100)
-        });
-        throw new Error(`Failed to parse knowledge base JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-      }
-      
-      // Debug logging for knowledge base structure
-      logInfo('taxonomy_service_debug_kb_structure', {
-        hasEntities: !!kbData.entities,
-        entitiesType: typeof kbData.entities,
-        isArray: Array.isArray(kbData.entities),
-        topLevelKeys: Object.keys(kbData).slice(0, 10),
-        kbDataType: typeof kbData,
-        fileSize: JSON.stringify(kbData).length
-      });
-
-      if (!kbData.entities || !Array.isArray(kbData.entities)) {
-        logError('taxonomy_service_invalid_format', {
-          hasEntities: !!kbData.entities,
-          entitiesType: typeof kbData.entities,
-          isArray: Array.isArray(kbData.entities),
-          topLevelKeys: Object.keys(kbData)
-        });
-        throw new Error('Invalid knowledge base format: missing entities array');
+      if (!taxonomyData || !taxonomyData.taxonomy || !taxonomyData.taxonomy.categories) {
+        throw new Error('Invalid taxonomy format: missing categories');
       }
 
-      // Process entities and build taxonomy structure
+      // Process the taxonomy-only structure
       this.taxonomyData = {};
       this.entityLookup.clear();
       const categoryCount: Record<string, number> = {};
-
       let processedEntities = 0;
-      let skippedEntities = 0;
 
-      for (const entity of kbData.entities) {
-        if (!entity.taxonomy || !entity.taxonomy.name) {
-          skippedEntities++;
-          continue;
+      // Iterate through the pre-built hierarchy
+      for (const [categoryName, categoryData] of Object.entries(taxonomyData.taxonomy.categories as any)) {
+        if (!this.taxonomyData[categoryName]) {
+          this.taxonomyData[categoryName] = {};
         }
-
-        const tax = entity.taxonomy;
-        const category = tax.category || 'Unknown';
-        const subcategory = tax.subcategory || 'General';
-        const subSubcategory = tax.sub_subcategory || 'General';
-        const name = tax.name;
-
-        // Skip meta categories
-        if (category === 'Taxonomy' || category === 'Hubs') {
-          skippedEntities++;
-          continue;
-        }
-
-        // Create taxonomy entity
-        const taxonomyEntity: TaxonomyEntity = {
-          name,
-          category,
-          subcategory,
-          sub_subcategory: subSubcategory,
-          completenessScore: entity.completeness_score || 0,
-          description: entity.description || '',
-          entityId: entity.id || name.toLowerCase().replace(/\s+/g, '_'),
-          originalEntity: entity
-        };
-
-        // Build hierarchical structure
-        if (!this.taxonomyData[category]) {
-          this.taxonomyData[category] = {};
-        }
-        if (!this.taxonomyData[category][subcategory]) {
-          this.taxonomyData[category][subcategory] = {};
-        }
-        if (!this.taxonomyData[category][subcategory][subSubcategory]) {
-          this.taxonomyData[category][subcategory][subSubcategory] = [];
-        }
-
-        this.taxonomyData[category][subcategory][subSubcategory].push(taxonomyEntity);
-        this.entityLookup.set(name, taxonomyEntity);
         
-        categoryCount[category] = (categoryCount[category] || 0) + 1;
-        processedEntities++;
+        for (const [subcategoryName, subcategoryData] of Object.entries((categoryData as any).subcategories)) {
+          if (!this.taxonomyData[categoryName][subcategoryName]) {
+            this.taxonomyData[categoryName][subcategoryName] = {};
+          }
+          
+          for (const [subSubcategoryName, subSubcategoryData] of Object.entries((subcategoryData as any).subSubcategories)) {
+            if (!this.taxonomyData[categoryName][subcategoryName][subSubcategoryName]) {
+              this.taxonomyData[categoryName][subcategoryName][subSubcategoryName] = [];
+            }
+            
+            // Process entities in this sub-subcategory
+            for (const entity of (subSubcategoryData as any).entities) {
+              const taxonomyEntity: TaxonomyEntity = {
+                name: entity.name,
+                category: entity.category,
+                subcategory: entity.subcategory,
+                sub_subcategory: entity.sub_subcategory,
+                completenessScore: entity.completenessScore || 0,
+                description: entity.description || '',
+                entityId: entity.entityId || entity.name.toLowerCase().replace(/\s+/g, '_')
+              };
+              
+              this.taxonomyData[categoryName][subcategoryName][subSubcategoryName].push(taxonomyEntity);
+              this.entityLookup.set(entity.name, taxonomyEntity);
+              processedEntities++;
+            }
+          }
+        }
+        
+        categoryCount[categoryName] = (categoryData as any).count;
       }
 
       // Calculate statistics
@@ -223,20 +173,28 @@ class TaxonomyService {
       };
 
       this.initialized = true;
-
-      logInfo('taxonomy_service_init_completed', {
+      
+      logInfo('Taxonomy processed', {
         processedEntities,
-        skippedEntities,
         categories: this.stats.categories,
         subcategories: this.stats.subcategories,
         subSubcategories: this.stats.subSubcategories
       });
 
     } catch (error) {
-      logError('taxonomy_service_load_knowledge_base_failed', {
+      logError('Failed to load knowledge base', {
         error: error instanceof Error ? error.message : String(error)
       });
       throw error;
+    }
+  }
+
+  /**
+   * Ensure the service is initialized before any operation
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
     }
   }
 
@@ -299,7 +257,11 @@ class TaxonomyService {
   /**
    * Get all entities in a specific sub-subcategory
    */
-  async getEntitiesBySubSubcategory(category: string, subcategory: string, subSubcategory: string): Promise<TaxonomyEntity[]> {
+  async getEntitiesBySubSubcategory(
+    category: string, 
+    subcategory: string, 
+    subSubcategory: string
+  ): Promise<TaxonomyEntity[]> {
     await this.ensureInitialized();
     return this.taxonomyData![category]?.[subcategory]?.[subSubcategory] || [];
   }
@@ -309,144 +271,92 @@ class TaxonomyService {
    */
   async getCategories(): Promise<string[]> {
     await this.ensureInitialized();
-    return Object.keys(this.taxonomyData!).sort();
+    return Object.keys(this.taxonomyData!);
   }
 
   /**
-   * Get all subcategories for a category
+   * Get subcategories for a category
    */
   async getSubcategories(category: string): Promise<string[]> {
     await this.ensureInitialized();
     const categoryData = this.taxonomyData![category];
-    if (!categoryData) return [];
-    return Object.keys(categoryData).sort();
+    return categoryData ? Object.keys(categoryData) : [];
   }
 
   /**
-   * Get all sub-subcategories for a category and subcategory
+   * Get sub-subcategories for a subcategory
    */
   async getSubSubcategories(category: string, subcategory: string): Promise<string[]> {
     await this.ensureInitialized();
     const subcategoryData = this.taxonomyData![category]?.[subcategory];
-    if (!subcategoryData) return [];
-    return Object.keys(subcategoryData).sort();
+    return subcategoryData ? Object.keys(subcategoryData) : [];
   }
 
   /**
    * Search entities by name (partial match)
    */
-  async searchEntities(query: string, limit: number = 50): Promise<TaxonomyEntity[]> {
+  async searchEntities(query: string): Promise<TaxonomyEntity[]> {
     await this.ensureInitialized();
+    const lowerQuery = query.toLowerCase();
     const results: TaxonomyEntity[] = [];
-    const queryLower = query.toLowerCase();
-
-    for (const entity of this.entityLookup.values()) {
-      if (entity.name.toLowerCase().includes(queryLower)) {
+    
+    for (const [name, entity] of this.entityLookup.entries()) {
+      if (name.toLowerCase().includes(lowerQuery)) {
         results.push(entity);
-        if (results.length >= limit) break;
       }
     }
-
-    // Sort by completeness score descending
-    return results.sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0));
+    
+    return results;
   }
 
   /**
-   * Get high-quality entities (completeness score > threshold)
+   * Get entities by taxonomy selection
    */
-  async getHighQualityEntities(threshold: number = 65): Promise<TaxonomyEntity[]> {
+  async getEntitiesByTaxonomy(taxonomy: {
+    categories?: string[];
+    subcategories?: string[];
+    entities?: string[];
+  }): Promise<TaxonomyEntity[]> {
     await this.ensureInitialized();
+    
     const entities: TaxonomyEntity[] = [];
+    const entitySet = new Set<string>();
     
-    for (const entity of this.entityLookup.values()) {
-      if ((entity.completenessScore || 0) > threshold) {
-        entities.push(entity);
-      }
-    }
-
-    return entities.sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0));
-  }
-
-  /**
-   * Get entity counts for UI display
-   */
-  async getEntityCounts(): Promise<Record<string, number>> {
-    await this.ensureInitialized();
-    const counts: Record<string, number> = {};
-    
-    // Count entities at each level
-    for (const [categoryName, categoryData] of Object.entries(this.taxonomyData!)) {
-      let categoryCount = 0;
-      
-      for (const [subcategoryName, subcategoryData] of Object.entries(categoryData)) {
-        let subcategoryCount = 0;
-        
-        for (const [subSubcategoryName, entities] of Object.entries(subcategoryData)) {
-          const subSubcategoryCount = entities.length;
-          counts[`${categoryName}::${subcategoryName}::${subSubcategoryName}`] = subSubcategoryCount;
-          subcategoryCount += subSubcategoryCount;
-        }
-        
-        counts[`${categoryName}::${subcategoryName}`] = subcategoryCount;
-        categoryCount += subcategoryCount;
-      }
-      
-      counts[categoryName] = categoryCount;
-    }
-    
-    return counts;
-  }
-
-  /**
-   * Get weighted entity selection for question generation
-   */
-  async getWeightedEntitySelection(count: number, category?: string, subcategory?: string): Promise<TaxonomyEntity[]> {
-    await this.ensureInitialized();
-    
-    let entities: TaxonomyEntity[];
-    if (category && subcategory) {
-      entities = await this.getEntitiesBySubcategory(category, subcategory);
-    } else if (category) {
-      entities = await this.getEntitiesByCategory(category);
-    } else {
-      entities = await this.getHighQualityEntities();
-    }
-
-    if (entities.length === 0) return [];
-
-    // Weight entities by completeness score
-    const totalWeight = entities.reduce((sum, entity) => sum + (entity.completenessScore || 0), 0);
-    const selected: TaxonomyEntity[] = [];
-    const used = new Set<string>();
-
-    for (let i = 0; i < count && selected.length < entities.length; i++) {
-      let random = Math.random() * totalWeight;
-      let selectedEntity: TaxonomyEntity | null = null;
-
-      for (const entity of entities) {
-        if (used.has(entity.name)) continue;
-        
-        random -= (entity.completenessScore || 0);
-        if (random <= 0) {
-          selectedEntity = entity;
-          break;
+    if (taxonomy.entities && taxonomy.entities.length > 0) {
+      // Direct entity selection
+      for (const entityName of taxonomy.entities) {
+        const entity = this.entityLookup.get(entityName);
+        if (entity && !entitySet.has(entity.name)) {
+          entities.push(entity);
+          entitySet.add(entity.name);
         }
       }
-
-      if (selectedEntity) {
-        selected.push(selectedEntity);
-        used.add(selectedEntity.name);
-      } else if (entities.length > used.size) {
-        // Fallback: pick first unused entity
-        const availableEntities = entities.filter(e => !used.has(e.name));
-        if (availableEntities.length > 0) {
-          selected.push(availableEntities[0]);
-          used.add(availableEntities[0].name);
+    } else if (taxonomy.subcategories && taxonomy.subcategories.length > 0) {
+      // Subcategory selection
+      for (const subcategoryPath of taxonomy.subcategories) {
+        const [category, subcategory] = subcategoryPath.split('/');
+        const subcatEntities = await this.getEntitiesBySubcategory(category, subcategory);
+        for (const entity of subcatEntities) {
+          if (!entitySet.has(entity.name)) {
+            entities.push(entity);
+            entitySet.add(entity.name);
+          }
+        }
+      }
+    } else if (taxonomy.categories && taxonomy.categories.length > 0) {
+      // Category selection
+      for (const category of taxonomy.categories) {
+        const catEntities = await this.getEntitiesByCategory(category);
+        for (const entity of catEntities) {
+          if (!entitySet.has(entity.name)) {
+            entities.push(entity);
+            entitySet.add(entity.name);
+          }
         }
       }
     }
-
-    return selected;
+    
+    return entities;
   }
 
   /**
@@ -482,31 +392,37 @@ class TaxonomyService {
       taxonomySubSubcategory: entity.sub_subcategory
     };
   }
-
-  /**
-   * Ensure the service is initialized (async lazy loading)
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (this.initialized && this.taxonomyData) {
-      return;
-    }
-
-    // If initialization is already in progress, wait for it
-    if (this.initializationPromise) {
-      await this.initializationPromise;
-      return;
-    }
-
-    // Start initialization
-    this.initializationPromise = this.initialize();
-    await this.initializationPromise;
-  }
 }
 
-// Export singleton instance
-export const taxonomyService = TaxonomyService.getInstance();
+// DO NOT export singleton instance directly - use getter functions
+export const getTaxonomyService = () => TaxonomyServiceV2.getInstance();
 
 // Export initialization function for Firebase Functions
 export async function initializeTaxonomyService(): Promise<void> {
-  await taxonomyService.initialize();
+  const service = TaxonomyServiceV2.getInstance();
+  await service.initialize();
 }
+
+// For backward compatibility with existing code that imports taxonomyService
+// Create a proxy that initializes lazily on first access
+const createLazyProxy = () => {
+  const handler: ProxyHandler<any> = {
+    get(target, prop, receiver) {
+      const service = TaxonomyServiceV2.getInstance();
+      const value = (service as any)[prop];
+      
+      // If it's a function, bind it to the service instance
+      if (typeof value === 'function') {
+        return value.bind(service);
+      }
+      
+      return value;
+    }
+  };
+  
+  return new Proxy({}, handler);
+};
+
+export const taxonomyService = createLazyProxy();
+
+// Types are already exported above with the interfaces

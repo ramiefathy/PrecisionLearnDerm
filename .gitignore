@@ -13,6 +13,8 @@ lib/
 # Firebase
 .firebase/
 firebase-debug.log
+functions/service-account.json
+service-account.json
 
 # Environment variables
 .env

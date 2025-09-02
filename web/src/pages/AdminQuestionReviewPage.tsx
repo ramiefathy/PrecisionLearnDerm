@@ -93,6 +93,12 @@ export default function AdminQuestionReviewPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [showAiReview, setShowAiReview] = useState(false);
   const [validatingClinical, setValidatingClinical] = useState(false);
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedQuestion, setEditedQuestion] = useState<any>(null);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     loadQuestionQueue();
@@ -251,7 +257,7 @@ export default function AdminQuestionReviewPage() {
     }
   };
 
-  const handleRegenerateQuestion = async (questionId: string, originalQuestion: QueuedQuestion) => {
+  const handleRegenerateQuestion = async (questionId: string, originalQuestion: QueuedQuestion, autoSave = false) => {
     if (!originalQuestion.draftItem || !adminFeedback.trim()) {
       toast.error('Feedback Required', 'Please provide specific feedback for question regeneration');
       return;
@@ -265,7 +271,8 @@ export default function AdminQuestionReviewPage() {
         questionData: originalQuestion.draftItem,
         adminFeedback: adminFeedback.trim(),
         preserveCorrectAnswer: false,
-        focusArea: 'clinical_accuracy'
+        focusArea: 'clinical_accuracy',
+        autoSave // Use the parameter passed to the function
       }) as any;
       
       if (result.success) {
@@ -285,8 +292,114 @@ export default function AdminQuestionReviewPage() {
     }
   };
 
-  // Reset AI review state when selecting a different question
+  // Edit mode functions
+  const enterEditMode = () => {
+    if (!selectedQuestion) return;
+    
+    setEditedQuestion({
+      stem: selectedQuestion.draftItem?.stem || '',
+      leadIn: selectedQuestion.draftItem?.leadIn || '',
+      options: selectedQuestion.draftItem?.options || [],
+      keyIndex: selectedQuestion.draftItem?.keyIndex || 0,
+      explanation: selectedQuestion.draftItem?.explanation || '',
+      difficulty: selectedQuestion.draftItem?.difficulty || 0.5,
+      qualityScore: selectedQuestion.draftItem?.qualityScore || 50,
+      citations: selectedQuestion.draftItem?.citations || [],
+      taxonomyCategory: selectedQuestion.topicHierarchy?.category || '',
+      taxonomySubcategory: selectedQuestion.topicHierarchy?.topic || ''
+    });
+    setIsEditMode(true);
+    setHasUnsavedChanges(false);
+  };
+
+  const exitEditMode = () => {
+    if (hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+        return;
+      }
+    }
+    setIsEditMode(false);
+    setEditedQuestion(null);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    setEditedQuestion((prev: any) => ({
+      ...prev,
+      [field]: value
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleOptionChange = (index: number, text: string) => {
+    const newOptions = [...editedQuestion.options];
+    newOptions[index] = { text };
+    handleEditChange('options', newOptions);
+  };
+
+  const handleSaveEdits = async (saveAsDraft = false) => {
+    if (!selectedQuestion || !editedQuestion) return;
+    
+    try {
+      setSavingEdits(true);
+      
+      const updates: any = {
+        stem: editedQuestion.stem,
+        leadIn: editedQuestion.leadIn,
+        options: editedQuestion.options,
+        keyIndex: editedQuestion.keyIndex,
+        explanation: editedQuestion.explanation,
+        difficulty: editedQuestion.difficulty,
+        qualityScore: editedQuestion.qualityScore,
+        citations: editedQuestion.citations
+      };
+
+      // Add taxonomy updates if changed
+      if (editedQuestion.taxonomyCategory || editedQuestion.taxonomySubcategory) {
+        updates.topicHierarchy = {
+          taxonomyCategory: editedQuestion.taxonomyCategory,
+          taxonomySubcategory: editedQuestion.taxonomySubcategory
+        };
+      }
+      
+      const result = await api.admin.updateQuestion({
+        questionId: selectedQuestion.id,
+        updates,
+        saveAsDraft
+      }) as any;
+      
+      if (result.success) {
+        // Refresh the question queue to show updated question
+        await loadQuestionQueue();
+        setIsEditMode(false);
+        setEditedQuestion(null);
+        setHasUnsavedChanges(false);
+        toast.success(
+          saveAsDraft ? 'Draft Saved' : 'Question Updated',
+          result.message || 'Changes saved successfully'
+        );
+      } else {
+        toast.error('Save Failed', result.error || 'Failed to save changes');
+      }
+    } catch (error: any) {
+      handleAdminError(error, 'save question edits');
+    } finally {
+      setSavingEdits(false);
+    }
+  };
+
+  // Reset AI review state and edit mode when selecting a different question
   const handleQuestionSelect = (question: QueuedQuestion) => {
+    // Exit edit mode if active
+    if (isEditMode) {
+      if (hasUnsavedChanges && !confirm('You have unsaved changes. Are you sure you want to switch questions?')) {
+        return;
+      }
+      setIsEditMode(false);
+      setEditedQuestion(null);
+      setHasUnsavedChanges(false);
+    }
+    
     setSelectedQuestion(question);
     setAiReviewResult(null);
     setShowAiReview(false);
@@ -443,8 +556,42 @@ export default function AdminQuestionReviewPage() {
                       <h2 className="text-xl font-bold text-gray-900">{selectedQuestion.kbSource?.entity || 'Unknown Entity'}</h2>
                       <p className="text-gray-600">{selectedQuestion.topicHierarchy ? getTopicBreadcrumb(selectedQuestion.topicHierarchy) : 'Unknown Topic'}</p>
                     </div>
-                    <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getQualityColor(selectedQuestion.kbSource?.completenessScore || 0)}`}>
-                      KB Score: {selectedQuestion.kbSource?.completenessScore || 0}
+                    <div className="flex items-center gap-3">
+                      <div className={`px-3 py-1 rounded-lg text-sm font-semibold ${getQualityColor(selectedQuestion.kbSource?.completenessScore || 0)}`}>
+                        KB Score: {selectedQuestion.kbSource?.completenessScore || 0}
+                      </div>
+                      {!isEditMode ? (
+                        <button
+                          onClick={enterEditMode}
+                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium hover:shadow-lg transition-all text-sm"
+                        >
+                          ✏️ Edit Question
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveEdits(false)}
+                            disabled={savingEdits || !hasUnsavedChanges}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50 text-sm"
+                          >
+                            {savingEdits ? 'Saving...' : '💾 Save'}
+                          </button>
+                          <button
+                            onClick={() => handleSaveEdits(true)}
+                            disabled={savingEdits || !hasUnsavedChanges}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50 text-sm"
+                          >
+                            📝 Save Draft
+                          </button>
+                          <button
+                            onClick={exitEditMode}
+                            disabled={savingEdits}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50 text-sm"
+                          >
+                            ❌ Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -453,67 +600,216 @@ export default function AdminQuestionReviewPage() {
                     {/* Stem */}
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Clinical Vignette</h3>
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <p className="text-gray-700">{selectedQuestion.draftItem?.stem || 'No stem available'}</p>
-                      </div>
+                      {isEditMode ? (
+                        <textarea
+                          value={editedQuestion?.stem || ''}
+                          onChange={(e) => handleEditChange('stem', e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[150px] resize-y"
+                          placeholder="Enter the clinical vignette..."
+                        />
+                      ) : (
+                        <div className="bg-gray-50 rounded-xl p-4">
+                          <p className="text-gray-700">{selectedQuestion.draftItem?.stem || 'No stem available'}</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Lead-in and Options */}
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Question</h3>
                       <div className="bg-blue-50 rounded-xl p-4">
-                        <p className="font-medium text-blue-900 mb-4">{selectedQuestion.draftItem?.leadIn || 'No lead-in available'}</p>
-                        <div className="space-y-2">
-                          {(selectedQuestion.draftItem?.options || []).map((option: { text: string }, index: number) => (
-                            <div
-                              key={index}
-                              className={`p-3 rounded-lg border-2 ${
-                                index === (selectedQuestion.draftItem?.keyIndex || -1)
-                                  ? 'border-green-300 bg-green-50 text-green-900'
-                                  : 'border-gray-200 bg-white text-gray-700'
-                              }`}
-                            >
-                              <span className="font-medium mr-2">
-                                {String.fromCharCode(65 + index)}.
-                              </span>
-                              {option.text}
-                              {index === (selectedQuestion.draftItem?.keyIndex || -1) && (
-                                <span className="ml-2 text-green-600 font-semibold">✓ Correct</span>
-                              )}
+                        {isEditMode ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editedQuestion?.leadIn || ''}
+                              onChange={(e) => handleEditChange('leadIn', e.target.value)}
+                              className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 font-medium"
+                              placeholder="Enter the lead-in question..."
+                            />
+                            <div className="space-y-2">
+                              {(editedQuestion?.options || []).map((option: { text: string }, index: number) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <input
+                                    type="radio"
+                                    name="correctAnswer"
+                                    checked={index === editedQuestion?.keyIndex}
+                                    onChange={() => handleEditChange('keyIndex', index)}
+                                    className="w-4 h-4 text-green-600"
+                                  />
+                                  <span className="font-medium text-gray-700">
+                                    {String.fromCharCode(65 + index)}.
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={option.text}
+                                    onChange={(e) => handleOptionChange(index, e.target.value)}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder={`Option ${String.fromCharCode(65 + index)}...`}
+                                  />
+                                  {index === editedQuestion?.keyIndex && (
+                                    <span className="text-green-600 font-semibold">✓</span>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-blue-900 mb-4">{selectedQuestion.draftItem?.leadIn || 'No lead-in available'}</p>
+                            <div className="space-y-2">
+                              {(selectedQuestion.draftItem?.options || []).map((option: { text: string }, index: number) => (
+                                <div
+                                  key={index}
+                                  className={`p-3 rounded-lg border-2 ${
+                                    index === (selectedQuestion.draftItem?.keyIndex || -1)
+                                      ? 'border-green-300 bg-green-50 text-green-900'
+                                      : 'border-gray-200 bg-white text-gray-700'
+                                  }`}
+                                >
+                                  <span className="font-medium mr-2">
+                                    {String.fromCharCode(65 + index)}.
+                                  </span>
+                                  {option.text}
+                                  {index === (selectedQuestion.draftItem?.keyIndex || -1) && (
+                                    <span className="ml-2 text-green-600 font-semibold">✓ Correct</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     {/* Explanation */}
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Explanation</h3>
-                      <div className="prose prose-sm max-w-none">
-                        <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded border text-gray-700">
-                          {selectedQuestion.draftItem?.explanation || 'No explanation available'}
-                        </pre>
-                      </div>
+                      {isEditMode ? (
+                        <textarea
+                          value={editedQuestion?.explanation || ''}
+                          onChange={(e) => handleEditChange('explanation', e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[200px] resize-y font-mono text-sm"
+                          placeholder="Enter the explanation for the correct answer..."
+                        />
+                      ) : (
+                        <div className="prose prose-sm max-w-none">
+                          <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded border text-gray-700">
+                            {selectedQuestion.draftItem?.explanation || 'No explanation available'}
+                          </pre>
+                        </div>
+                      )}
                     </div>
 
                     {/* Metadata */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="bg-purple-50 rounded-xl p-4">
                         <h4 className="font-semibold text-purple-900 mb-2">Question Metadata</h4>
-                        <div className="space-y-1 text-sm">
-                          <div><span className="text-purple-600">Type:</span> {selectedQuestion.draftItem?.type || 'Unknown'}</div>
-                          <div><span className="text-purple-600">Difficulty:</span> {selectedQuestion.draftItem?.difficulty ? selectedQuestion.draftItem.difficulty.toFixed(2) : 'N/A'}</div>
-                          <div><span className="text-purple-600">Quality Score:</span> {selectedQuestion.draftItem?.qualityScore || 0}/100</div>
-                        </div>
+                        {isEditMode ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm text-purple-600">Difficulty: {(editedQuestion?.difficulty || 0).toFixed(2)}</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                value={editedQuestion?.difficulty || 0.5}
+                                onChange={(e) => handleEditChange('difficulty', parseFloat(e.target.value))}
+                                className="w-full mt-1"
+                              />
+                              <div className="flex justify-between text-xs text-purple-500">
+                                <span>Easy</span>
+                                <span>Medium</span>
+                                <span>Hard</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-sm text-purple-600">Quality Score: {editedQuestion?.qualityScore || 50}/100</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={editedQuestion?.qualityScore || 50}
+                                onChange={(e) => handleEditChange('qualityScore', parseInt(e.target.value))}
+                                className="w-full mt-1"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1 text-sm">
+                            <div><span className="text-purple-600">Type:</span> {selectedQuestion.draftItem?.type || 'Unknown'}</div>
+                            <div><span className="text-purple-600">Difficulty:</span> {selectedQuestion.draftItem?.difficulty ? selectedQuestion.draftItem.difficulty.toFixed(2) : 'N/A'}</div>
+                            <div><span className="text-purple-600">Quality Score:</span> {selectedQuestion.draftItem?.qualityScore || 0}/100</div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="bg-indigo-50 rounded-xl p-4">
                         <h4 className="font-semibold text-indigo-900 mb-2">Citations</h4>
-                        <div className="space-y-1 text-sm">
-                          {(selectedQuestion.draftItem?.citations || []).map((citation: { source: string }, index: number) => (
-                            <div key={index} className="text-indigo-600">{citation.source}</div>
-                          ))}
-                        </div>
+                        {isEditMode ? (
+                          <div className="space-y-2">
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {(editedQuestion?.citations || []).map((citation: any, index: number) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={citation.source || ''}
+                                    onChange={(e) => {
+                                      const newCitations = [...(editedQuestion?.citations || [])];
+                                      newCitations[index] = { ...citation, source: e.target.value };
+                                      handleEditChange('citations', newCitations);
+                                    }}
+                                    className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="Citation source..."
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const newCitations = (editedQuestion?.citations || []).filter((_: any, i: number) => i !== index);
+                                      handleEditChange('citations', newCitations);
+                                    }}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const newCitations = [...(editedQuestion?.citations || []), { source: '', type: 'manual', reliability: 'medium' }];
+                                handleEditChange('citations', newCitations);
+                              }}
+                              className="w-full py-1 px-2 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                            >
+                              + Add Citation
+                            </button>
+                            <div className="text-xs text-indigo-600 mt-1">
+                              Auto-detected: {(selectedQuestion.draftItem?.citations || []).filter((c: any) => c.type !== 'manual').length} sources
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1 text-sm">
+                            {(selectedQuestion.draftItem?.citations || []).map((citation: any, index: number) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <span className="text-indigo-600">• {citation.source}</span>
+                                {citation.type && (
+                                  <span className={`text-xs px-1 py-0.5 rounded ${
+                                    citation.reliability === 'high' ? 'bg-green-100 text-green-700' :
+                                    citation.reliability === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {citation.type}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                            {(!selectedQuestion.draftItem?.citations || selectedQuestion.draftItem.citations.length === 0) && (
+                              <div className="text-gray-500 italic">No citations available</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -696,25 +992,28 @@ export default function AdminQuestionReviewPage() {
                         </AnimatePresence>
                       )}
 
-                      {/* Admin Feedback Chat Interface */}
-                      {showAiReview && (
-                        <div className="mb-6">
-                          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                            💬 Admin Feedback & Regeneration
-                          </h4>
-                          <div className="bg-gray-50 rounded-xl p-4">
-                            <div className="mb-3">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Specific Feedback for Question Improvement
-                              </label>
-                              <textarea
-                                value={adminFeedback}
-                                onChange={(e) => setAdminFeedback(e.target.value)}
-                                placeholder="Provide specific feedback about what needs to be improved (e.g., 'The stem lacks sufficient clinical detail about the patient's presentation' or 'Option B is too obviously incorrect')..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                rows={4}
-                              />
-                            </div>
+                    </div>
+
+                    {/* Admin Feedback & Regeneration Section - Always show in edit mode */}
+                    {isEditMode && (
+                      <div className="border-t pt-6 mt-6">
+                        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <span>💬</span> Admin Feedback & Regeneration
+                        </h3>
+                        <div className="bg-gray-50 rounded-xl p-4">
+                          <div className="mb-3">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Specific Feedback for Question Improvement
+                            </label>
+                            <textarea
+                              value={adminFeedback}
+                              onChange={(e) => setAdminFeedback(e.target.value)}
+                              placeholder="Provide specific feedback about what needs to be improved (e.g., 'The stem lacks sufficient clinical detail about the patient's presentation' or 'Option B is too obviously incorrect')..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                              rows={4}
+                            />
+                          </div>
+                          <div className="flex gap-3">
                             <button
                               onClick={() => handleRegenerateQuestion(selectedQuestion.id, selectedQuestion)}
                               disabled={regenerating || !adminFeedback.trim()}
@@ -727,10 +1026,23 @@ export default function AdminQuestionReviewPage() {
                                 </div>
                               ) : '🔄 Regenerate Question'}
                             </button>
+                            <button
+                              onClick={() => handleRegenerateQuestion(selectedQuestion.id, selectedQuestion, true)}
+                              disabled={regenerating || !adminFeedback.trim()}
+                              className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium hover:shadow-lg transition-all disabled:opacity-50"
+                              title="Regenerate and automatically save the improved question"
+                            >
+                              {regenerating ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  Regenerating...
+                                </div>
+                              ) : '🔄 Regenerate & Auto-Save'}
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Review Actions */}
                     <div className="border-t pt-6 mt-6">

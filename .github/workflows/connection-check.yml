@@ -1,0 +1,59 @@
+name: Connection Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools
+
+      - name: Firebase CLI version
+        run: firebase --version
+
+      - name: Verify Firebase auth via token
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          firebase projects:list --json | jq '.[0] // {}' || true
+
+      - name: List Functions (project)
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          firebase functions:list --project dermassist-ai-1zyic || true
+
+      - name: List Function Secrets (project)
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          firebase functions:secrets:list --project dermassist-ai-1zyic || true
+
+      - name: Health Check HTTP endpoint
+        run: |
+          set -e
+          curl -sS -w "\nHTTP %{http_code}\n" https://us-central1-dermassist-ai-1zyic.cloudfunctions.net/healthCheck || true
+
+      - name: Web build smoke test
+        working-directory: web
+        run: |
+          npm ci
+          VITE_FIREBASE_API_KEY='AIzaSyB0Jh0q16acdPWXwy1dc0H4eggqAVew4xA' \
+          VITE_FIREBASE_AUTH_DOMAIN='dermassist-ai-1zyic.firebaseapp.com' \
+          VITE_FIREBASE_PROJECT_ID='dermassist-ai-1zyic' \
+          VITE_FIREBASE_STORAGE_BUCKET='dermassist-ai-1zyic.firebasestorage.app' \
+          VITE_FIREBASE_MESSAGING_SENDER_ID='141408860984' \
+          VITE_FIREBASE_APP_ID='1:141408860984:web:7507332d26b8453b045fcd' \
+          VITE_USE_FIREBASE_PROD='true' \
+          npm run build
+

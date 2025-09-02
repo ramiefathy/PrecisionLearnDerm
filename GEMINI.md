@@ -151,6 +151,30 @@ PrecisionLearnDerm/
     └── storage.rules         # File storage permissions
 ```
 
+## Evaluation System (Admin) — Gemini Integration
+
+The evaluation pipeline uses Gemini to assess board-style question quality.
+
+- Normalize MCQ shapes across pipelines
+  - Board-Style → array options + index
+  - Orchestrator → `{A..E}` options + letter
+  - Canonicalized at write-time: `normalized.optionsArray`, `normalized.correctAnswerIndex`, `normalized.correctAnswerLetter`
+- Store flattened AI scores at write-time (`aiScoresFlat.*`) for charting and analytics
+- When prompting Gemini for evaluation, convert numeric correct answers to letters for clarity
+
+Relevant files:
+- `functions/src/evaluation/evaluationProcessor.ts` — canonicalization and cancellation checks
+- `functions/src/evaluation/aiQuestionScorer.ts` — streamlined scoring prompt
+- `web/src/components/evaluation/EvaluationDashboard.tsx` — prefers canonical fields with fallbacks
+
+Short-timeout deploy of evaluation functions:
+```bash
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+firebase deploy --only functions:startPipelineEvaluation
+```
+
 ## Core Systems
 
 ### Backend Architecture

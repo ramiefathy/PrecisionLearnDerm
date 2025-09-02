@@ -70,12 +70,13 @@ const CONFIG = {
 };
 
 // Debug logging for Review Agent V2 configuration
-logger.info('[CONFIG_DEBUG] Review Agent V2 Configuration:', {
-  USE_REVIEW_V2_ENV: process.env.USE_REVIEW_V2,
-  USE_REVIEW_V2_RESOLVED: CONFIG.USE_REVIEW_V2,
-  REVIEW_V2_MIN_SCORE: CONFIG.REVIEW_V2_MIN_SCORE,
-  NODE_ENV: process.env.NODE_ENV
-});
+// NOTE: Commented out to prevent module-level execution during deployment
+// logger.info('[CONFIG_DEBUG] Review Agent V2 Configuration:', {
+//   USE_REVIEW_V2_ENV: process.env.USE_REVIEW_V2,
+//   USE_REVIEW_V2_RESOLVED: CONFIG.USE_REVIEW_V2,
+//   REVIEW_V2_MIN_SCORE: CONFIG.REVIEW_V2_MIN_SCORE,
+//   NODE_ENV: process.env.NODE_ENV
+// });
 
 /**
  * OPTIMIZATION 1: Parallel Web Search Execution
@@ -648,7 +649,8 @@ export async function generateQuestionsOptimized(
   const addAgentOutput = (agent: any) => {
     agentOutputs.push(agent);
     // Automatically trim old entries when limit exceeded
-    if (agentOutputs.length > MAX_AGENT_OUTPUTS) {
+    // Use WHILE loop to ensure array stays within bounds
+    while (agentOutputs.length > MAX_AGENT_OUTPUTS) {
       const removed = agentOutputs.shift();
       logger.info(`[MEMORY_MGMT] Removed old agent output: ${removed?.name}, keeping last ${MAX_AGENT_OUTPUTS}`);
     }

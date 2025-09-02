@@ -2,7 +2,8 @@
 // System Health Monitoring - Moved from monitoring.ts to break circular dependency
 
 import * as admin from 'firebase-admin';
-import { logError } from './monitoring'; // Will depend on monitoring for logging errors
+// Removed import from monitoring to break circular dependency
+// Use console.error directly instead
 
 // Moved from monitoring.ts
 interface SystemHealth {
@@ -49,7 +50,7 @@ export class SystemHealthMonitor {
     
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        logError('health.check_failed', result.reason, { checkIndex: index });
+        console.error('[Health] Check failed:', result.reason, { checkIndex: index });
       }
     });
   }

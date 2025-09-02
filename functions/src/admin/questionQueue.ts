@@ -5,6 +5,7 @@ import { requireAdmin } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
 import { config } from '../util/config';
 import * as fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import * as path from 'path';
 
 // Import the optimized orchestrator for question generation
@@ -18,15 +19,16 @@ const db = admin.firestore();
 let questionQueueKnowledgeBase: Record<string, any> | null = null;
 let topicWeights: Record<string, number> | null = null;
 
-// Initialize knowledge base on first use
-function initializeKnowledgeBase() {
+// Initialize knowledge base on first use (async version)
+async function initializeKnowledgeBase() {
   if (questionQueueKnowledgeBase !== null) {
     return; // Already loaded
   }
 
   try {
+    // Use async file read to avoid blocking
     const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
-    const kbData = fs.readFileSync(kbPath, 'utf8');
+    const kbData = await fsPromises.readFile(kbPath, 'utf8');
     questionQueueKnowledgeBase = JSON.parse(kbData);
     
     // Calculate topic weights based on completeness scores
@@ -48,6 +50,227 @@ function initializeKnowledgeBase() {
     questionQueueKnowledgeBase = {};
     topicWeights = {};
   }
+}
+
+// Helper function to calculate quality score based on content characteristics and agent outputs
+function calculateQualityScore(mcq: any, agentOutputs?: any[]): number {
+  let score = 50; // Base score
+  
+  // Check stem quality
+  if (mcq.stem) {
+    if (mcq.stem.length > 100) score += 10; // Good detail
+    if (mcq.stem.includes('year-old')) score += 8; // Clinical vignette
+    if (mcq.stem.match(/\d+-year-old/)) score += 5; // Age specificity
+  }
+  
+  // Check explanation quality
+  if (mcq.explanation) {
+    if (mcq.explanation.length > 200) score += 10; // Detailed explanation
+    if (mcq.explanation.includes('because') || mcq.explanation.includes('due to')) score += 5; // Reasoning
+  }
+  
+  // Check options quality
+  if (mcq.options) {
+    const optionCount = Object.keys(mcq.options).length;
+    if (optionCount >= 4) score += 8; // Has sufficient options
+    if (optionCount === 5) score += 4; // Has all 5 options
+  }
+  
+  // Include scoring agent output if available
+  if (agentOutputs && Array.isArray(agentOutputs)) {
+    const scoringAgent = agentOutputs.find(a => 
+      a.name?.includes('Scoring Agent') || a.type === 'scoring'
+    );
+    if (scoringAgent?.result?.totalScore) {
+      // Scoring agent uses 0-25 scale, normalize to 0-20 for quality score component
+      const normalizedScore = (scoringAgent.result.totalScore / 25) * 20;
+      score += Math.round(normalizedScore);
+    }
+    
+    // Include review agent assessment
+    const reviewAgent = agentOutputs.find(a => 
+      a.name?.includes('Review Agent') || a.type === 'review'
+    );
+    if (reviewAgent?.result?.reviewScore) {
+      // Review agent uses 0-10 scale, normalize to 0-10 for quality score component  
+      score += Math.round(reviewAgent.result.reviewScore);
+    }
+  }
+  
+  return Math.min(100, Math.max(0, score));
+}
+
+// Helper function to extract citations from explanation text and web search results
+function extractCitations(explanation: string, entityName: string, agentOutputs?: any[]): any[] {
+  const citations: any[] = [];
+  const citationSet = new Set<string>(); // Prevent duplicates
+  
+  // Always include the knowledge base source
+  const kbCitation = { 
+    source: `KB: ${entityName}`,
+    type: 'knowledge_base',
+    reliability: 'high'
+  };
+  citations.push(kbCitation);
+  citationSet.add(kbCitation.source);
+  
+  // Extract citations from web search results in agent outputs
+  if (agentOutputs && Array.isArray(agentOutputs)) {
+    // Find context gathering agent with web search results
+    const contextAgent = agentOutputs.find(a => 
+      a.name?.includes('Context Gathering') || a.type === 'context'
+    );
+    
+    if (contextAgent?.result) {
+      // Add NCBI citations if available
+      if (contextAgent.result.ncbiResultsLength > 0) {
+        const ncbiCitation = {
+          source: 'NCBI PubMed',
+          type: 'database',
+          reliability: 'high',
+          resultsFound: contextAgent.result.ncbiResultsLength
+        };
+        if (!citationSet.has(ncbiCitation.source)) {
+          citations.push(ncbiCitation);
+          citationSet.add(ncbiCitation.source);
+        }
+      }
+      
+      // Add OpenAlex citations if available
+      if (contextAgent.result.openAlexResultsLength > 0) {
+        const openAlexCitation = {
+          source: 'OpenAlex Academic Database',
+          type: 'database',
+          reliability: 'high',
+          resultsFound: contextAgent.result.openAlexResultsLength
+        };
+        if (!citationSet.has(openAlexCitation.source)) {
+          citations.push(openAlexCitation);
+          citationSet.add(openAlexCitation.source);
+        }
+      }
+    }
+  }
+  
+  // Check for guideline references in explanation
+  if (explanation && (explanation.includes('guidelines') || explanation.includes('Guidelines'))) {
+    const guidelineCitation = {
+      source: 'Clinical Guidelines',
+      type: 'guideline',
+      reliability: 'high'
+    };
+    if (!citationSet.has(guidelineCitation.source)) {
+      citations.push(guidelineCitation);
+      citationSet.add(guidelineCitation.source);
+    }
+  }
+  
+  // Check for research references
+  if (explanation && (explanation.includes('study') || explanation.includes('research') || explanation.includes('trial'))) {
+    const researchCitation = {
+      source: 'Research Literature',
+      type: 'research',
+      reliability: 'medium'
+    };
+    if (!citationSet.has(researchCitation.source)) {
+      citations.push(researchCitation);
+      citationSet.add(researchCitation.source);
+    }
+  }
+  
+  // Check for specific journal patterns
+  const journalPattern = /\b(JAAD|NEJM|Lancet|JAMA|BMJ|Nature|Science|Dermatology|Pediatrics)\b/gi;
+  const journalMatches = explanation ? explanation.match(journalPattern) : null;
+  if (journalMatches) {
+    journalMatches.forEach(journal => {
+      const journalCitation = {
+        source: `Journal: ${journal.toUpperCase()}`,
+        type: 'journal',
+        reliability: 'high'
+      };
+      if (!citationSet.has(journalCitation.source)) {
+        citations.push(journalCitation);
+        citationSet.add(journalCitation.source);
+      }
+    });
+  }
+  
+  // Check for year references (likely studies)
+  const yearPattern = /\b(19|20)\d{2}\b/g;
+  const yearMatches = explanation ? explanation.match(yearPattern) : null;
+  if (yearMatches && yearMatches.length > 0) {
+    const studyCitation = {
+      source: `Studies (${yearMatches[0]})`,
+      type: 'study',
+      reliability: 'medium',
+      year: yearMatches[0]
+    };
+    if (!citationSet.has(studyCitation.source)) {
+      citations.push(studyCitation);
+      citationSet.add(studyCitation.source);
+    }
+  }
+  
+  return citations;
+}
+
+// Helper function to transform agent outputs to pipeline outputs structure
+function transformToPipelineOutputs(agentOutputs: any[], difficulty: string): any {
+  const pipelineOutputs: any = {
+    generation: {
+      method: 'orchestrated_multi_agent',
+      model: 'gemini-2.5-pro',
+      difficulty: difficulty,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  // Try to extract specific phase data from agent outputs
+  if (agentOutputs && Array.isArray(agentOutputs)) {
+    agentOutputs.forEach(output => {
+      if (!output) return;
+      
+      // Map different agent outputs to pipeline phases
+      if (output.type === 'validation' || output.phase === 'validation') {
+        pipelineOutputs.validation = {
+          isValid: output.isValid !== false,
+          errors: output.errors || [],
+          warnings: output.warnings || [],
+          score: output.score || 0,
+          timestamp: output.timestamp || new Date().toISOString()
+        };
+      } else if (output.type === 'review' || output.phase === 'review') {
+        pipelineOutputs.review = {
+          originalQuestion: output.original || {},
+          correctedItem: output.corrected || {},
+          changes: output.changes || [],
+          reviewNotes: output.notes || [],
+          timestamp: output.timestamp || new Date().toISOString()
+        };
+      } else if (output.type === 'scoring' || output.phase === 'scoring') {
+        pipelineOutputs.scoring = {
+          totalScore: output.totalScore || output.score || 0,
+          rubric: output.rubric || {},
+          needsRewrite: output.needsRewrite || false,
+          iterations: output.iterations || [],
+          timestamp: output.timestamp || new Date().toISOString()
+        };
+      }
+    });
+  }
+  
+  // Add defaults for missing phases
+  if (!pipelineOutputs.validation) {
+    pipelineOutputs.validation = {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      score: 75,
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  return pipelineOutputs;
 }
 
 interface QueuedQuestion {
@@ -115,6 +338,7 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
     // Use the orchestrator to generate all three difficulty levels in parallel
     const orchestratorResult = await orchestrateQuestionGeneration(entityName, ['Basic', 'Advanced', 'Very Difficult']);
     const results = orchestratorResult.questions;
+    const agentOutputs = orchestratorResult.agentOutputs || [];
     
     const generatedQuestions: any[] = [];
     const difficultyMappings = {
@@ -128,6 +352,17 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
       const mcq = results[difficulty as keyof typeof results];
       
       if (mcq) {
+        // Filter agent outputs for this difficulty level
+        const difficultyAgentOutputs = agentOutputs.filter((output: any) => 
+          !output.difficulty || output.difficulty === difficulty
+        );
+        
+        // Calculate quality score based on content characteristics and agent outputs
+        const qualityScore = calculateQualityScore(mcq, difficultyAgentOutputs);
+        
+        // Extract citations from the explanation and web search results
+        const citations = extractCitations(mcq.explanation, entityName, difficultyAgentOutputs);
+        
         // Convert to the format expected by questionQueue
         const draftItem = {
           type: 'A',
@@ -142,10 +377,10 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
           ],
           keyIndex: ['A', 'B', 'C', 'D'].indexOf(mcq.correctAnswer),
           explanation: mcq.explanation,
-          citations: [{ source: `RESEARCH:${entityName}` }],
+          citations: citations,
           difficulty: mapping.difficulty,
           difficultyLevel: mapping.difficultyLabel,
-          qualityScore: 85, // High quality from orchestrator
+          qualityScore: qualityScore,
           status: 'draft',
           aiGenerated: true,
           createdBy: { 
@@ -161,7 +396,11 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
             includesScoring: true,
             includesValidation: true,
             difficulty: mapping.difficultyLabel
-          }
+          },
+          // Store agent outputs for pipeline analysis
+          agentOutputs: agentOutputs.filter((output: any) => 
+            output && output.difficulty === difficulty
+          )
         };
         
         generatedQuestions.push(draftItem);
@@ -170,7 +409,8 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
           entityName, 
           difficulty: mapping.difficultyLabel,
           stemLength: mcq.stem.length,
-          explanationLength: mcq.explanation.length 
+          explanationLength: mcq.explanation.length,
+          qualityScore: qualityScore
         });
       } else {
         logInfo('orchestrated_generation_failed_for_difficulty', { 
@@ -198,8 +438,8 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
 }
 
 // Select topics based on weighted distribution
-function selectWeightedTopics(count: number): string[] {
-  initializeKnowledgeBase();
+async function selectWeightedTopics(count: number): Promise<string[]> {
+  await initializeKnowledgeBase();
   const topics = Object.keys(topicWeights || {});
   const weights = Object.values(topicWeights || {});
   const selected: string[] = [];
@@ -287,6 +527,12 @@ export const admin_generateQuestionQueue = functions
         // Create a separate queue entry for each difficulty level
         for (const draftItem of draftItems) {
           const newQuestionRef = db.collection('questionQueue').doc();
+          
+          // Extract pipeline outputs from draftItem if available
+          const pipelineOutputs = draftItem.agentOutputs ? 
+            transformToPipelineOutputs(draftItem.agentOutputs, draftItem.difficultyLevel) : 
+            undefined;
+          
           const newQuestion: QueuedQuestion = {
               id: newQuestionRef.id,
               draftItem,
@@ -296,6 +542,7 @@ export const admin_generateQuestionQueue = functions
                   entity: taxonomyEntity.name,
                   completenessScore: taxonomyEntity.completenessScore || 0,
               },
+              pipelineOutputs: pipelineOutputs,
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               priority: taxonomyEntity.completenessScore || 0,
           };
@@ -404,7 +651,7 @@ export const admin_generate_per_topic = functions
     const { perTopic = 5, topicFilter = [] } = data || {};
 
     // Initialize and load knowledge base for topic weighting
-    initializeKnowledgeBase();
+    await initializeKnowledgeBase();
     if (!questionQueueKnowledgeBase || Object.keys(questionQueueKnowledgeBase).length === 0) {
       throw new Error('Knowledge base not loaded');
     }
@@ -465,6 +712,12 @@ export const admin_generate_per_topic = functions
           // Create a separate queue entry for each difficulty level
           for (const draftItem of draftItems) {
             const newQuestionRef = db.collection('questionQueue').doc();
+            
+            // Extract pipeline outputs from draftItem if available
+            const pipelineOutputs = draftItem.agentOutputs ? 
+              transformToPipelineOutputs(draftItem.agentOutputs, draftItem.difficultyLevel) : 
+              undefined;
+            
             const newQuestion: QueuedQuestion = {
                 id: newQuestionRef.id,
                 draftItem,
@@ -474,6 +727,7 @@ export const admin_generate_per_topic = functions
                     entity: entityName,
                     completenessScore: entity.completeness_score,
                 },
+                pipelineOutputs: pipelineOutputs,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 priority: entity.completeness_score,
             };
@@ -630,6 +884,148 @@ export const admin_reviewQuestion = functions.https.onCall(async (data, context)
   }
 });
 
+// New function to directly update question content in the queue
+export const admin_update_question = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+
+  try {
+    const { questionId, updates, saveAsDraft = false } = data || {};
+
+    if (!questionId) {
+      throw new Error('Missing required parameter: questionId');
+    }
+
+    if (!updates || Object.keys(updates).length === 0) {
+      throw new Error('No updates provided');
+    }
+
+    const queueRef = db.collection('questionQueue').doc(questionId);
+    
+    // Get current question data
+    const questionDoc = await queueRef.get();
+    if (!questionDoc.exists) {
+      throw new Error('Question not found in queue');
+    }
+    
+    const currentData = questionDoc.data();
+    
+    // Build update object
+    const updateData: any = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastEditedBy: context?.auth?.uid || 'admin',
+      lastEditedAt: admin.firestore.FieldValue.serverTimestamp(),
+      editType: 'manual',
+      isDraft: saveAsDraft
+    };
+
+    // Add edit history entry
+    const editHistoryEntry = {
+      timestamp: new Date().toISOString(),
+      editedBy: context?.auth?.uid || 'admin',
+      editType: 'manual',
+      changes: Object.keys(updates),
+      previousValues: {} as any
+    };
+
+    // Update draftItem fields if provided
+    if (updates.stem || updates.leadIn || updates.options || updates.keyIndex !== undefined || updates.explanation) {
+      updateData.draftItem = currentData?.draftItem || {};
+      
+      if (updates.stem !== undefined) {
+        editHistoryEntry.previousValues.stem = currentData?.draftItem?.stem;
+        updateData.draftItem.stem = updates.stem;
+      }
+      
+      if (updates.leadIn !== undefined) {
+        editHistoryEntry.previousValues.leadIn = currentData?.draftItem?.leadIn;
+        updateData.draftItem.leadIn = updates.leadIn;
+      }
+      
+      if (updates.options !== undefined) {
+        editHistoryEntry.previousValues.options = currentData?.draftItem?.options;
+        updateData.draftItem.options = updates.options;
+      }
+      
+      if (updates.keyIndex !== undefined) {
+        editHistoryEntry.previousValues.keyIndex = currentData?.draftItem?.keyIndex;
+        updateData.draftItem.keyIndex = updates.keyIndex;
+      }
+      
+      if (updates.explanation !== undefined) {
+        editHistoryEntry.previousValues.explanation = currentData?.draftItem?.explanation;
+        updateData.draftItem.explanation = updates.explanation;
+      }
+
+      // Preserve other draftItem fields
+      updateData.draftItem = {
+        ...currentData?.draftItem,
+        ...updateData.draftItem,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+    }
+
+    // Update taxonomy fields if provided
+    if (updates.topicHierarchy) {
+      editHistoryEntry.previousValues.topicHierarchy = currentData?.topicHierarchy;
+      updateData.topicHierarchy = {
+        ...currentData?.topicHierarchy,
+        ...updates.topicHierarchy
+      };
+    }
+
+    // Update quality scores if provided
+    if (updates.difficulty !== undefined) {
+      editHistoryEntry.previousValues.difficulty = currentData?.draftItem?.difficulty;
+      updateData.draftItem = updateData.draftItem || { ...currentData?.draftItem };
+      updateData.draftItem.difficulty = updates.difficulty;
+    }
+
+    if (updates.qualityScore !== undefined) {
+      editHistoryEntry.previousValues.qualityScore = currentData?.draftItem?.qualityScore;
+      updateData.draftItem = updateData.draftItem || { ...currentData?.draftItem };
+      updateData.draftItem.qualityScore = updates.qualityScore;
+    }
+
+    // Initialize or update edit history
+    const editHistory = currentData?.editHistory || [];
+    editHistory.push(editHistoryEntry);
+    updateData.editHistory = editHistory;
+
+    // Log the update
+    logInfo('question_updated_manually', {
+      questionId,
+      uid: context?.auth?.uid,
+      changedFields: Object.keys(updates),
+      saveAsDraft
+    });
+
+    // Update the document
+    await queueRef.update(updateData);
+
+    // Get updated document
+    const updatedDoc = await queueRef.get();
+    const updatedData = updatedDoc.data();
+
+    return {
+      success: true,
+      message: saveAsDraft ? 'Question saved as draft' : 'Question updated successfully',
+      questionId,
+      updatedQuestion: {
+        id: questionId,
+        ...updatedData
+      }
+    };
+
+  } catch (error: any) {
+    logError('question_update_error', { 
+      questionId: data?.questionId,
+      error: error.message 
+    });
+    console.error('Error updating question:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
 // Initialize queue with default questions
 export const initializeQueue = functions.https.onRequest(async (req, res) => {
   corsHandler(req, res, async () => {
@@ -663,12 +1059,12 @@ export const initializeQueue = functions.https.onRequest(async (req, res) => {
         return res.status(200).send({ data: { message: 'Queue already full', count: currentCount } });
       }
       
-      const selectedTopics = selectWeightedTopics(needed);
+      const selectedTopics = await selectWeightedTopics(needed);
       const generatedQuestions: any[] = [];
       
       for (const entityName of selectedTopics) {
         try {
-          initializeKnowledgeBase();
+          await initializeKnowledgeBase();
           const entity = questionQueueKnowledgeBase ? questionQueueKnowledgeBase[entityName] : null;
           if (!entity) continue;
           

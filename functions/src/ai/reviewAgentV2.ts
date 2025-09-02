@@ -84,7 +84,7 @@ function initializeGeminiClient(): { success: boolean; client?: any; error?: str
       return { success: false, error };
     }
     
-    // Correct API initialization with object containing apiKey
+    // Correct API initialization - GoogleGenAI constructor takes options object with apiKey
     const client = new GoogleGenAI({ apiKey });
     log('info', 'client_init', 'Gemini client initialized successfully');
     
@@ -192,6 +192,7 @@ function parseReviewResponse(text: string): { success: boolean; data?: any; erro
  * Call Gemini API with retry logic and fallbacks
  */
 async function callGeminiWithRetry(client: any, prompt: string): Promise<{ success: boolean; text?: string; error?: string }> {
+  // Use the Gemini 2.5 models
   const models = ['gemini-2.5-pro', 'gemini-2.5-flash'];
   const maxRetries = 2;
   

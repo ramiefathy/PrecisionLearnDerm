@@ -17,7 +17,7 @@ export interface ParsedMCQ {
     B: string;
     C: string;
     D: string;
-    E?: string;
+    E: string; // E is required for ABD format
   };
   correctAnswer: 'A' | 'B' | 'C' | 'D' | 'E';
   explanation: string;
@@ -139,12 +139,13 @@ export function parseStructuredMCQResponse(text: string): ParsedMCQ | null {
       return null;
     }
     
-    // Validate options (minimum 4 required)
+    // Validate options (exactly 5 required for ABD format)
     const optionKeys = Object.keys(result.options || {});
-    if (optionKeys.length < 4) {
-      logger.warn('[PARSER] Insufficient options', {
+    if (optionKeys.length !== 5 || !['A', 'B', 'C', 'D', 'E'].every(key => key in result.options!)) {
+      logger.warn('[PARSER] Invalid options - ABD format requires exactly 5 options (A-E)', {
         foundOptions: optionKeys,
-        count: optionKeys.length
+        count: optionKeys.length,
+        missingOptions: ['A', 'B', 'C', 'D', 'E'].filter(key => !(key in (result.options || {})))
       });
       return null;
     }

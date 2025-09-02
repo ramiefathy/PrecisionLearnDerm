@@ -15,10 +15,9 @@ export default defineConfig({
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/functions'],
           
           // Animation chunk - framer-motion is heavy
-          animations: ['framer-motion'],
+          animations: ['framer-motion']
           
-          // UI chunk - often used together
-          ui: ['@testing-library/react', '@testing-library/jest-dom', '@testing-library/user-event']
+          // Removed testing-library as those are dev dependencies
         }
       }
     },

@@ -1,7 +1,7 @@
 # AI Pipeline API Documentation
 
-**Version**: 2.0  
-**Last Updated**: 2025-08-15  
+**Version**: 2.1  
+**Last Updated**: 2025-09-02  
 **Status**: Production Ready
 
 ## Overview
@@ -258,6 +258,165 @@ const MEDICAL_CHECKS = [
 ### Quality Improvement System
 
 #### Iterative Enhancement
+
+## Pipeline Evaluation API (Admin)
+
+The evaluation system runs controlled tests across pipelines and topics, recording metrics and detailed results in Firestore for live dashboards.
+
+### Start Evaluation
+
+Endpoint: `startPipelineEvaluation`  
+Type: Firebase Callable  
+Auth: Required
+
+Request
+```ts
+interface StartEvaluationRequest {
+  basicCount?: number;           // per topic per pipeline (0–10, default 1)
+  advancedCount?: number;        // 0–10, default 1
+  veryDifficultCount?: number;   // 0–10, default 1
+  pipelines?: ('boardStyle'|'optimizedOrchestrator'|'hybridRouter')[];
+  topics?: string[];             // defaults to 5 common topics when empty
+}
+```
+
+Response
+```ts
+interface StartEvaluationResponse {
+  success: true;
+  jobId: string;
+  message: string;
+  estimatedDuration: number;     // seconds
+}
+```
+
+Behavior
+- Immediately creates `evaluationJobs/{jobId}`
+- Schedules full processing via `processBatchTestsLogic(jobId, 0, 1, true)`
+
+### Process Batch Tests
+
+Endpoint: `processBatchTests`  
+Type: Firebase Callable  
+Auth: Required  
+Secrets: `GEMINI_API_KEY`
+
+Request
+```ts
+interface ProcessBatchRequest {
+  jobId: string;
+  startIndex: number;
+  batchSize?: number;            // default 1; function auto-tunes per load/complexity
+  processAllRemaining?: boolean; // default false; true to process to completion
+}
+```
+
+Response
+```ts
+interface ProcessBatchResponse {
+  success: boolean;
+  finished?: boolean;
+  nextStartIndex?: number;
+  batchSuccesses?: number;
+  batchSize?: number;
+}
+```
+
+Behavior (highlights)
+- Intelligent batch sizing by taxonomy/complexity and current system load
+- Writes per-test docs into `evaluationJobs/{jobId}/testResults`
+- Writes streaming logs into `evaluationJobs/{jobId}/liveLogs`
+- New: honors `evaluationJobs/{jobId}.cancelRequested` pre‑batch and post‑batch; on cancel, logs and fails job
+- New: canonicalization on save (see data model)
+
+### Cancel Evaluation
+
+Endpoint: `cancelEvaluationJob`  
+Type: Firebase Callable  
+Auth: Required
+
+Request
+```ts
+interface CancelRequest {
+  jobId: string;
+  reason?: string;
+}
+```
+
+Response
+```ts
+{ success: true }
+```
+
+Behavior
+- Sets `evaluationJobs/{jobId}.cancelRequested = true` and `cancellationReason`
+- Adds live log `evaluation_cancel_request`; processor will stop at next cancel check
+
+### Firestore Data Model
+
+Job Document: `evaluationJobs/{jobId}`
+```ts
+{
+  status: 'pending'|'running'|'completed'|'failed',
+  config: { basicCount, advancedCount, veryDifficultCount, pipelines: string[], topics: string[] },
+  progress: { totalTests: number, completedTests: number, currentPipeline?: string, currentTopic?: string, currentDifficulty?: string },
+  // cancellation
+  cancelRequested?: boolean,
+  cancellationReason?: string,
+  // timestamps
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+  completedAt?: Timestamp,
+  userId: string
+}
+```
+
+Per-Test Result: `evaluationJobs/{jobId}/testResults/test_{index}`
+```ts
+{
+  success: boolean,
+  testCase: { pipeline: string, topic: string, difficulty: string, category?: string },
+  result: { stem: string, options: string[] | {A:string,B:string,C:string,D:string,E:string}, correctAnswer: number|'A'|'B'|'C'|'D'|'E', explanation: string },
+  latency: number,                // ms
+  quality: number,                // 0–100 (rule-based)
+  detailedScores?: { overall: number, dimensions: { ... } },
+  aiScores?: {... nested original shape ...},
+  // New canonicalized fields for UI/analytics
+  normalized: {
+    optionsArray: string[],
+    correctAnswerIndex: number|null,
+    correctAnswerLetter: string|null
+  },
+  aiScoresFlat: {
+    overall: number|null,
+    boardReadiness: string|null,
+    clinicalRealism: number|null,
+    medicalAccuracy: number|null,
+    distractorQuality: number|null,
+    cueingAbsence: number|null
+  },
+  createdAt: Timestamp
+}
+```
+
+Live Logs: `evaluationJobs/{jobId}/liveLogs/*`
+- `test_start`, `test_complete`, `test_error`, `generation_progress`, `batch_transition`, `evaluation_complete`, `evaluation_cancel_request`, `evaluation_cancelled`
+
+### Frontend Notes
+- Components prefer `normalized.*` and `aiScoresFlat.*` with fallback to original shapes for historical data
+- Quality values are percentages (0–100%) across charts and summaries
+
+### Deployment Tips (short-timeout safe)
+```bash
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+firebase deploy --only functions:startPipelineEvaluation
+
+npm --prefix web run build
+# optional
+firebase deploy --only hosting
+```
 1. **Error Correction**: Fix structural issues automatically
 2. **Content Enhancement**: Add clinical context and details
 3. **Format Standardization**: Ensure consistent presentation

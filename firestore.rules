@@ -49,5 +49,23 @@ service cloud.firestore {
     match /ops/{document=**} {
       allow read, write: if isAdmin();
     }
+
+    // Evaluation jobs collection for pipeline testing
+    match /evaluationJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+      
+      // Live logs subcollection
+      match /liveLogs/{logId} {
+        allow read: if isAdmin();
+        allow write: if isAdmin();
+      }
+      
+      // Test results subcollection  
+      match /testResults/{resultId} {
+        allow read: if isAdmin();
+        allow write: if isAdmin();
+      }
+    }
   }
 }

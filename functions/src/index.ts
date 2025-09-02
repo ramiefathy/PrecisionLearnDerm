@@ -8,7 +8,9 @@ admin.initializeApp();
 
 // AI functions
 export { generateMcq as ai_generate_mcq } from './ai/drafting';
-export { processReview as ai_review_mcq } from './ai/review';
+// Old review agent - deprecated, use V2 instead
+// export { processReview as ai_review_mcq_old } from './ai/review';
+export { processReviewV2 as ai_review_mcq } from './ai/reviewAgentV2';
 export { processReviewV2 as ai_review_mcq_v2 } from './ai/reviewAgentV2';
 export { processScoring as ai_score_mcq, processScoring as scoreMcq } from './ai/scoring';
 // Enhanced scoring with ABD-specific 20-criterion rubric
@@ -61,8 +63,11 @@ export { itemsRevise as items_revise } from './items/revise';
 // Admin functions - Re-enabling essential admin panel functions
 export { admin_generateQuestionQueue as admin_generate_question_queue } from './admin/questionQueue';
 export { admin_generate_per_topic as admin_generate_per_topic } from './admin/questionQueue';
+// Metadata enhancement function
+export { enhanceQuestionMetadata as admin_enhance_metadata } from './admin/enhanceMetadata';
 export { admin_getQuestionQueue as admin_get_question_queue } from './admin/questionQueue';
 export { admin_reviewQuestion as admin_review_question } from './admin/questionQueue';
+export { admin_update_question } from './admin/questionQueue';
 export { admin_listUncategorized as admin_list_uncategorized } from './admin/taxonomy';
 export { admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
 // Re-enabled after taxonomy filtering optimization (categories 8-9 filtered out)
@@ -111,6 +116,12 @@ export { test_generate_question, test_review_question, test_score_question } fro
 // Test endpoints - temporarily disabled during deployment troubleshooting
 // export { test_enhanced_pipeline, test_generate_with_details } from './test/enhancedTestEndpoints';
 
+// Deployment test functions
+export { testDeployment as test_deployment, testReviewV2Import as test_review_v2_import } from './test/deploymentTest';
+
+// Knowledge base upload function (temporary for setup)
+export { uploadKnowledgeBase as admin_upload_kb } from './scripts/uploadKB';
+
 // REMOVED: Distributed services test endpoints - Files deleted
 // export { 
 //   testDistributedHealth,
@@ -131,6 +142,9 @@ export { seedDatabase as util_seed_database } from './util/seed';
 
 // Main Orchestrator for Multi-Agent Pipeline
 export { orchestrateQuestionGenerationFunction as orchestrateQuestionGeneration } from './ai/adaptedOrchestrator';
+
+// Board Style MCQ Generation  
+export { generateBoardStyleMcq } from './ai/boardStyleGeneration';
 
 // Direct MCQ Generator - Single-pass architecture (will enable after deployment testing)
 // export { generateMCQDirect } from './ai/directGenerator';
@@ -165,3 +179,11 @@ export { orchestrateQuestionGenerationFunction as orchestrateQuestionGeneration 
 // Public test endpoint (remove in production)
 export { testGenerateQuestions } from './test/publicTestEndpoint';
 
+// Pipeline Evaluation Functions
+export { startPipelineEvaluation } from './evaluation/startPipelineEvaluation';
+export { processPipelineEvaluation } from './evaluation/processPipelineEvaluation';
+export { processSingleTest, processBatchTests, addEvaluatedQuestionsToQueue as admin_add_evaluated_questions_to_queue } from './evaluation/evaluationProcessor';
+export { cancelEvaluationJob } from './evaluation/evaluationProcessor';
+
+// Hybrid Pipeline Router
+export { hybridGenerateMCQ } from './ai/hybridPipelineRouter';

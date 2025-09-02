@@ -7,7 +7,16 @@
 
 import * as admin from 'firebase-admin';
 import { createHash } from 'crypto';
-import { logInfo, logError } from './logging';
+
+// Use console logging to avoid circular dependency
+// (enhancedCache -> logging -> monitoring -> health -> enhancedCache)
+const logInfo = (event: string, data?: any) => {
+  console.log(`[Cache] ${event}`, data || '');
+};
+
+const logError = (event: string, error: any, data?: any) => {
+  console.error(`[Cache] ERROR: ${event}`, error, data || '');
+};
 
 const db = admin.firestore();
 

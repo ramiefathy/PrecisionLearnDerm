@@ -1,7 +1,7 @@
 # Troubleshooting Guide
 
 **Version**: 2.0  
-**Last Updated**: 2025-08-15  
+**Last Updated**: 2025-09-02  
 **Status**: Production Support Guide
 
 ## Overview
@@ -230,8 +230,8 @@ Error: Unauthenticated. Authentication required.
    ```
 
 2. **For Production - Ensure Authentication**
-   ```javascript
-   // Ensure user is authenticated
+  ```javascript
+  // Ensure user is authenticated
    const user = firebase.auth().currentUser;
    if (!user) {
      await firebase.auth().signInAnonymously();
@@ -243,7 +243,50 @@ Error: Unauthenticated. Authentication required.
    // Call function with authentication
    const generateQuestion = firebase.functions().httpsCallable('ai_generate_enhanced_mcq');
    const result = await generateQuestion({ topicIds: ['psoriasis'] });
-   ```
+  ```
+
+## Evaluation Dashboard Issues (Admin)
+
+### Issue: AI scores not appearing in charts
+
+Symptoms
+```
+AI charts show 0 values for clinical realism/accuracy/board readiness
+```
+
+Root Cause
+- UI previously read nested fields (e.g., `aiScores.coreQuality.clinicalRealism`)
+- New canonical fields are stored under `aiScoresFlat.*`; historical runs may only have nested shape
+
+Resolution
+- Ensure web app is updated: it reads `aiScoresFlat.*` with fallback to nested `aiScores`
+- For legacy data, re-run the evaluation to populate `aiScoresFlat`
+
+### Issue: Options not rendering for some tests
+
+Symptoms
+```
+Question dialog shows no options for orchestrator-generated tests
+```
+
+Root Cause
+- Orchestrator returns options as object `{A..E}`, Board-Style returns array
+
+Resolution
+- UI normalizes via `normalized.optionsArray`; ensure functions are redeployed to write canonical `normalized.*` fields
+
+### Issue: Cancel button does nothing
+
+Root Cause
+- `cancelEvaluationJob` not deployed or missing permissions
+
+Resolution
+```bash
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+```
+- Confirm callable is accessible and user is authenticated
 
 3. **Check Authentication Rules**
    ```typescript

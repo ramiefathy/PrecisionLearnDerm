@@ -568,16 +568,17 @@ export const validateClinical = functions.https.onCall(async (data: ClinicalVali
 /**
  * Regenerate question based on admin feedback
  */
-export const regenerateQuestionWithFeedback = functions.https.onCall(async (data: RegenerationRequest, context) => {
+export const regenerateQuestionWithFeedback = functions.https.onCall(async (data: RegenerationRequest & { autoSave?: boolean }, context) => {
   try {
     requireAdmin(context);
     
-    const { questionId, questionData, adminFeedback, previousReview } = data;
+    const { questionId, questionData, adminFeedback, previousReview, autoSave = false } = data;
     
     logInfo('question_regeneration_started', {
       questionId,
       feedbackLength: adminFeedback?.length || 0,
-      hasPreviousReview: !!previousReview
+      hasPreviousReview: !!previousReview,
+      autoSave
     });
 
     // Validate input
@@ -661,11 +662,81 @@ IMPORTANT:
 
     const regeneratedQuestion = JSON.parse(parsedResponse.text || '{}');
 
+    // If autoSave is enabled, update the question in the database
+    let savedQuestionId = questionId;
+    if (autoSave && questionId) {
+      try {
+        const db = admin.firestore();
+        const queueRef = db.collection('questionQueue').doc(questionId);
+        
+        // Prepare update data
+        const updateData: any = {
+          'draftItem.stem': regeneratedQuestion.stem || regeneratedQuestion.IMPROVED_STEM,
+          'draftItem.leadIn': regeneratedQuestion.leadIn || regeneratedQuestion.IMPROVED_LEAD_IN,
+          'draftItem.explanation': regeneratedQuestion.explanation || regeneratedQuestion.IMPROVED_EXPLANATION,
+          'draftItem.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+          lastEditedBy: context?.auth?.uid || 'admin',
+          lastEditedAt: admin.firestore.FieldValue.serverTimestamp(),
+          editType: 'ai_regeneration',
+          regenerationFeedback: adminFeedback
+        };
+
+        // Parse and update options if present
+        if (regeneratedQuestion.options || regeneratedQuestion.IMPROVED_OPTIONS) {
+          const options = regeneratedQuestion.options || regeneratedQuestion.IMPROVED_OPTIONS;
+          if (typeof options === 'string') {
+            // Parse text options format (A) option, B) option, etc.)
+            const parsedOptions = options.split('\n')
+              .filter((line: string) => line.match(/^[A-E]\)/))
+              .map((line: string) => ({ text: line.replace(/^[A-E]\)\s*/, '') }));
+            updateData['draftItem.options'] = parsedOptions;
+          } else if (Array.isArray(options)) {
+            updateData['draftItem.options'] = options;
+          }
+        }
+
+        // Update correct answer index if present
+        if (regeneratedQuestion.correctAnswer || regeneratedQuestion.CORRECT_ANSWER) {
+          const correctAnswer = regeneratedQuestion.correctAnswer || regeneratedQuestion.CORRECT_ANSWER;
+          const keyIndex = ['A', 'B', 'C', 'D', 'E'].indexOf(correctAnswer.toUpperCase());
+          if (keyIndex !== -1) {
+            updateData['draftItem.keyIndex'] = keyIndex;
+          }
+        }
+
+        // Add to edit history
+        const editHistoryEntry = {
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          editedBy: context?.auth?.uid || 'admin',
+          editType: 'ai_regeneration',
+          adminFeedback,
+          changesMade: regeneratedQuestion.changesMade || regeneratedQuestion.CHANGES_MADE || []
+        };
+        
+        await queueRef.update({
+          ...updateData,
+          editHistory: admin.firestore.FieldValue.arrayUnion(editHistoryEntry)
+        });
+
+        logInfo('regenerated_question_auto_saved', {
+          questionId,
+          uid: context?.auth?.uid
+        });
+      } catch (saveError) {
+        logError('auto_save_failed', {
+          questionId,
+          error: saveError instanceof Error ? saveError.message : String(saveError)
+        });
+        // Don't throw - return the regenerated question even if save fails
+      }
+    }
+
     logInfo('question_regeneration_completed', {
       questionId,
       stemLength: regeneratedQuestion.stem?.length || 0,
       optionsCount: regeneratedQuestion.options?.length || 0,
-      changesMade: regeneratedQuestion.changesMade?.length || 0
+      changesMade: regeneratedQuestion.changesMade?.length || 0,
+      autoSaved: autoSave
     });
 
     return {
@@ -673,7 +744,8 @@ IMPORTANT:
       regeneratedQuestion,
       adminFeedback,
       timestamp: Date.now(),
-      originalQuestionId: questionId
+      originalQuestionId: questionId,
+      autoSaved: autoSave
     };
 
   } catch (error: any) {

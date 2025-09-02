@@ -394,6 +394,19 @@ export default function AdminSetupPage() {
             </Link>
 
             <Link
+              to="/admin/evaluation"
+              className="flex items-center gap-3 p-4 rounded-xl border-2 border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all"
+            >
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 grid place-items-center">
+                <span className="text-indigo-600">📈</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Pipeline Evaluation</h3>
+                <p className="text-sm text-gray-600">Test & compare</p>
+              </div>
+            </Link>
+
+            <Link
               to="/admin/items"
               className="flex items-center gap-3 p-4 rounded-xl border-2 border-orange-200 hover:border-orange-300 hover:bg-orange-50 transition-all"
             >

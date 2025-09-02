@@ -8,6 +8,8 @@ import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { getGeminiApiKey } from './config';
 import { logInfo, logError } from './logging';
 import { parseGeminiResponse } from './geminiResponseParser';
+import { withTimeout, TimeoutError, createCascadingTimeout, withRetry } from './timeoutWrapper';
+import { systemLoadService } from '../services/systemLoadService';
 
 export interface GeminiClientOptions {
   maxRetries?: number;
@@ -44,6 +46,7 @@ export class RobustGeminiClient {
 
   constructor(options: GeminiClientOptions = {}) {
     const apiKey = getGeminiApiKey();
+    // Correct initialization - GoogleGenAI takes options object with apiKey property
     this.genAI = new GoogleGenAI({ apiKey });
     
     // Fast mode: Aggressive settings for speed
@@ -234,40 +237,23 @@ export class RobustGeminiClient {
   }
 
   /**
-   * Make a single request to the Gemini API
+   * Make a single request to the Gemini API with enhanced timeout handling
    */
   private async makeSingleRequest(
     prompt: string,
     modelName: string,
     operation: string
   ): Promise<GeminiResult> {
-    return new Promise(async (resolve, reject) => {
-      // DEBUG: Log the actual timeout value being used
-      logInfo('robust_gemini_timeout_value', {
-        operation,
-        model: modelName,
-        timeoutValue: this.options.timeout,
-        fastMode: this.options.fastMode,
-        allOptions: JSON.stringify(this.options)
-      });
-      
-      const timeoutId = setTimeout(() => {
-        logError('robust_gemini_timeout', {
-          operation,
-          operationName: operation, // Explicit operation name tracking
-          operationLength: operation.length,
-          model: modelName,
-          timeout: this.options.timeout,
-          timeoutSource: 'robustGeminiClient',
-          timestamp: new Date().toISOString()
-        });
-        resolve({
-          success: false,
-          error: `Request timed out after ${this.options.timeout}ms for operation: ${operation}`
-        });
-      }, this.options.timeout);
+    // DEBUG: Log the actual timeout value being used
+    logInfo('robust_gemini_timeout_value', {
+      operation,
+      model: modelName,
+      timeoutValue: this.options.timeout,
+      fastMode: this.options.fastMode,
+      allOptions: JSON.stringify(this.options)
+    });
 
-      try {
+    try {
         // Configure model with optimal parameters for medical content generation
         const isJsonOperation = operation.includes('json') || operation.includes('structured');
         
@@ -379,14 +365,20 @@ export class RobustGeminiClient {
           });
         }
         
-        const response = await this.genAI.models.generateContent({
-          model: modelName,
-          contents: prompt,
-          config
-        });
+        // Wrap the API call with our enhanced timeout handling
+        const response = await withTimeout(
+          this.genAI.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config
+          }),
+          this.options.timeout,
+          `${operation} (${modelName})`
+        );
         const requestDuration = Date.now() - requestStartTime;
-        
-        clearTimeout(timeoutId);
+
+        // Track API call for system load monitoring
+        systemLoadService.recordApiCall();
         
         // DEBUG: Log the actual response structure from new library
         logInfo('robust_gemini_api_response', {
@@ -414,27 +406,41 @@ export class RobustGeminiClient {
           if (operation.includes('json') && !operation.includes('structured')) {
             const jsonValidation = this.validateJsonResponse(parseResult.text);
             if (!jsonValidation.isValid) {
-              resolve({
+              return {
                 success: false,
                 error: `Invalid JSON response: ${jsonValidation.error}`
-              });
-              return;
+              };
             }
           }
           
-          resolve({
+          return {
             success: true,
             text: parseResult.text
-          });
+          };
         } else {
-          resolve({
+          return {
             success: false,
             error: parseResult.error || 'Failed to parse response'
-          });
+          };
         }
 
       } catch (error: any) {
-        clearTimeout(timeoutId);
+        // Handle timeout errors specifically
+        if (error instanceof TimeoutError) {
+          logError('robust_gemini_timeout', {
+            operation,
+            operationName: operation,
+            model: modelName,
+            timeout: error.timeoutMs,
+            timeoutSource: 'timeoutWrapper',
+            timestamp: new Date().toISOString()
+          });
+          
+          return {
+            success: false,
+            error: error.message
+          };
+        }
         
         const errorMessage = this.extractErrorMessage(error);
         logError('robust_gemini_api_error', {
@@ -446,12 +452,11 @@ export class RobustGeminiClient {
           prompt,
         });
         
-        resolve({
+        return {
           success: false,
           error: errorMessage
-        });
+        };
       }
-    });
   }
 
   /**

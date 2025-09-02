@@ -78,14 +78,7 @@ export default function AdminTestingPage() {
     {
       id: 'review',
       name: 'Review Agent',
-      description: 'Test the review agent independently',
-      endpoint: 'reviewMcq',
-      category: 'ai'
-    },
-    {
-      id: 'reviewV2',
-      name: 'Review Agent V2',
-      description: 'Test the redesigned review agent with simplified architecture',
+      description: 'Test the review agent with optimized architecture',
       endpoint: 'reviewMcqV2',
       category: 'ai'
     },

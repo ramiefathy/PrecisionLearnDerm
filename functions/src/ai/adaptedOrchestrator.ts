@@ -160,7 +160,7 @@ export const orchestrateQuestionGenerationFunction = functions
   .runWith({ 
     timeoutSeconds: 540, // 9 minutes - maximum allowed
     memory: '2GB', // Increased memory for better performance
-    secrets: [GEMINI_API_KEY]
+    secrets: ['GEMINI_API_KEY']
   })
   .https.onCall(async (data, context) => {
   try {

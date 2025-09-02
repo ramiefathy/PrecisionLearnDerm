@@ -20,6 +20,28 @@ PrecisionLearnDerm is a sophisticated AI-powered platform designed to help medic
 - **🎯 Real-time Performance Tracking**: SRS-based spaced repetition system
 - **👨‍⚕️ Admin Dashboard**: Comprehensive management tools for educators and administrators
 
+### 📊 Admin Pipeline Evaluation (New)
+
+Test and compare AI pipelines with live dashboards, logs, and canonicalized results.
+
+- Route: `/admin/evaluation`
+- UI Components:
+  - `web/src/components/evaluation/EvaluationDashboard.tsx` — live charts, table, question dialog
+  - `web/src/components/evaluation/EvaluationProgressMonitor.tsx` — progress + cancel
+  - `web/src/components/evaluation/LiveEvaluationLogs.tsx` — streaming logs
+  - `web/src/components/evaluation/EvaluationResultsDisplay.tsx` — final results view
+- Functions:
+  - `functions/src/evaluation/startPipelineEvaluation.ts` — create job and trigger processing
+  - `functions/src/evaluation/evaluationProcessor.ts` — batched processing, logs, results (with cancel checks)
+  - `functions/src/evaluation/evaluationJobManager.ts` — job lifecycle utils
+  - `functions/src/evaluation/aiQuestionScorer.ts` — Gemini-based evaluation
+
+Canonical fields saved per test for robust UI/analytics:
+- `normalized.optionsArray`, `normalized.correctAnswerIndex`, `normalized.correctAnswerLetter`
+- `aiScoresFlat.overall`, `.boardReadiness`, `.clinicalRealism`, `.medicalAccuracy`, `.distractorQuality`, `.cueingAbsence`
+
+Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the processor stops at batch boundaries.
+
 ## 🏗️ Architecture
 
 ### Frontend
@@ -37,6 +59,13 @@ PrecisionLearnDerm is a sophisticated AI-powered platform designed to help medic
 - **Structured text parsing** to eliminate JSON truncation issues
 - **Robust client** with retry logic and fallback to Gemini 2.5 Flash
 - **Parallel processing** for research and question generation
+
+### 🔌 File Interconnections (Key Paths)
+
+- Entry: `functions/src/index.ts` (exports) and `web/src/App.tsx` (routes)
+- Pipelines: `functions/src/ai/boardStyleGeneration.ts`, `functions/src/ai/optimizedOrchestrator.ts`, `functions/src/ai/hybridPipelineRouter.ts`
+- Evaluation (backend): `functions/src/evaluation/startPipelineEvaluation.ts`, `functions/src/evaluation/evaluationProcessor.ts`, `functions/src/evaluation/evaluationJobManager.ts`, `functions/src/evaluation/aiQuestionScorer.ts`
+- Evaluation (frontend): `web/src/pages/AdminEvaluationPage.tsx` + components under `web/src/components/evaluation/`
 
 ## 🚀 Quick Start
 
@@ -81,6 +110,24 @@ cd functions && npm run build && firebase deploy --only functions
 
 # Deploy frontend
 cd ../web && npm run build && firebase deploy --only hosting
+
+### 🧭 Minimal, Safe Deploy of Evaluation Functions
+
+To avoid deployment timeouts, deploy these functions individually after building once:
+
+```bash
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+firebase deploy --only functions:startPipelineEvaluation
+```
+
+Then deploy the web app as needed:
+
+```bash
+npm --prefix web run build
+firebase deploy --only hosting
+```
 ```
 
 ## 🎮 Usage
@@ -141,6 +188,12 @@ npm run test         # Run tests
 # Deployment
 firebase deploy --only functions    # Deploy backend
 firebase deploy --only hosting      # Deploy frontend
+
+# Evaluation functions (one-by-one)
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+firebase deploy --only functions:startPipelineEvaluation
 ```
 
 ## 🧪 Testing
@@ -170,6 +223,8 @@ npm run test:e2e
 - **Rate limiting** to prevent abuse
 - **Secure API key management** with environment variables
 - **Private repository** for sensitive medical content
+  - Store LLM keys in Firebase Secrets (e.g., `GEMINI_API_KEY`)
+  - Always enforce `requireAuth`/`requireAdmin` in callables
 
 ## 📈 Performance
 
@@ -232,4 +287,34 @@ This project is proprietary software for medical education. All rights reserved.
 
 **Built with ❤️ for medical education**
 
-*Last updated: August 2025*
+*Last updated: September 2025*
+
+---
+
+## ✅ Best Practices (Cheat Sheet)
+
+- Firebase Functions
+  - Prefer `https.onCall` with `requireAuth`/`requireAdmin`
+  - Keep module scope light; lazy-load KB/Taxonomy
+  - Use `getRobustGeminiClient` with timeouts/retries/Flash fallback
+  - Write canonical fields for UI (`normalized.*`, `aiScoresFlat.*`)
+  - Avoid deep function-to-function chains (timeout cascades)
+
+- Firestore
+  - Store compact per-test results; avoid full raw LLM dumps
+  - Use atomic increments (e.g., `completedTests`) where possible
+  - Add indexes for admin listing/filters
+
+- Frontend
+  - Prefer canonical fields; keep fallbacks for legacy data
+  - Treat quality as percentage (0–100%) consistently
+  - Sanitize any rich text before rendering
+
+- Secrets & Config
+  - Keep keys in Firebase Secrets
+  - Verify Node.js 20 in `functions/package.json` engines
+  - Set required secrets before deploys (e.g., `GEMINI_API_KEY`)
+
+## 🧭 Overall Product Architecture
+
+SPA (React) on Firebase Hosting → Firebase Functions (callables) → Firestore (data) → Gemini (AI). Pipelines orchestrate drafting/review/scoring with robust caching, structured text, and live progress logs. Admin evaluation writes canonical result shapes for resilient dashboards.

@@ -68,6 +68,15 @@ firebase deploy --only functions
 firebase deploy --only functions:ai_generate_mcq,functions:ai_review_mcq
 firebase deploy --only functions:admin_grant_admin_role,functions:admin_revoke_admin_role
 firebase deploy --only functions:healthCheck,functions:getMetrics,functions:getLogs
+
+### Evaluation Functions (short-timeout safe)
+To avoid deployment timeouts, deploy the evaluation functions individually after building:
+```bash
+npm --prefix functions run build
+firebase deploy --only functions:cancelEvaluationJob
+firebase deploy --only functions:processBatchTests
+firebase deploy --only functions:startPipelineEvaluation
+```
 ```
 
 ### Step 5: Deploy Web App
@@ -202,5 +211,5 @@ firebase deploy
 
 ---
 
-Last Updated: 2025-08-15
+Last Updated: 2025-09-02
 Status: Ready for deployment with security fixes

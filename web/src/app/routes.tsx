@@ -41,6 +41,12 @@ function AdminNavigation() {
       description: 'Statistics & question library'
     },
     { 
+      name: 'Pipeline Evaluation', 
+      href: '/admin/evaluation', 
+      icon: '📊', 
+      description: 'Test & compare AI pipelines'
+    },
+    { 
       name: 'Development', 
       href: '/admin/testing', 
       icon: '🔧', 

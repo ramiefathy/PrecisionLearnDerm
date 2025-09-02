@@ -20,10 +20,13 @@
   "exclude": [
     "node_modules", 
     "**/*.test.ts", 
-    "**/*.spec.ts", 
+    "**/*.spec.ts",
+    "src/test/**/*",
     "src/test/automated-testing-pipeline.ts", 
     "src/test/integrationTestUtils.ts", 
     "src/test/run-testing-pipeline.ts",
-    "src/test/directGeneratorTest.ts"
+    "src/test/directGeneratorTest.ts",
+    "src/test/ai-drafting.test.ts",
+    "src/test/question-generation-pipeline.test.ts"
   ]
 }
