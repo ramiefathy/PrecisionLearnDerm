@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
+          cache-dependency-path: functions/package-lock.json
 
       # Install functions dependencies
       - name: Install Functions Dependencies
@@ -28,9 +29,8 @@ jobs:
         run: |
           echo "Node version: $(node --version)"
           echo "npm version: $(npm --version)"
-          # Remove problematic lockfile and reinstall fresh
-          rm -f package-lock.json
-          npm install
+          # Prefer clean install with lockfile; fall back to install if needed
+          npm ci || npm install
           npm run build
 
       - name: Install Firebase CLI
@@ -45,7 +45,7 @@ jobs:
           # Run this command manually once: 
           # firebase functions:secrets:set GEMINI_API_KEY
           
-          firebase deploy --only functions --token "${FIREBASE_TOKEN}" --non-interactive
+          firebase deploy --only functions --project dermassist-ai-1zyic --non-interactive
 
       - name: Deployment Status
         if: always()

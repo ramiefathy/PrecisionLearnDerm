@@ -7,7 +7,12 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
-lib/
+# Only ignore compiled libs, not source folders like web/src/lib
+functions/lib/
+
+# Ensure source utilities are tracked
+!web/src/lib/
+!web/src/lib/**
 *.tsbuildinfo
 
 # Firebase
