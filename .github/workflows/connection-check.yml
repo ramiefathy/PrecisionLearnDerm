@@ -47,7 +47,7 @@ jobs:
       - name: Web build smoke test
         working-directory: web
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           VITE_FIREBASE_API_KEY='AIzaSyB0Jh0q16acdPWXwy1dc0H4eggqAVew4xA' \
           VITE_FIREBASE_AUTH_DOMAIN='dermassist-ai-1zyic.firebaseapp.com' \
           VITE_FIREBASE_PROJECT_ID='dermassist-ai-1zyic' \
@@ -56,4 +56,3 @@ jobs:
           VITE_FIREBASE_APP_ID='1:141408860984:web:7507332d26b8453b045fcd' \
           VITE_USE_FIREBASE_PROD='true' \
           npm run build
-
