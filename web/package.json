@@ -53,8 +53,6 @@
     "postcss": "^8.5.6",
     "rollup": "^4.46.2",
     "chartjs-plugin-zoom": "^2.0.1",
-    "chartjs-chart-boxplot": "^4.3.3",
-    "chartjs-chart-matrix": "^2.0.1",
     "tailwindcss": "^3.4.17",
     "terser": "^5.43.1",
     "typescript": "~5.8.3",

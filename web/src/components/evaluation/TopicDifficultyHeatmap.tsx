@@ -1,5 +1,4 @@
-import { Card, CardContent, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
-import { Chart as ChartJSComponent } from 'react-chartjs-2';
+import { Box, Card, CardContent, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import type { Metric, TopicDifficultyCell } from '../../types';
 import { useMemo, useState } from 'react';
 
@@ -9,41 +8,19 @@ export function TopicDifficultyHeatmap({ cells }:{ cells: TopicDifficultyCell[] 
   const topics = useMemo(()=> Array.from(new Set(cells.map(c=>c.topic))).sort(), [cells]);
   const value = (c: TopicDifficultyCell) => metric==='successRate' ? (c.successRate*100) : metric==='ai' ? c.ai : c.latency;
 
-  const dataPoints = cells.map(c => ({ x: difficulties.indexOf(c.difficulty), y: topics.indexOf(c.topic), v: value(c) }));
-  const chartData:any = {
-    datasets: [{
-      label: 'Heatmap',
-      data: dataPoints,
-      backgroundColor: (ctx:any) => {
-        const v = ctx.raw.v || 0;
-        if (metric === 'latency') {
-          // lower is better: green to red
-          const t = Math.max(0, Math.min(1, 1 - (v/30000)));
-          return `hsl(${120*t} 70% 50% / 0.85)`;
-        } else {
-          // higher is better: red to green
-          const t = Math.max(0, Math.min(1, (v/(metric==='ai'?100:100))));
-          return `hsl(${120*t} 70% 50% / 0.85)`;
-        }
-      },
-      width: ({chart}:any) => (chart.chartArea?.width || 0) / difficulties.length - 2,
-      height: ({chart}:any) => (chart.chartArea?.height || 0) / Math.max(1, topics.length) - 2,
-      borderWidth: 1,
-      type: 'matrix'
-    }]
-  };
-  const options:any = {
-    responsive:true,
-    plugins:{ legend:{ display:false }, tooltip:{ callbacks: { label:(ctx:any)=> {
-      const x = ctx.raw.x; const y = ctx.raw.y; const topic = topics[y]; const diff = difficulties[x];
-      const v = ctx.raw.v;
-      return `${topic} • ${diff}: ${metric==='latency'? (v/1000).toFixed(1)+'s' : v.toFixed(1)+'%'}`;
-    } } }, title:{ display:true, text:`Topic × Difficulty (${metric})` } },
-    scales:{
-      x:{ ticks:{ callback:(val:any)=> difficulties[val] } },
-      y:{ ticks:{ callback:(val:any)=> topics[val] } }
+  const cellMap = new Map<string, TopicDifficultyCell>();
+  cells.forEach(c=> cellMap.set(`${c.topic}||${c.difficulty}`, c));
+
+  const colorFor = (v:number) => {
+    if (metric === 'latency') {
+      const t = Math.max(0, Math.min(1, 1 - (v/30000)));
+      return `hsl(${120*t} 70% 50% / 0.85)`;
+    } else {
+      const t = Math.max(0, Math.min(1, (v/100)));
+      return `hsl(${120*t} 70% 50% / 0.85)`;
     }
   };
+
   return (
     <Card>
       <CardContent>
@@ -53,9 +30,30 @@ export function TopicDifficultyHeatmap({ cells }:{ cells: TopicDifficultyCell[] 
           <ToggleButton value="ai">AI Score</ToggleButton>
           <ToggleButton value="latency">Latency</ToggleButton>
         </ToggleButtonGroup>
-        <ChartJSComponent type='matrix' data={chartData} options={options} />
+        <Box sx={{ overflowX: 'auto' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: `180px repeat(${difficulties.length}, 120px)`, gap: 1 }}>
+            <Box />
+            {difficulties.map(d => (
+              <Box key={d} sx={{ fontWeight: 600, textAlign: 'center' }}>{d}</Box>
+            ))}
+            {topics.map(topic => (
+              <>
+                <Box key={`${topic}-label`} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{topic}</Box>
+                {difficulties.map(d => {
+                  const c = cellMap.get(`${topic}||${d}`);
+                  const v = c ? value(c) : 0;
+                  return (
+                    <Box key={`${topic}-${d}`} title={`${topic} • ${d}: ${metric==='latency'? (v/1000).toFixed(1)+'s' : v.toFixed(1)+'%'}`}
+                      sx={{ height: 32, borderRadius: 1, backgroundColor: colorFor(v), display:'grid', placeItems:'center', color:'#000', fontSize:'0.75rem' }}>
+                      {c ? (metric==='latency'? (v/1000).toFixed(1)+'s' : Math.round(v)+'%') : '—'}
+                    </Box>
+                  );
+                })}
+              </>
+            ))}
+          </Box>
+        </Box>
       </CardContent>
     </Card>
   );
 }
-
