@@ -14,6 +14,12 @@ import * as path from 'path';
 import { getSharedKB } from '../util/sharedCache';
 import { config } from '../util/config';
 import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
+import { 
+  parseStructuredMCQResponse, 
+  generateStructuredPromptTemplate,
+  validateMCQContent,
+  convertToLegacyFormat 
+} from '../util/structuredTextParser';
 
 const GEMINI_MODEL = config.gemini.model;
 
@@ -128,7 +134,7 @@ ABD BOARD EXAM QUESTION WRITING STANDARDS:
 `;
 
 /**
- * Call Gemini API with robust error handling and JSON mode
+ * Call Gemini API with robust error handling and structured text format
  */
 async function callGeminiAPI(prompt: string): Promise<string> {
   const client = getRobustGeminiClient({
@@ -139,7 +145,7 @@ async function callGeminiAPI(prompt: string): Promise<string> {
 
   const result = await client.generateText({
     prompt,
-    operation: 'board_style_generation_json', // Includes 'json' to enable JSON mode
+    operation: 'board_style_generation_structured', // Use structured text to avoid JSON truncation
     preferredModel: 'gemini-2.5-pro' // Use 2.5 pro as requested
   });
 
@@ -268,6 +274,7 @@ ${focusArea ? `Focus Area: ${focusArea} (e.g., diagnosis, treatment, pathophysio
 
 Difficulty Level: ${difficulty.toUpperCase()}
 - EASY: Common conditions, typical presentations, straightforward management
+  IMPORTANT for EASY: Include SOME pathognomonic findings but NOT ALL of them. The vignette should require careful reading and clinical reasoning, not be immediately obvious from the first sentence.
 - MEDIUM: Less common conditions or atypical presentations, requires clinical reasoning
 - HARD: Rare conditions, subtle findings, complex decision-making, or complications
 
@@ -279,33 +286,24 @@ CRITICAL REQUIREMENTS:
 1. Create a REALISTIC clinical vignette with ALL required elements
 2. Use ORIGINAL patient scenarios - do NOT copy from examples or KB
 3. Include specific, measurable findings (sizes, durations, locations)
-4. Write a clear, direct lead-in question
-5. Provide 5 homogeneous options (1 correct, 4 plausible distractors)
-6. Ensure the question is answerable WITHOUT seeing options
-7. Include comprehensive explanation for learning
+4. Provide 5 homogeneous options (1 correct, 4 plausible distractors)
+5. Ensure the question is answerable WITHOUT seeing options
+6. Include comprehensive explanation for learning
 
-Output your response in this EXACT JSON format:
-{
-  "stem": "Complete clinical vignette with all required elements",
-  "leadIn": "Direct question (What is the most likely diagnosis?)",
-  "options": [
-    "Correct answer",
-    "Plausible distractor 1",
-    "Plausible distractor 2",
-    "Plausible distractor 3",
-    "Plausible distractor 4"
-  ],
-  "correctAnswer": 0,
-  "explanation": "Comprehensive explanation including why correct answer is right and why each distractor is wrong",
-  "keyConcept": "Main learning point from this question",
-  "clinicalPearls": [
-    "Important clinical pearl 1",
-    "Important clinical pearl 2"
-  ],
-  "difficulty": "${difficulty}",
-  "topic": "${topic}"
-}
+IMPORTANT: Follow the EXACT structured text format provided below. Do NOT deviate from this format.
 
+FOR BASIC/EASY QUESTIONS:
+- CRITICAL: DO NOT include all pathognomonic findings together. Pick ONLY 2 key findings and omit others
+- For Dermatomyositis: Include EITHER heliotrope rash OR Gottron's papules, NOT BOTH
+- You may include muscle weakness as the second finding, but make it less specific (e.g., "fatigue" or "difficulty with activities")
+- DO NOT include shawl sign, mechanic's hands, or other classic signs in Basic questions
+- The question should require pattern recognition, not just memorization
+- Include enough clinical detail to guide toward the correct answer but require analysis
+- The vignette should present a realistic clinical scenario, not a textbook definition  
+- Distractors should be plausible conditions that could present similarly
+- AIM FOR 70-80% correct response rate, not 95-100%
+
+${generateStructuredPromptTemplate()}
 Remember: Create an ORIGINAL clinical scenario. Use the KB context for accuracy but do NOT copy from it directly.`;
 
     // Call Gemini API with error handling
@@ -322,42 +320,56 @@ Remember: Create an ORIGINAL clinical scenario. Use the KB context for accuracy 
       throw new Error(`Gemini API call failed: ${apiError.message || 'Unknown API error'}`);
     }
     
-    // Parse JSON response with error handling
-    let question: any;
-    try {
-      question = JSON.parse(response);
-    } catch (parseError: any) {
-      logError('board_style_json_parse_failed', {
+    // Parse structured text response with error handling
+    const parsedMCQ = parseStructuredMCQResponse(response);
+    
+    if (!parsedMCQ) {
+      logError('board_style_structured_parse_failed', {
         topic,
         difficulty,
         rawResponse: response.substring(0, 500), // Log first 500 chars
-        parseError: parseError.message || String(parseError),
         timestamp: new Date().toISOString()
       });
-      throw new Error(`Failed to parse JSON response: ${parseError.message || 'Invalid JSON'}`);
+      throw new Error('Failed to parse structured text response');
     }
     
-    // Validate generated question structure
-    if (!question.stem || !question.leadIn || !question.options || 
-        question.options.length !== 5 || question.correctAnswer === undefined ||
-        question.correctAnswer < 0 || question.correctAnswer > 4) {
-      throw new Error('Generated question does not meet structural requirements');
+    // Validate content quality
+    const validation = validateMCQContent(parsedMCQ);
+    if (!validation.isValid) {
+      logError('board_style_validation_failed', {
+        topic,
+        difficulty,
+        issues: validation.issues,
+        timestamp: new Date().toISOString()
+      });
+      // Log issues but don't fail - some may be acceptable
+      console.warn('MCQ validation issues:', validation.issues);
     }
     
-    // Ensure stem is substantial (at least 100 characters)
-    if (question.stem.length < 100) {
-      throw new Error('Clinical vignette is too brief');
+    // Convert to expected format using the centralized converter
+    const question = convertToLegacyFormat(parsedMCQ, true); // Use array format for compatibility with scoring
+    
+    // Override with provided values if not in parsed response
+    if (!parsedMCQ.difficulty) {
+      question.difficulty = difficulty;
+    }
+    if (!parsedMCQ.topic) {
+      question.topic = topic;
     }
     
-    // Ensure options are substantial (each at least 3 characters)
-    if (question.options.some((opt: string) => opt.length < 3)) {
-      throw new Error('Options are too brief');
-    }
+    // DEBUG: Log what we're returning
+    console.log('[BOARD_STYLE_DEBUG] Final result:', {
+      hasLeadIn: !!question.leadIn,
+      leadInValue: question.leadIn,
+      leadInLength: question.leadIn?.length || 0,
+      optionsType: Array.isArray(question.options) ? 'array' : 'object',
+      allFields: Object.keys(question)
+    });
     
     return {
       ...question,
       generatedAt: new Date().toISOString(),
-      generationMethod: 'board-style-context-based',
+      generationMethod: 'board-style-structured-text',
       kbContextUsed: !!knowledgeBase[topic.toLowerCase().replace(/[^a-z0-9]/g, '_')]
     };
     
