@@ -54,7 +54,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Line, Bar, Radar, Doughnut, Bubble } from 'react-chartjs-2';
+import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -161,8 +161,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
   // New: simple filters (phase 1). Advanced saved filters can follow.
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
+  const [selectedTopics] = useState<string[]>([]);
+  const [selectedDifficulties] = useState<string[]>([]);
 
   useEffect(() => {
     if (!jobId) return;

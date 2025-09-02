@@ -1,12 +1,14 @@
-import { Card, CardContent, Grid, List, ListItem, ListItemText, Typography } from '@mui/material';
+import { Card, CardContent, Grid, List, ListItem, ListItemButton, ListItemText, Typography } from '@mui/material';
 import type { ScoreSample } from '../../types';
 
 export function OutliersFailures({ worstAI, slowest, failures, onOpen }:{ worstAI: ScoreSample[]; slowest: ScoreSample[]; failures: ScoreSample[]; onOpen: (s: ScoreSample)=>void }){
   const renderList = (items: ScoreSample[], formatter: (s:ScoreSample)=>string) => (
     <List dense>
       {items.map(s => (
-        <ListItem key={s.id} button onClick={()=>onOpen(s)}>
-          <ListItemText primary={formatter(s)} secondary={`${s.pipeline} • ${s.topic} (${s.difficulty})`} />
+        <ListItem key={s.id} disablePadding>
+          <ListItemButton onClick={()=>onOpen(s)}>
+            <ListItemText primary={formatter(s)} secondary={`${s.pipeline} • ${s.topic} (${s.difficulty})`} />
+          </ListItemButton>
         </ListItem>
       ))}
     </List>
@@ -33,4 +35,3 @@ export function OutliersFailures({ worstAI, slowest, failures, onOpen }:{ worstA
     </Card>
   );
 }
-
