@@ -1,5 +1,5 @@
 CLAUDE.md — Agent Development Playbook (PrecisionLearnDerm)
-Last updated: 2025‑09‑02
+Last updated: 2025‑09‑02 (Rev 2)
 
 System Snapshot
 
@@ -11,12 +11,15 @@ Knowledge: Lazy, in‑memory KB + taxonomy singleton
 Knowledge Base: GraphRAG population pipeline, PDF extraction, multi-source augmentation
 Observability: Structured logs/metrics in Firestore, health check endpoints
 Build/Test: Functions via mocha + emulators; Web via Vitest/RTL
+CI/CD: GitHub Actions with connection check, build validation, and Firebase deployment
+Repository: Clean state with tracked lockfiles and web/src/lib source files
 Context Ingestion Checklist (Read Before Coding)
-Backend entrypoint: functions/src/index.ts
+Backend entrypoint: functions/src/index.ts (exports cancelEvaluationJob)
 Orchestrator: functions/src/ai/adaptedOrchestrator.ts → functions/src/ai/optimizedOrchestrator.ts
 Drafting: functions/src/ai/drafting.ts (structured text, not JSON)
 Review: functions/src/ai/reviewAgentV2.ts (Gemini client v2, retry-aware)
 Scoring: functions/src/ai/scoring.ts (structured rubric parsing)
+Evaluation: functions/src/evaluation/evaluationProcessor.ts (canonicalization + cancel support)
 Timeouts/Concurrency: functions/src/util/timeoutProtection.ts, functions/src/util/robustGeminiClient.ts, functions/src/util/concurrentExecutor.ts
 Caching: functions/src/util/enhancedCache.ts (L1 memory + L2 Firestore), functions/src/util/sharedCache.ts (topic/context helpers)
 Knowledge/Taxonomy: functions/src/services/knowledgeBaseSingleton.ts, functions/src/services/taxonomyService.ts
@@ -35,11 +38,11 @@ Infrastructure: GraphRAG/singleton_base.py, GraphRAG/memory_manager.py
 Configuration: GraphRAG/secure_config.py (env vars only)
 Golden Rules (Do/Don't)
 Do use https.onCall + requireAuth/requireAdmin for callable functions; prefer verifyAdmin(req) for onRequest.
-Don’t trust frontend profile fields for admin; rely on ID token customClaims.admin.
-Do use robustGeminiClient with structured text; don’t use JSON responses for long content.
+Don't trust frontend profile fields for admin; rely on ID token customClaims.admin.
+Do use robustGeminiClient with structured text; don't use JSON responses for long content.
 Do lazy‑load heavy data (KB/Taxonomy); never load megabyte files at module scope.
-Don’t create circular dependencies (util modules must not import each other in loops).
-Do use L1 (memory) + L2 (Firestore) caching; don’t re-run web searches or LLM calls unnecessarily.
+Don't create circular dependencies (util modules must not import each other in loops).
+Do use L1 (memory) + L2 (Firestore) caching; don't re-run web searches or LLM calls unnecessarily.
 Do sanitize any HTML on the client; only use renderSafeMarkdown.
 Don't expose test endpoints in production; guard on env and require admin.
 Do set timeouts (120s) and limit retries; don't block event loop with long sync work.
@@ -49,6 +52,9 @@ Do implement proper PDF loading before indexing (load() call required).
 Don't process entities sequentially; use semaphore-based parallelization.
 Do cache augmentation results to avoid repeated API calls.
 Never use mock implementations - all components must be real/functional.
+Do write canonical fields (normalized.*, aiScoresFlat.*) for UI resilience.
+Do handle correctAnswer === 0 as valid in quality scoring.
+Don't delete lockfiles in CI; preserve for reproducible builds.
 
 Pipeline Evaluation System (Admin)
 
@@ -80,14 +86,20 @@ Backend robustness (implemented)
 - `evaluateQuestionWithAI` normalizes numeric correctAnswer to letter in prompts (improves scoring clarity)
 - Rule-based `calculateQualityScore` now counts correctAnswer when it is 0 (board-style index)
 - `processBatchTestsLogic` checks `cancelRequested` before starting and after each batch; logs `evaluation_cancelled` and fails job with "Cancelled by user"
+- `storeTestResult` writes canonical fields for consistent UI consumption across pipeline variations
 
 Deployment guidance (short-timeout safe)
-- Build functions: `npm --prefix functions run build`
-- Deploy functions individually:
-  - `firebase deploy --only functions:cancelEvaluationJob`
-  - `firebase deploy --only functions:processBatchTests`
-  - `firebase deploy --only functions:startPipelineEvaluation`
-- Build web: `npm --prefix web run build` → Deploy hosting as needed
+- Prerequisites:
+  - Ensure `GEMINI_API_KEY` is set: `firebase functions:secrets:set GEMINI_API_KEY`
+  - Verify lockfiles exist: `functions/package-lock.json` and `web/package-lock.json`
+  - Check project: `firebase use dermassist-ai-1zyic`
+- Build functions: `cd functions && npm ci && npm run build && cd ..`
+- Deploy functions individually (avoids 540s timeout):
+  - `firebase deploy --only functions:cancelEvaluationJob --project dermassist-ai-1zyic`
+  - `firebase deploy --only functions:processBatchTests --project dermassist-ai-1zyic`
+  - `firebase deploy --only functions:startPipelineEvaluation --project dermassist-ai-1zyic`
+- Build web: `cd web && npm install && npm run build && cd ..`
+- Deploy hosting: `firebase deploy --only hosting --project dermassist-ai-1zyic`
 
 Operational checks
 - Start an evaluation: live progress fills, charts show AI metrics from `aiScoresFlat`
@@ -307,10 +319,14 @@ Deployment & Environments
 Emulators:
 Functions tests use firebase emulators with mocha; prefer emulator-driven tests for data ops.
 CI/CD:
-Deploy functions with targeted scope to avoid cold deploy failures:
-firebase deploy --only functions
+GitHub Actions workflows:
+- `.github/workflows/connection-check.yml`: Validates Firebase auth, lists functions/secrets, tests health endpoint
+- `.github/workflows/ci.yml`: Builds and tests on PR/push; uses `npm install` for web, `npm ci` for functions
+- `.github/workflows/deploy-firebase.yml`: Auto-deploys functions on main push; requires `FIREBASE_TOKEN` secret
+Deploy functions individually to avoid timeouts (see Deployment guidance above)
 Envs:
 NODE_ENV governs dev/prod behaviors in CORS and test endpoints; ensure production disables any public test function exports.
+Web requires Vite env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, etc.
 Monitoring:
 Health: functions/src/util/monitoring.ts (healthCheck onRequest)
 Logs/Metrics: getLogs/getMetrics callable (admin‑guarded)
@@ -334,10 +350,15 @@ Pitfalls & Troubleshooting
 Ensure Review Agent V2 is used; retry via robust client; keep prompt size small.
 Firebase deployment timeouts:
 Check for circular imports; verify no heavy file IO at module scope; run madge if needed locally.
+Deploy functions individually with --project flag to avoid 540s timeout.
 Slow endpoints:
 Add caching; parallelize independent calls; lower retries; verify external API timeouts (10s typical).
 Production safety:
 Ensure test/public onRequest endpoints are disabled or admin‑guarded; remove from index.ts exports in prod.
+CI/CD Issues:
+"Dependencies lock file not found": Ensure package-lock.json files are committed
+EBADPLATFORM errors: Remove platform-specific devDependencies (darwin-arm64)
+"Cannot find module ../lib/firebase": Ensure web/src/lib is tracked in git
 GraphRAG Issues:
 "0 pages loaded": Ensure pdf_indexer.load() is called before build_complete_index
 Entity timeout (40-60s): Implement caching + parallelization (see Performance Optimizations)
@@ -353,17 +374,22 @@ withCORS('STRICT') + verifyAdmin(req) if sensitive
 or convert to https.onCall with requireAdmin
 Appendix A — High‑Value Entry Points
 
-functions/src/index.ts: authoritative exports list
+functions/src/index.ts: authoritative exports list (includes cancelEvaluationJob)
 functions/src/ai/adaptedOrchestrator.ts: callable wrapper
 functions/src/ai/optimizedOrchestrator.ts: parallel search + validation + agents
 functions/src/ai/drafting.ts: structured drafting
 functions/src/ai/reviewAgentV2.ts: robust review with GoogleGenAI
 functions/src/ai/scoring.ts: rubric scoring + rewrite (optional)
+functions/src/evaluation/evaluationProcessor.ts: batch processing + canonicalization
+functions/src/evaluation/evaluationJobManager.ts: job lifecycle + quality scoring
+functions/src/evaluation/aiQuestionScorer.ts: AI-powered board-style scoring
 functions/src/services/taxonomyService.ts: lazy taxonomy API
 functions/src/services/knowledgeBaseSingleton.ts: KB/taxonomy cache
 functions/src/util/enhancedCache.ts: two-tier cache
 functions/src/util/monitoring.ts: logs/metrics/health
 firestore.rules, storage.rules: access control
+web/src/components/evaluation/*: evaluation UI components
+web/src/pages/AdminEvaluationPage.tsx: evaluation admin page
 Appendix B — Example Robust Gemini Call
 const client = getRobustGeminiClient({
 maxRetries: 3,

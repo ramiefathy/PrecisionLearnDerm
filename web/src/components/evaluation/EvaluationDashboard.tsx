@@ -31,6 +31,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import {
   collection,
   doc,
@@ -53,11 +54,21 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Radar, Doughnut, Bubble } from 'react-chartjs-2';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import { OverviewKPIs } from './OverviewKPIs';
+import { PipelineQuadrant } from './PipelineQuadrant';
+import { BoardReadinessBars } from './BoardReadinessBars';
+import { OutliersFailures } from './OutliersFailures';
+import { ScoreDistributions } from './ScoreDistributions';
+import { TopicDifficultyHeatmap } from './TopicDifficultyHeatmap';
+import { TimelinePanel } from './TimelinePanel';
+import { useEvaluationData } from '../../hooks/useEvaluationData';
+import type { EvaluationFilters, PipelineAggregate, ScoreSample } from '../../types';
 
 // Register Chart.js components
 ChartJS.register(
@@ -71,7 +82,8 @@ ChartJS.register(
   Title,
   ChartTooltip,
   Legend,
-  Filler
+  Filler,
+  zoomPlugin
 );
 
 interface EvaluationDashboardProps {
@@ -147,6 +159,10 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const [selectedTab, setSelectedTab] = useState(0);
   const [selectedQuestion, setSelectedQuestion] = useState<TestResult | null>(null);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
+  // New: simple filters (phase 1). Advanced saved filters can follow.
+  const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -229,6 +245,13 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   };
 
   const metrics = calculateMetrics();
+  // Phase 1: derive aggregates using canonical fields and simple filters
+  const filters: EvaluationFilters = {
+    pipelines: selectedPipelines,
+    topics: selectedTopics,
+    difficulties: selectedDifficulties,
+  };
+  const { samples: aggSamples, aggregates, outliers, failures } = useEvaluationData(jobId, filters);
 
   const handleViewQuestion = (testResult: TestResult) => {
     setSelectedQuestion(testResult);
@@ -305,10 +328,10 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     if (!latestTest?.aiScores) {
       return {
         labels: ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 
-                 'Board Format', 'Cognitive Level'],
+                 'Cueing Absence', 'Overall Score', 'Generation Time'],
         datasets: [{
           label: 'No Data',
-          data: [0, 0, 0, 0, 0],
+          data: [0, 0, 0, 0, 0, 0],
           backgroundColor: 'rgba(200, 200, 200, 0.2)',
           borderColor: 'rgba(200, 200, 200, 1)',
           pointBackgroundColor: 'rgba(200, 200, 200, 1)'
@@ -322,10 +345,14 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     const distractorQuality = latestTest.aiScoresFlat?.distractorQuality ?? (latestTest.aiScores as any)?.technicalQuality?.distractorQuality ?? (latestTest.aiScores as any)?.distractorQuality ?? 0;
     const cueingAbsence = latestTest.aiScoresFlat?.cueingAbsence ?? (latestTest.aiScores as any)?.technicalQuality?.cueingAbsence ?? (latestTest.aiScores as any)?.cueingAbsence ?? 0;
     const overall = latestTest.aiScoresFlat?.overall ?? (latestTest.aiScores as any)?.overall ?? 0;
+    
+    // Normalize latency to 0-100 scale (30s max, where faster is better)
+    const latencyMs = latestTest.latency || 0;
+    const latencyScore = Math.max(0, Math.min(100, 100 - (latencyMs / 30000) * 100));
 
     return {
       labels: ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 
-               'Cueing Absence', 'Overall Score'],
+               'Cueing Absence', 'Overall Score', 'Generation Time'],
       datasets: [{
         label: 'Latest Question Quality (Streamlined)',
         data: [
@@ -333,7 +360,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
           medicalAccuracy,
           distractorQuality,
           cueingAbsence,
-          overall
+          overall,
+          latencyScore
         ],
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         borderColor: 'rgba(255, 99, 132, 1)',
@@ -592,6 +620,33 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         </Box>
       </Box>
 
+      {/* Phase 1: Overview and Insights */}
+      <OverviewKPIs overall={aggregates.overall} />
+
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <PipelineQuadrant
+            data={aggregates.byPipeline as PipelineAggregate[]}
+            onSelect={(pl) => setSelectedPipelines(prev => prev.includes(pl) ? prev : [...prev, pl])}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <BoardReadinessBars data={aggregates.byPipeline as PipelineAggregate[]} />
+        </Grid>
+      </Grid>
+
+      <OutliersFailures
+        worstAI={outliers.worstAI as ScoreSample[]}
+        slowest={outliers.slowest as ScoreSample[]}
+        failures={failures as ScoreSample[]}
+        onOpen={(s) => {
+          const target = testResults.find(tr => tr.id === s.id);
+          if (target) {
+            handleViewQuestion(target);
+          }
+        }}
+      />
+
       {/* Tabs for different views */}
       <Paper sx={{ mb: 3 }}>
         <Tabs value={selectedTab} onChange={(_, v) => setSelectedTab(v)}>
@@ -599,6 +654,9 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
           <Tab label="Pipeline Comparison" />
           <Tab label="Quality Radar" />
           <Tab label="Board Readiness" />
+          <Tab label="Distributions" />
+          <Tab label="Heatmap" />
+          <Tab label="Timeline" />
           <Tab label="Detailed Results" />
         </Tabs>
       </Paper>
@@ -681,6 +739,9 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         {selectedTab === 2 && (
           <Box>
             <Typography variant="h6" gutterBottom>Quality Dimensions</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              All dimensions scored 0-100. Generation Time: higher score = faster generation (100 = instant, 0 = 30s+)
+            </Typography>
             <Box sx={{ height: 400, display: 'flex', justifyContent: 'center' }}>
               <Box sx={{ width: '60%' }}>
                 <Radar 
@@ -719,6 +780,27 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         )}
 
         {selectedTab === 4 && (
+          <Box>
+            <ScoreDistributions samples={aggSamples} />
+          </Box>
+        )}
+
+        {selectedTab === 5 && (
+          <Box>
+            <TopicDifficultyHeatmap cells={aggregates.topicDifficulty} />
+          </Box>
+        )}
+
+        {selectedTab === 6 && (
+          <Box>
+            <TimelinePanel
+              aiSeries={aggSamples.map(s=> ({ x: s.createdAt, y: s.ai }))}
+              latencySeries={aggSamples.map(s=> ({ x: s.createdAt, y: s.latency }))}
+            />
+          </Box>
+        )}
+
+        {selectedTab === 7 && (
           <Box>
             <Typography variant="h6" gutterBottom>Detailed Test Results</Typography>
             <TableContainer>

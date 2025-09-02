@@ -32,6 +32,50 @@ export interface UserProfile {
   };
 }
 
+// Evaluation Dashboard Extensions
+export type PipelineId = 'boardStyle' | 'optimizedOrchestrator' | 'hybridRouter' | string;
+
+export interface ScoreSample {
+  ai: number;
+  latency: number;
+  ready: string | null;
+  createdAt: number;
+  topic: string;
+  difficulty: string;
+  pipeline: PipelineId;
+  id?: string;
+}
+
+export interface PipelineAggregate {
+  pipeline: PipelineId;
+  avgAI: number;
+  p50AI: number;
+  p90AI: number;
+  avgLatency: number;
+  p50Latency: number;
+  p90Latency: number;
+  testCount: number;
+  readiness: { ready: number; minor: number; major: number; reject: number };
+}
+
+export interface TopicDifficultyCell {
+  topic: string;
+  difficulty: string;
+  successRate: number; // 0..1
+  ai: number;          // 0..100
+  latency: number;     // ms
+  count: number;
+}
+
+export type Metric = 'ai' | 'latency' | 'successRate';
+
+export interface EvaluationFilters {
+  pipelines: PipelineId[];
+  topics: string[];
+  difficulties: string[];
+  timeRange?: { from: number; to: number };
+}
+
 // Question and Quiz types
 export interface QuestionOption {
   text: string;

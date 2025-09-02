@@ -252,6 +252,12 @@ export async function processBatchTestsLogic(
         return { success: true, finished: true };
       }
       
+      // Update job status to running if it's still pending (first batch)
+      if (job.status === 'pending' && startIndex === 0) {
+        logger.info('[EVAL_PROCESSOR] Updating job status to running', { jobId });
+        await updateJobProgress(jobId, {}, 'running');
+      }
+      
       // Calculate intelligent batch size based on available tests
       const remainingTests = testCases.slice(startIndex);
       const intelligentBatchSize = await calculateIntelligentBatchSize(batchSize, remainingTests);
@@ -1112,6 +1118,79 @@ async function finalizeEvaluation(
     };
     
     await completeJob(jobId, finalResults);
+
+    // Write evaluation summary document for history/analytics
+    try {
+      const summaryRef = db.collection('evaluationSummaries').doc(jobId);
+      // Build per-pipeline aggregates including readiness counts and basic percentiles
+      const byPipelineAgg: any = {};
+      const aiByPipeline: Record<string, number[]> = {};
+      const latByPipeline: Record<string, number[]> = {};
+      const readinessByPipeline: Record<string, {ready:number; minor:number; major:number; reject:number}> = {};
+      results.forEach((r: any) => {
+        const p = r.testCase?.pipeline || 'unknown';
+        if (!aiByPipeline[p]) { aiByPipeline[p]=[]; latByPipeline[p]=[]; readinessByPipeline[p]={ ready:0, minor:0, major:0, reject:0 }; }
+        if (r.success) {
+          const ai = (r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? r.quality ?? 0) as number;
+          aiByPipeline[p].push(ai);
+          latByPipeline[p].push(r.latency || 0);
+          const br = r.aiScoresFlat?.boardReadiness ?? r.aiScores?.boardReadiness ?? r.aiScores?.metadata?.boardReadiness;
+          if (br === 'ready') readinessByPipeline[p].ready++;
+          else if (br === 'minor_revision') readinessByPipeline[p].minor++;
+          else if (br === 'major_revision') readinessByPipeline[p].major++;
+          else if (br === 'reject') readinessByPipeline[p].reject++;
+        }
+      });
+      const quant = (arr: number[], q:number) => {
+        if (!arr || arr.length===0) return 0;
+        const s = [...arr].sort((a,b)=>a-b);
+        const pos = (s.length-1)*q; const base = Math.floor(pos); const rest = pos-base;
+        return s[base+1]!==undefined ? s[base]+rest*(s[base+1]-s[base]) : s[base];
+      };
+      Object.keys(aiByPipeline).forEach(p => {
+        const aiArr = aiByPipeline[p];
+        const latArr = latByPipeline[p];
+        const agg = {
+          pipeline: p,
+          testCount: aiArr.length,
+          avgAI: aiArr.length? aiArr.reduce((a,b)=>a+b,0)/aiArr.length : 0,
+          p50AI: quant(aiArr, 0.5),
+          p90AI: quant(aiArr, 0.9),
+          avgLatency: latArr.length? latArr.reduce((a,b)=>a+b,0)/latArr.length : 0,
+          p50Latency: quant(latArr, 0.5),
+          p90Latency: quant(latArr, 0.9),
+          readiness: readinessByPipeline[p]
+        };
+        byPipelineAgg[p] = agg;
+      });
+
+      // Topic×Difficulty cells
+      const topicDiffMap: Record<string, { sumAI:number; sumLat:number; count:number; success:number }> = {};
+      results.forEach((r:any) => {
+        const topic = r.testCase?.topic || 'Unknown';
+        const diff = r.testCase?.difficulty || 'Unknown';
+        const key = `${topic}||${diff}`;
+        if (!topicDiffMap[key]) topicDiffMap[key] = { sumAI:0, sumLat:0, count:0, success:0 };
+        const ai = (r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? r.quality ?? 0) as number;
+        topicDiffMap[key].sumAI += ai; topicDiffMap[key].sumLat += (r.latency||0); topicDiffMap[key].count += 1;
+        const br = r.aiScoresFlat?.boardReadiness ?? r.aiScores?.boardReadiness ?? r.aiScores?.metadata?.boardReadiness;
+        if (br === 'ready' || br === 'minor_revision') topicDiffMap[key].success += 1;
+      });
+      const byTopicDifficulty = Object.entries(topicDiffMap).map(([k,v])=>{
+        const [topic, difficulty] = k.split('||');
+        return { topic, difficulty, successRate: v.count? v.success/v.count:0, ai: v.count? v.sumAI/v.count:0, latency: v.count? v.sumLat/v.count:0, count: v.count };
+      });
+
+      await summaryRef.set({
+        jobId,
+        overall: finalResults.overall,
+        byPipeline: byPipelineAgg,
+        byTopicDifficulty,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      logger.warn('[EVAL_PROCESSOR] Failed to write evaluation summary', { jobId, error: e instanceof Error? e.message: String(e) });
+    }
     
     // Add completion log
     await addLiveLog(jobId, {
