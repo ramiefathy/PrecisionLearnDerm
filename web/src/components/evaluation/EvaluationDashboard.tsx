@@ -31,7 +31,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import { Grid } from '@mui/material';
 import {
   collection,
   doc,
