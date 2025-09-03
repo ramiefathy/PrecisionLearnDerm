@@ -225,6 +225,16 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       return sum + val;
     }, 0) / (successfulTests.length || 1);
 
+    // Critical Min: minimum of core dimensions per test, averaged across tests
+    const criticalMinArr = successfulTests.map(r => {
+      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
+      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
+      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0;
+      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0;
+      return Math.min(cr, ma, dq, ca);
+    });
+    const avgCriticalMin = criticalMinArr.length ? (criticalMinArr.reduce((a,b)=>a+b,0)/criticalMinArr.length) : 0;
+
     // Calculate rule-based scores averages
     const avgRuleBasedScore = successfulTests.reduce((sum, r) => 
       sum + (r.quality || 0), 0) / (successfulTests.length || 1);
@@ -237,6 +247,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       boardReadyCount,
       avgClinicalRealism,
       avgMedicalAccuracy,
+      avgCriticalMin,
       avgRuleBasedScore,
       avgDetailedScore,
       totalTests: testResults.length,
@@ -521,6 +532,18 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
               </Typography>
               <Typography variant="h4" color={metrics.avgAIScore >= 70 ? 'success.main' : 'warning.main'}>
                 {Math.round(metrics.avgAIScore)}%
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
+        <Box sx={{ flex: '1 1 150px', minWidth: 150 }}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom variant="caption">
+                Critical Min (Avg)
+              </Typography>
+              <Typography variant="h4" color={metrics.avgCriticalMin >= 70 ? 'success.main' : (metrics.avgCriticalMin >= 50 ? 'warning.main' : 'error.main')}>
+                {Math.round(metrics.avgCriticalMin)}%
               </Typography>
             </CardContent>
           </Card>

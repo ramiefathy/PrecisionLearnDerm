@@ -112,5 +112,8 @@ export const config = {
   },
   logs: {
     enableStreaming: false
+  },
+  routing: {
+    hybridEarlyFallback: false
   }
 };

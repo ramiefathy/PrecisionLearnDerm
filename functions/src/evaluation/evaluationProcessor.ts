@@ -770,6 +770,16 @@ async function storeTestResult(
       cueingAbsence: ai?.technicalQuality?.cueingAbsence ?? ai?.cueingAbsence ?? null
     };
 
+    // Concise trace for insight (no streaming required)
+    const trace = {
+      draftModel: config.generation.useFlashForDraft ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      reviewModel: config.generation.useFlashForReview ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      finalEvalModel: config.scoring.useProForFinal ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
+      latencyMs: result?.latency ?? undefined,
+      aiOverall: aiScoresFlat.overall,
+      boardReadiness: aiScoresFlat.boardReadiness
+    };
+
     await db.collection('evaluationJobs').doc(jobId)
       .collection('testResults').doc(`test_${testIndex}`).set({
         ...result,
@@ -779,6 +789,7 @@ async function storeTestResult(
           correctAnswerLetter
         },
         aiScoresFlat,
+        trace,
         createdAt: admin.firestore.Timestamp.now()
       });
 

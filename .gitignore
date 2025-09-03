@@ -9,6 +9,7 @@ dist/
 build/
 # Only ignore compiled libs, not source folders like web/src/lib
 functions/lib/
+web/package-lock.json
 
 # Ensure source utilities are tracked
 !web/src/lib/
@@ -102,3 +103,5 @@ GraphRAG/
 *" 2.json"
 *" 3.json"
 "tsconfig 2.json"
+.env
+GraphRAG/.env

@@ -12,7 +12,7 @@ import { generateBoardStyleMCQ } from './boardStyleGeneration';
 import { generateQuestionsOptimized } from './optimizedOrchestrator';
 import { getSystemHealthMonitor } from '../util/health';
 import { getMCQCache } from '../util/enhancedCache';
-import { GEMINI_API_KEY } from '../util/config';
+import { GEMINI_API_KEY, config } from '../util/config';
 
 // Pipeline performance metrics (UPDATED from evaluation results)
 const PIPELINE_METRICS = {
@@ -286,7 +286,41 @@ async function executePipeline(
       default:
         throw new Error(`Unknown pipeline: ${decision.pipeline}`);
     }
-    
+    // Early fallback (optional): if result structure is implausible, switch routes
+    if (config.routing.hybridEarlyFallback && !isFallbackAttempt) {
+      try {
+        const plausibleMCQ = (mcq: any) => {
+          if (!mcq) return false;
+          const stemOk = typeof mcq.stem === 'string' && mcq.stem.length >= 40;
+          const explOk = typeof mcq.explanation === 'string' && mcq.explanation.length >= 30;
+          const rawOpts = mcq.options;
+          const opts = Array.isArray(rawOpts)
+            ? rawOpts
+            : rawOpts && typeof rawOpts === 'object'
+              ? ['A','B','C','D','E'].map(k => rawOpts[k]).filter((v: any) => typeof v === 'string' && v.length > 0)
+              : [];
+          const optsOk = opts.length === 5;
+          return stemOk && explOk && optsOk;
+        };
+        let plausible = true;
+        const d0 = request.difficulties && request.difficulties[0];
+        if (result?.questions && d0) plausible = plausibleMCQ(result.questions[d0]);
+        else if (decision.pipeline === 'boardStyle') plausible = plausibleMCQ(result);
+        if (!plausible) {
+          const fallbackPipeline = decision.pipeline === 'boardStyle' ? 'orchestrator' : 'boardStyle';
+          const fallbackDecision: RouteDecision = {
+            pipeline: fallbackPipeline,
+            reason: `Early fallback due to implausible result from ${decision.pipeline}`,
+            estimatedLatency: 30000,
+            estimatedSuccessRate: 0.5
+          };
+          return executePipeline(fallbackDecision, request, true);
+        }
+      } catch (e) {
+        logger.warn('[ROUTER] Early fallback check failed', { error: (e as any)?.message || String(e) });
+      }
+    }
+
     // Cache successful result
     if (result && decision.cacheKey) {
       const cache = getMCQCache();
