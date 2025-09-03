@@ -10,7 +10,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
   Table,
   TableBody,
   TableCell,
@@ -27,6 +26,7 @@ import {
   AccordionDetails,
   Stack
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import {
   ExpandMore as ExpandMoreIcon,
   Download as DownloadIcon,

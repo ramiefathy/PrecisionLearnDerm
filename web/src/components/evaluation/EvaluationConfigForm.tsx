@@ -17,9 +17,9 @@ import {
   Button,
   Alert,
   Chip,
-  Slider,
-  Grid
+  Slider
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SettingsIcon from '@mui/icons-material/Settings';
 
@@ -247,7 +247,7 @@ export const EvaluationConfigForm: React.FC<EvaluationConfigFormProps> = ({
               placeholder="Add custom topic..."
               value={customTopic}
               onChange={(e) => setCustomTopic(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTopic()}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTopic()}
               disabled={isLoading}
             />
             <Button

@@ -20,8 +20,9 @@ import {
   Card,
   CardContent,
   Stack,
-  Grid
+  
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,

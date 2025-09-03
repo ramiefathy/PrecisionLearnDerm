@@ -31,7 +31,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import {
   collection,
   doc,
@@ -299,7 +299,10 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     const pipelines = [...new Set(testResults.map(r => r.testCase.pipeline))];
     const avgScoresByPipeline = pipelines.map(pipeline => {
       const pipelineTests = testResults.filter(r => r.testCase.pipeline === pipeline);
-      return pipelineTests.reduce((sum, r) => sum + (r.aiScores?.overall || 0), 0) / 
+      return pipelineTests.reduce(
+        (sum, r) => sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
+        0
+      ) / 
              (pipelineTests.length || 1);
     });
 
@@ -325,7 +328,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
 
   const prepareRadarData = () => {
     const latestTest = testResults[testResults.length - 1];
-    if (!latestTest?.aiScores) {
+    if (!(latestTest?.aiScoresFlat || latestTest?.aiScores)) {
       return {
         labels: ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 
                  'Cueing Absence', 'Overall Score', 'Generation Time'],
@@ -381,7 +384,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       datasets: [
         {
           label: 'AI Score (%)',
-          data: testResults.map(r => r.aiScores?.overall || 0),
+          data: testResults.map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.1
@@ -901,7 +904,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
             <Typography variant="subtitle2" color="text.secondary">
               Pipeline: {selectedQuestion.testCase.pipeline} | Topic: {selectedQuestion.testCase.topic} | 
               Difficulty: {selectedQuestion.testCase.difficulty} | 
-              AI Score: {selectedQuestion.aiScores?.overall || 0}%
+              AI Score: {selectedQuestion.aiScoresFlat?.overall ?? (selectedQuestion.aiScores as any)?.overall ?? 0}%
             </Typography>
           )}
         </DialogTitle>

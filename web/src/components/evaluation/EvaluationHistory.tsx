@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, orderBy, query, limit } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Card, CardContent, Grid, Typography } from '@mui/material';
+import { Card, CardContent, Typography } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import { Line } from 'react-chartjs-2';
 
 interface SummaryDoc {
@@ -52,4 +53,3 @@ export function EvaluationHistory({ max=10 }:{ max?: number }){
     </Grid>
   );
 }
-

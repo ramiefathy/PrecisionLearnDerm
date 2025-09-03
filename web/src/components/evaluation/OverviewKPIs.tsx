@@ -1,4 +1,5 @@
-import { Card, CardContent, Grid, Typography } from '@mui/material';
+import { Card, CardContent, Typography } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import type { PipelineAggregate } from '../../types';
 
 export function OverviewKPIs({ overall }: { overall: PipelineAggregate | null }) {
@@ -40,4 +41,3 @@ export function OverviewKPIs({ overall }: { overall: PipelineAggregate | null })
     </Grid>
   );
 }
-
