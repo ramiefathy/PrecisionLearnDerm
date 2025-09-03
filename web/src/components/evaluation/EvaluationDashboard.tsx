@@ -37,7 +37,8 @@ import {
   doc,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  limit as fsLimit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import {
@@ -181,7 +182,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     // Listen to test results
     const resultsQuery = query(
       collection(db, 'evaluationJobs', jobId, 'testResults'),
-      orderBy('createdAt', 'asc')
+      orderBy('createdAt', 'asc'),
+      fsLimit(1000)
     );
 
     const resultsUnsubscribe = onSnapshot(

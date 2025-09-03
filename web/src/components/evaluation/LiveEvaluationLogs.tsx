@@ -219,13 +219,14 @@ export const LiveEvaluationLogs: React.FC<LiveEvaluationLogsProps> = ({
               size="small"
               onClick={() => setAutoScroll(!autoScroll)}
               color={autoScroll ? 'primary' : 'default'}
+              aria-label={autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll'}
             >
               <RefreshIcon />
             </IconButton>
           </Tooltip>
           
           <Tooltip title="Clear logs">
-            <IconButton size="small" onClick={clearLogs}>
+            <IconButton size="small" onClick={clearLogs} aria-label="Clear logs">
               <ClearIcon />
             </IconButton>
           </Tooltip>
@@ -234,6 +235,7 @@ export const LiveEvaluationLogs: React.FC<LiveEvaluationLogsProps> = ({
             <IconButton 
               size="small"
               onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={isExpanded ? 'Collapse logs' : 'Expand logs'}
             >
               {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
