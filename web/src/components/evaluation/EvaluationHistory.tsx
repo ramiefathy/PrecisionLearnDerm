@@ -31,19 +31,19 @@ export function EvaluationHistory({ max=10 }:{ max?: number }){
 
   return (
     <Grid container spacing={2}>
-      <Grid size={{ xs:12, md:4 }}>
+      <Grid item xs={12} md={4}>
         <Card><CardContent>
           <Typography variant='subtitle1' gutterBottom>Avg AI Score (history)</Typography>
           <Line data={{ labels, datasets:[{ label:'AI (%)', data: aiSeries, borderColor:'rgb(75,192,192)'}] }} options={{ responsive:true, plugins:{ legend:{ display:false } } }} />
         </CardContent></Card>
       </Grid>
-      <Grid size={{ xs:12, md:4 }}>
+      <Grid item xs={12} md={4}>
         <Card><CardContent>
           <Typography variant='subtitle1' gutterBottom>Avg Latency (history)</Typography>
           <Line data={{ labels, datasets:[{ label:'Latency (s)', data: latencySeries, borderColor:'rgb(255,99,132)'}] }} options={{ responsive:true, plugins:{ legend:{ display:false } } }} />
         </CardContent></Card>
       </Grid>
-      <Grid size={{ xs:12, md:4 }}>
+      <Grid item xs={12} md={4}>
         <Card><CardContent>
           <Typography variant='subtitle1' gutterBottom>Success Rate (history)</Typography>
           <Line data={{ labels, datasets:[{ label:'Success (%)', data: successSeries, borderColor:'rgb(54,162,235)'}] }} options={{ responsive:true, plugins:{ legend:{ display:false } } }} />
@@ -52,4 +52,3 @@ export function EvaluationHistory({ max=10 }:{ max?: number }){
     </Grid>
   );
 }
-

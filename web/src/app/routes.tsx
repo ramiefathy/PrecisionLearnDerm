@@ -161,7 +161,7 @@ export function AdminRoute() {
           <p className="text-gray-600 mb-6">
             You don't have permission to access this area. Admin access is required.
             {user?.email && (
-              <>< br/><span className="text-sm">Signed in as: {user.email}</span></>
+              <><br /><span className="text-sm">Signed in as: {user.email}</span></>
             )}
           </p>
           <button 

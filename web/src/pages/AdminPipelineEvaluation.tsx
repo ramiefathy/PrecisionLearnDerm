@@ -206,7 +206,7 @@ export default function AdminPipelineEvaluation() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <Typography variant="body2" color="text.secondary">
                 {currentSummary 
                   ? `Last evaluation: ${new Date(currentSummary.timestamp).toLocaleString()}`
@@ -214,7 +214,7 @@ export default function AdminPipelineEvaluation() {
                 }
               </Typography>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }} sx={{ textAlign: 'right' }}>
+            <Grid item xs={12} md={6} sx={{ textAlign: 'right' }}>
               <Button
                 variant="contained"
                 startIcon={running ? <CircularProgress size={20} /> : <PlayArrow />}
@@ -242,7 +242,7 @@ export default function AdminPipelineEvaluation() {
         <>
           {/* Summary Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -255,7 +255,7 @@ export default function AdminPipelineEvaluation() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -268,7 +268,7 @@ export default function AdminPipelineEvaluation() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -281,7 +281,7 @@ export default function AdminPipelineEvaluation() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -309,7 +309,7 @@ export default function AdminPipelineEvaluation() {
           {/* Tab Content */}
           {selectedTab === 0 && (
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -328,7 +328,7 @@ export default function AdminPipelineEvaluation() {
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -352,7 +352,7 @@ export default function AdminPipelineEvaluation() {
 
           {selectedTab === 1 && (
             <Grid container spacing={3}>
-              <Grid size={12}>
+              <Grid item xs={12}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -377,7 +377,7 @@ export default function AdminPipelineEvaluation() {
 
           {selectedTab === 2 && (
             <Grid container spacing={3}>
-              <Grid size={12}>
+              <Grid item xs={12}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -421,7 +421,7 @@ export default function AdminPipelineEvaluation() {
 
           {selectedTab === 3 && (
             <Grid container spacing={3}>
-              <Grid size={12}>
+              <Grid item xs={12}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>

@@ -70,7 +70,7 @@ const AdminEvaluationPage: React.FC = () => {
   // Check admin access and load existing jobs
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      navigate('/auth');
     } else if (!isAdmin) {
       navigate('/');
     } else {

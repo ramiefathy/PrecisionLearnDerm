@@ -20,7 +20,7 @@ import {
 import { calculateDetailedQualityScore, type DetailedQualityScore } from './questionScorer';
 import { evaluateQuestionWithAI, type BoardStyleQualityScore } from './aiQuestionScorer';
 import { systemLoadService } from '../services/systemLoadService';
-import { requireAuth } from '../util/auth';
+import { requireAuth, isAdmin } from '../util/auth';
 // Lazy import taxonomyComplexityService to avoid initialization timeout
 // import { taxonomyComplexityService } from '../services/taxonomyComplexityService';
 
@@ -791,6 +791,15 @@ export const cancelEvaluationJob = functions
     }
 
     try {
+      // Only the job owner or an admin may cancel
+      const jobSnap = await db.collection('evaluationJobs').doc(jobId).get();
+      const job = jobSnap.exists ? jobSnap.data() as any : null;
+      const isOwner = job?.userId === uid;
+      const admin = isAdmin(context);
+      if (!isOwner && !admin) {
+        throw new functions.https.HttpsError('permission-denied', 'Only the job owner or an admin can cancel this evaluation');
+      }
+
       await db.collection('evaluationJobs').doc(jobId).set({
         cancelRequested: true,
         cancellationReason: reason,

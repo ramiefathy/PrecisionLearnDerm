@@ -291,15 +291,15 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
               Currently Testing
             </Typography>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid item xs={12} md={4}>
                 <Typography variant="caption" color="text.secondary">Pipeline</Typography>
                 <Typography variant="body2">{job.progress.currentPipeline}</Typography>
               </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid item xs={12} md={4}>
                 <Typography variant="caption" color="text.secondary">Topic</Typography>
                 <Typography variant="body2">{job.progress.currentTopic || 'N/A'}</Typography>
               </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid item xs={12} md={4}>
                 <Typography variant="caption" color="text.secondary">Difficulty</Typography>
                 <Typography variant="body2">{job.progress.currentDifficulty || 'N/A'}</Typography>
               </Grid>
@@ -312,7 +312,7 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" gutterBottom>Configuration</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Stack spacing={1}>
               <Typography variant="caption" color="text.secondary">Pipelines</Typography>
               {job.config.pipelines.map(pipeline => (
@@ -320,13 +320,13 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
               ))}
             </Stack>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Typography variant="caption" color="text.secondary">Questions per Topic</Typography>
             <Typography variant="body2">Basic: {job.config.basicCount}</Typography>
             <Typography variant="body2">Advanced: {job.config.advancedCount}</Typography>
             <Typography variant="body2">Very Difficult: {job.config.veryDifficultCount}</Typography>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Typography variant="caption" color="text.secondary">Duration</Typography>
             <Typography variant="body2">
               {formatDuration(job.createdAt, job.completedAt)}
