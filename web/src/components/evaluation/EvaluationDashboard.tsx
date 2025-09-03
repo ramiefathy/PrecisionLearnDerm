@@ -31,7 +31,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import { Grid } from '@mui/material';
 import {
   collection,
   doc,
@@ -653,13 +653,13 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       <OverviewKPIs overall={aggregates.overall} />
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid xs={12} md={6}>
+        <Grid item xs={12} md={6}>
           <PipelineQuadrant
             data={aggregates.byPipeline as PipelineAggregate[]}
             onSelect={(pl) => setSelectedPipelines(prev => prev.includes(pl) ? prev : [...prev, pl])}
           />
         </Grid>
-        <Grid xs={12} md={6}>
+        <Grid item xs={12} md={6}>
           <BoardReadinessBars data={aggregates.byPipeline as PipelineAggregate[]} />
         </Grid>
       </Grid>
