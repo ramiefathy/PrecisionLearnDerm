@@ -29,4 +29,3 @@ export function BoardReadinessBars({ data }:{ data: PipelineAggregate[] }) {
     </Card>
   );
 }
-

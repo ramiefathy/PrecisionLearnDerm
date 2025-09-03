@@ -11,7 +11,7 @@
 
 import * as functions from 'firebase-functions';
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
-import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
+import { getGeminiApiKey, GEMINI_API_KEY, config } from '../util/config';
 
 interface ReviewRequest {
   question: {
@@ -193,7 +193,9 @@ function parseReviewResponse(text: string): { success: boolean; data?: any; erro
  */
 async function callGeminiWithRetry(client: any, prompt: string): Promise<{ success: boolean; text?: string; error?: string }> {
   // Use the Gemini 2.5 models
-  const models = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+  const models = (config.generation.useFlashForReview
+    ? ['gemini-2.5-flash', 'gemini-2.5-pro']
+    : ['gemini-2.5-pro', 'gemini-2.5-flash']);
   const maxRetries = 2;
   
   for (const modelName of models) {

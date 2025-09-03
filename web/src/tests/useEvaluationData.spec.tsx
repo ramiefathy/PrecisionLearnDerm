@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { useEffect } from 'react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@testing-library/react';
 import { useEvaluationData } from '../hooks/useEvaluationData';
 import type { EvaluationFilters } from '../types';
@@ -75,4 +75,3 @@ describe('useEvaluationData', () => {
     expect(latest.failures.length).toBe(0);
   });
 });
-

@@ -42,6 +42,16 @@ Canonical fields saved per test for robust UI/analytics:
 
 Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the processor stops at batch boundaries.
 
+### ⚠️ Frontend UI Note: MUI Grid v7
+- Use `Grid` from `@mui/material` (not `Grid2` or `Unstable_Grid2`).
+- For responsive sizing, use `size={{ xs: n, md: m }}`.
+- Avoid legacy Grid props like `item`, `xs`, and `md` in v7.
+
+### 🔧 Build Tooling Note: Vite 6 + esbuild
+- Pin `esbuild@0.25.9` in `devDependencies` for compatibility with Vite 6.
+- Do not add platform‑specific esbuild packages (e.g., `@esbuild/darwin-arm64`) to `package.json` — they fail on Linux CI.
+- If you hit a host/binary mismatch, clear stale binaries in `web/node_modules` and reinstall.
+
 ## 🏗️ Architecture
 
 ### Frontend

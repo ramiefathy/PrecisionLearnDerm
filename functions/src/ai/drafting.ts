@@ -4,6 +4,7 @@ import { requireAuth } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
 import { validateInput, GenerateMCQSchema } from '../util/validation';
+import { z } from 'zod';
 import { getGeminiApiKey, GEMINI_API_KEY } from '../util/config';
 // KB imports removed - no longer using knowledge base
 
@@ -366,7 +367,7 @@ export const generateMcq = functions
   try {
     requireAuth(callContext);
     // Validate input
-    const validatedData = validateInput(GenerateMCQSchema, data);
+    const validatedData: z.infer<typeof GenerateMCQSchema> = validateInput(GenerateMCQSchema, data);
     const { topicIds, difficulty: difficultyTarget = 0.3, useAI = true } = validatedData;
     
     if (!topicIds || topicIds.length === 0) {
@@ -411,4 +412,3 @@ export const generateMcq = functions
     };
   }
 });
-

@@ -338,6 +338,67 @@ Error: Insufficient permissions. Admin role required.
 
 ## Generation Quality Issues
 
+## Build and CI Failures
+
+### Issue: Vite/esbuild version mismatch (Host 0.25.x vs binary 0.21.x)
+
+Symptoms
+```
+✘ [ERROR] Cannot start service: Host version "0.25.9" does not match binary version "0.21.5"
+```
+
+Root Cause
+- Vite 6 requires esbuild 0.25.x, but a stale 0.21.x esbuild binary remains in `node_modules`.
+
+Resolution
+- Pin esbuild in `web/package.json`:
+```
+"devDependencies": {
+  "esbuild": "0.25.9"
+}
+```
+- Remove stale binaries and reinstall:
+```
+rm -f web/node_modules/.bin/esbuild
+find web/node_modules -type d \( -name esbuild -o -name '@esbuild*' \) -prune -exec rm -rf {} +
+npm --prefix web install --foreground-scripts
+web/node_modules/.bin/esbuild --version # expect 0.25.9
+```
+- If needed, set `ESBUILD_BINARY_PATH` for one install to force the correct binary.
+
+### Issue: EBADPLATFORM installing @esbuild/darwin-arm64 on Linux CI
+
+Symptoms
+```
+npm ERR! notsup Unsupported platform for @esbuild/darwin-arm64@0.25.9 (os=linux, cpu=x64)
+```
+
+Root Cause
+- `@esbuild/darwin-arm64` is a macOS‑only package committed in `web/package.json` or locked in a macOS‑generated lockfile.
+
+Resolution
+- Remove platform‑specific packages from `web/package.json` (use generic `esbuild@0.25.9`).
+- Avoid committing lockfiles that contain platform‑specific entries. Let CI resolve platform binaries with `npm install`.
+
+### Issue: MUI Grid TS errors ("item"/"xs" not found)
+
+Symptoms
+```
+TS: Property 'item' does not exist on type 'GridBaseProps'
+```
+
+Root Cause
+- MUI v7 Grid API uses `size` instead of legacy `item` and `xs`/`md` props. `Grid2`/`Unstable_Grid2` subpaths may not exist in v7.
+
+Resolution
+- Import `Grid` from `@mui/material` and use:
+```
+<Grid container spacing={2}>
+  <Grid size={{ xs: 12, md: 6 }}>...</Grid>
+</Grid>
+```
+- Do not import from `@mui/material/Grid2` or `@mui/material/Unstable_Grid2`.
+
 ### Issue: Low Quality Scores
 
 #### Symptoms

@@ -3,7 +3,7 @@ Last updated: 2025‑09‑02 (Rev 2)
 
 System Snapshot
 
-Frontend: React 19, Vite 6, TypeScript, Firebase Hosting
+Frontend: React 19, Vite 6, TypeScript, Firebase Hosting (MUI 7)
 Backend: Firebase Cloud Functions (Node 20 + TypeScript), callable functions preferred
 Data: Firestore (rules + indexes), Firebase Storage (rules)
 AI: Gemini 2.5 Pro (primary), Gemini 2.5 Flash (fallback), structured text protocols
@@ -11,7 +11,7 @@ Knowledge: Lazy, in‑memory KB + taxonomy singleton
 Knowledge Base: GraphRAG population pipeline, PDF extraction, multi-source augmentation
 Observability: Structured logs/metrics in Firestore, health check endpoints
 Build/Test: Functions via mocha + emulators; Web via Vitest/RTL
-CI/CD: GitHub Actions with connection check, build validation, and Firebase deployment
+CI/CD: GitHub Actions (Ubuntu, Node 20) with connection check, build validation, and Firebase deployment
 Repository: Clean state with tracked lockfiles and web/src/lib source files
 Context Ingestion Checklist (Read Before Coding)
 Backend entrypoint: functions/src/index.ts (exports cancelEvaluationJob)
@@ -54,7 +54,22 @@ Do cache augmentation results to avoid repeated API calls.
 Never use mock implementations - all components must be real/functional.
 Do write canonical fields (normalized.*, aiScoresFlat.*) for UI resilience.
 Do handle correctAnswer === 0 as valid in quality scoring.
-Don't delete lockfiles in CI; preserve for reproducible builds.
+Lockfiles: prefer lockfiles for reproducibility, but avoid committing platform‑specific artifacts that break Linux CI (e.g., @esbuild/darwin‑arm64). Do not pin platform‑specific packages in package.json. If unavoidable, omit the web lockfile and rely on `npm install` to resolve platform binaries on CI.
+
+MUI Grid v7 (Frontend Standard)
+- Use `Grid` from `@mui/material` only. Do not import `Grid2` or `Unstable_Grid2`.
+- Replace legacy props (`item`, `xs`, `md`) with `container` and `size={{ xs: N, md: M }}`.
+- Ensure type safety with MUI 7 typings; this removes the “Property 'item' does not exist” errors.
+
+Build Toolchain Lessons Learned (Vite 6 + esbuild)
+- Vite 6 expects esbuild 0.25.x. Pin `devDependencies: { "esbuild": "0.25.9" }` in `web/package.json`.
+- Never depend on platform‑specific esbuild packages (e.g., `@esbuild/darwin-arm64`) in package.json — they fail on Linux CI with `EBADPLATFORM`.
+- If CI/local shows “Cannot start service: Host 0.25.9 does not match binary 0.21.5”, you have a stale binary. Clean with:
+  - Remove esbuild binaries: delete `web/node_modules/.bin/esbuild` and any `node_modules/**/esbuild` directories; clear `~/Library/Caches/esbuild` if macOS.
+  - Reinstall, or export `ESBUILD_BINARY_PATH` to the correct platform binary for one recovery install.
+
+Functions Coding Note
+- Avoid shadowing `firebase-admin` import symbol `admin`. Use distinct names (e.g., `userIsAdmin`) for booleans derived from auth checks to prevent TypeScript name collisions.
 
 Pipeline Evaluation System (Admin)
 

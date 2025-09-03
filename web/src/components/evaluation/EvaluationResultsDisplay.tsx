@@ -26,7 +26,7 @@ import {
   AccordionDetails,
   Stack
 } from '@mui/material';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import {
   ExpandMore as ExpandMoreIcon,
   Download as DownloadIcon,
@@ -215,7 +215,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
 
         {/* Summary Cards */}
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -234,7 +234,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -253,7 +253,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -272,7 +272,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -318,7 +318,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 0 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Success Rate by Pipeline</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={pipelineChartData}>
@@ -331,7 +331,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={pipelineChartData}>
@@ -452,7 +452,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                     </AccordionSummary>
                     <AccordionDetails>
                       <Grid container spacing={2}>
-                        <Grid size={12}>
+                        <Grid item xs={12}>
                           <Typography variant="subtitle2">Error Message</Typography>
                           <Alert severity="error" sx={{ mt: 1 }}>
                             <Typography variant="body2">{error.error.message}</Typography>
@@ -460,7 +460,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                         </Grid>
                         
                         {error.error.stack && (
-                          <Grid size={12}>
+                          <Grid item xs={12}>
                             <Typography variant="subtitle2">Stack Trace</Typography>
                             <Paper sx={{ p: 2, bgcolor: 'grey.100', mt: 1 }}>
                               <Typography variant="caption" component="pre" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
@@ -470,7 +470,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                           </Grid>
                         )}
                         
-                        <Grid size={12}>
+                        <Grid item xs={12}>
                           <Typography variant="caption" color="text.secondary">
                             Timestamp: {new Date(error.timestamp).toLocaleString()}
                           </Typography>
@@ -494,7 +494,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 3 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Success Distribution</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -517,7 +517,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Overall Statistics</Typography>
                 <TableContainer>
                   <Table>

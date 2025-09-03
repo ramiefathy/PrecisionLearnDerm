@@ -5,6 +5,7 @@
 
 import * as logger from 'firebase-functions/logger';
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
+import { config } from '../util/config';
 // parseStructuredTextResponse not needed - we'll parse directly
 
 export interface BoardStyleQualityScore {
@@ -55,7 +56,7 @@ export async function evaluateQuestionWithAI(
     const result = await client.generateText({
       prompt,
       operation: 'board_style_evaluation',
-      preferredModel: 'gemini-2.5-pro'
+      preferredModel: (config.scoring.useProForFinal ? config.gemini.proModel : config.gemini.flashModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
     });
 
     if (!result.text) {
