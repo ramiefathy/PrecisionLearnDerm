@@ -4,6 +4,7 @@
  */
 
 import * as functions from 'firebase-functions';
+import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
 import * as admin from 'firebase-admin';
 import { 
@@ -20,7 +21,7 @@ import {
 import { calculateDetailedQualityScore, type DetailedQualityScore } from './questionScorer';
 import { evaluateQuestionWithAI, type BoardStyleQualityScore } from './aiQuestionScorer';
 import { systemLoadService } from '../services/systemLoadService';
-import { requireAuth } from '../util/auth';
+import { requireAuth, isAdmin } from '../util/auth';
 // Lazy import taxonomyComplexityService to avoid initialization timeout
 // import { taxonomyComplexityService } from '../services/taxonomyComplexityService';
 
@@ -28,6 +29,7 @@ import { requireAuth } from '../util/auth';
 import { generateBoardStyleMCQ } from '../ai/boardStyleGeneration';
 import { generateQuestionsOptimized } from '../ai/optimizedOrchestrator';
 import { routeHybridGeneration } from '../ai/hybridPipelineRouter';
+import { config } from '../util/config';
 
 // Batch size configuration constants
 const MAX_SAFE_BATCH_SIZE = 3;   // Maximum allowed batch size
@@ -175,6 +177,76 @@ export const processBatchTests = functions
 
 // Keep the old function name for compatibility during transition
 export const processSingleTest = processBatchTests;
+
+/**
+ * Cloud Task handler for processing evaluation batches
+ * This provides reliable async processing with automatic retries
+ */
+export const processEvaluationBatch = functions
+  .runWith({
+    timeoutSeconds: 300, // 5 minutes per batch
+    memory: '2GB',
+    secrets: ['GEMINI_API_KEY']
+  })
+  .tasks.taskQueue({
+    rateLimits: { 
+      maxConcurrentDispatches: 10,
+      maxDispatchesPerSecond: 5
+    },
+    retryConfig: {
+      maxAttempts: 3,
+      minBackoffSeconds: 10,
+      maxBackoffSeconds: 300,
+      maxRetryDuration: 1800 // 30 minutes total
+    }
+  })
+  .onDispatch(async (data) => {
+    const { jobId, startIndex, batchSize = 3 } = data;
+    
+    logger.info('[EVAL_PROCESSOR] Cloud Task: Processing batch', {
+      jobId,
+      startIndex,
+      batchSize,
+      attempt: data.retryCount || 0
+    });
+    
+    try {
+      // Process the batch (without processAllRemaining)
+      const result = await processBatchTestsLogic(jobId, startIndex, batchSize, false);
+      
+      // If not finished, queue the next batch
+      if (!result.finished && result.nextStartIndex < result.totalTests) {
+        const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+        await taskQueue.enqueue({
+          jobId,
+          startIndex: result.nextStartIndex,
+          batchSize: batchSize
+        }, {
+          scheduleDelaySeconds: 2, // Small delay between batches
+          dispatchDeadlineSeconds: 1800 // 30 minutes deadline
+        });
+        
+        logger.info('[EVAL_PROCESSOR] Queued next batch', {
+          jobId,
+          nextStartIndex: result.nextStartIndex,
+          remainingTests: result.totalTests - result.nextStartIndex
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error('[EVAL_PROCESSOR] Cloud Task: Batch processing failed', {
+        jobId,
+        startIndex,
+        batchSize,
+        error: error instanceof Error ? error.message : String(error),
+        attempt: data.retryCount || 0
+      });
+      
+      // Re-throw to trigger Cloud Tasks retry
+      throw error;
+    }
+  });
 
 /**
  * Compatibility wrapper for single test processing
@@ -469,7 +541,8 @@ export async function processBatchTestsLogic(
         totalTests: testCases.length,
         currentPipeline: 'batch processing',
         currentTopic: `Batch ${Math.floor(startIndex / batchSize) + 1}`,
-        currentDifficulty: `${batchSuccesses}/${batchTests.length} succeeded`
+        currentDifficulty: `${batchSuccesses}/${batchTests.length} succeeded`,
+        lastProcessedIndex: endIndex - 1
       });
       
       // Log batch completion
@@ -549,6 +622,7 @@ export async function processBatchTestsLogic(
         success: true, 
         finished: nextStartIndex >= testCases.length,
         nextStartIndex,
+        totalTests: testCases.length,
         batchSuccesses,
         batchSize: batchTests.length
       };
@@ -635,6 +709,13 @@ async function executePipelineTestWithLogging(
         optionsCount: boardResult?.options?.length,
         optionsIsArray: Array.isArray(boardResult?.options)
       });
+      if (config.logs.enableStreaming && boardResult) {
+        const streamChunk = (text?: string) => (text ? text.substring(0, 800) : '');
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_stem', message: streamChunk(boardResult.stem) });
+        const opts = Array.isArray(boardResult.options) ? boardResult.options : Object.values(boardResult.options || {});
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_options', message: opts.slice(0,5).join(' | ').substring(0, 800) });
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_explanation', message: streamChunk(boardResult.explanation) });
+      }
       
       // DEBUG: Log the leadIn value
       await captureLog('board_result_leadIn', {
@@ -667,6 +748,15 @@ async function executePipelineTestWithLogging(
         hasResult: !!orchestratorResult,
         hasDifficulty: !!orchestratorResult?.[difficultyKey]
       });
+      if (config.logs.enableStreaming && orchestratorResult?.agentOutputs) {
+        for (const agent of (orchestratorResult.agentOutputs as any[])) {
+          await addLiveLog(jobId, {
+            type: 'stream',
+            stage: `agent:${agent.name || 'unknown'}`,
+            message: JSON.stringify({ status: agent.status, duration: agent.duration, fields: { input: agent.input ? Object.keys(agent.input) : [], result: agent.result ? Object.keys(agent.result) : [] } }).substring(0, 800)
+          });
+        }
+      }
       
       if (orchestratorResult && orchestratorResult[difficultyKey]) {
         return orchestratorResult[difficultyKey];
@@ -695,6 +785,13 @@ async function executePipelineTestWithLogging(
         hasResult: !!hybridResult,
         hasQuestions: !!hybridResult?.questions
       });
+      if (hybridResult?.routing) {
+        await captureLog('routing_metadata', {
+          decision: hybridResult.routing.decision,
+          reason: hybridResult.routing.reason,
+          routeLatency: hybridResult.routing.totalLatency
+        });
+      }
       
       if (hybridResult && hybridResult.questions && hybridResult.questions[difficulty]) {
         return hybridResult.questions[difficulty];
@@ -753,6 +850,16 @@ async function storeTestResult(
       cueingAbsence: ai?.technicalQuality?.cueingAbsence ?? ai?.cueingAbsence ?? null
     };
 
+    // Concise trace for insight (no streaming required)
+    const trace = {
+      draftModel: config.generation.useFlashForDraft ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      reviewModel: config.generation.useFlashForReview ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      finalEvalModel: config.scoring.useProForFinal ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
+      latencyMs: result?.latency ?? undefined,
+      aiOverall: aiScoresFlat.overall,
+      boardReadiness: aiScoresFlat.boardReadiness
+    };
+
     await db.collection('evaluationJobs').doc(jobId)
       .collection('testResults').doc(`test_${testIndex}`).set({
         ...result,
@@ -762,6 +869,7 @@ async function storeTestResult(
           correctAnswerLetter
         },
         aiScoresFlat,
+        trace,
         createdAt: admin.firestore.Timestamp.now()
       });
 
@@ -791,6 +899,15 @@ export const cancelEvaluationJob = functions
     }
 
     try {
+      // Only the job owner or an admin may cancel
+      const jobSnap = await db.collection('evaluationJobs').doc(jobId).get();
+      const job = jobSnap.exists ? jobSnap.data() as any : null;
+      const isOwner = job?.userId === uid;
+      const userIsAdmin = isAdmin(context);
+      if (!isOwner && !userIsAdmin) {
+        throw new functions.https.HttpsError('permission-denied', 'Only the job owner or an admin can cancel this evaluation');
+      }
+
       await db.collection('evaluationJobs').doc(jobId).set({
         cancelRequested: true,
         cancellationReason: reason,
@@ -1217,3 +1334,109 @@ async function finalizeEvaluation(
     );
   }
 }
+
+/**
+ * Scheduled function to recover stalled evaluation jobs
+ * Runs every 10 minutes to check for jobs that haven't updated recently
+ */
+export const recoverStalledJobs = functions
+  .runWith({
+    timeoutSeconds: 60,
+    memory: '512MB'
+  })
+  .pubsub.schedule('every 10 minutes')
+  .timeZone('America/New_York')
+  .onRun(async (context) => {
+    logger.info('[EVAL_PROCESSOR] Starting stalled job recovery check');
+    
+    try {
+      // Find jobs that are 'running' but haven't updated in more than 10 minutes
+      const tenMinutesAgo = new Date();
+      tenMinutesAgo.setMinutes(tenMinutesAgo.getMinutes() - 10);
+      
+      const stalledJobsSnapshot = await db.collection('evaluationJobs')
+        .where('status', '==', 'running')
+        .where('updatedAt', '<', admin.firestore.Timestamp.fromDate(tenMinutesAgo))
+        .limit(10) // Process max 10 stalled jobs per run
+        .get();
+      
+      if (stalledJobsSnapshot.empty) {
+        logger.info('[EVAL_PROCESSOR] No stalled jobs found');
+        return;
+      }
+      
+      const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+      let recoveredCount = 0;
+      
+      for (const doc of stalledJobsSnapshot.docs) {
+        const job = { id: doc.id, ...doc.data() } as EvaluationJob;
+        
+        // Check if job has cancelRequested
+        if ((job as any).cancelRequested) {
+          logger.info('[EVAL_PROCESSOR] Skipping cancelled job recovery', { jobId: job.id });
+          continue;
+        }
+        
+        const lastProcessedIndex = job.progress.completedTests || 0;
+        const totalTests = job.progress.totalTests || 0;
+        
+        if (lastProcessedIndex >= totalTests) {
+          // Job should be complete but status wasn't updated
+          logger.warn('[EVAL_PROCESSOR] Marking completed job as finished', { 
+            jobId: job.id,
+            lastProcessedIndex,
+            totalTests
+          });
+          
+          await finalizeEvaluation(job.id, job);
+          continue;
+        }
+        
+        // Re-queue processing from the next unprocessed test
+        logger.info('[EVAL_PROCESSOR] Recovering stalled job', {
+          jobId: job.id,
+          lastProcessedIndex,
+          totalTests,
+          stalledDuration: Date.now() - (job.updatedAt as any).toDate().getTime()
+        });
+        
+        await taskQueue.enqueue({
+          jobId: job.id,
+          startIndex: lastProcessedIndex,
+          batchSize: 3
+        }, {
+          scheduleDelaySeconds: recoveredCount * 5, // Stagger recovery
+          dispatchDeadlineSeconds: 1800
+        });
+        
+        // Add recovery log
+        await addLiveLog(job.id, {
+          type: 'evaluation_recovery',
+          timestamp: new Date().toISOString(),
+          message: `🔄 Recovered stalled evaluation, resuming from test ${lastProcessedIndex + 1}/${totalTests}`,
+          details: {
+            lastProcessedIndex,
+            totalTests,
+            stalledDuration: Date.now() - (job.updatedAt as any).toDate().getTime()
+          }
+        });
+        
+        // Update job to prevent duplicate recovery
+        await db.collection('evaluationJobs').doc(job.id).update({
+          updatedAt: admin.firestore.Timestamp.now()
+        });
+        
+        recoveredCount++;
+      }
+      
+      logger.info('[EVAL_PROCESSOR] Stalled job recovery complete', {
+        checkedJobs: stalledJobsSnapshot.size,
+        recoveredJobs: recoveredCount
+      });
+      
+    } catch (error) {
+      logger.error('[EVAL_PROCESSOR] Failed to recover stalled jobs', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });

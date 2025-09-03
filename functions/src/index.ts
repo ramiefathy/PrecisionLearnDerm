@@ -184,6 +184,9 @@ export { startPipelineEvaluation } from './evaluation/startPipelineEvaluation';
 export { processPipelineEvaluation } from './evaluation/processPipelineEvaluation';
 export { processSingleTest, processBatchTests, addEvaluatedQuestionsToQueue as admin_add_evaluated_questions_to_queue } from './evaluation/evaluationProcessor';
 export { cancelEvaluationJob } from './evaluation/evaluationProcessor';
+// Cloud Task handler and recovery functions for evaluation
+export { processEvaluationBatch } from './evaluation/evaluationProcessor';
+export { recoverStalledJobs } from './evaluation/evaluationProcessor';
 
 // Hybrid Pipeline Router
 export { hybridGenerateMCQ } from './ai/hybridPipelineRouter';
