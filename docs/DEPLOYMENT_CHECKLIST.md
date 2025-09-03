@@ -31,6 +31,10 @@ firebase login
 
 # Verify project
 firebase use precisionlearnderm
+
+# Ensure Node versions
+# Functions build: Node 20 (engines enforced)
+# Web build: Node 20 recommended with Vite 6 + esbuild 0.25.x
 ```
 
 ### Step 2: Set Secrets
@@ -89,6 +93,10 @@ cd ..
 # Deploy hosting
 firebase deploy --only hosting
 ```
+
+Notes
+- Frontend uses MUI v7 Grid. Use `Grid` from `@mui/material` with `size={{ xs, md }}` props. Avoid `Grid2`/`Unstable_Grid2`.
+- esbuild must be 0.25.x for Vite 6. Pin `esbuild@0.25.9` in devDependencies and avoid platform‑specific packages like `@esbuild/darwin-arm64` to keep CI and deploy environments cross‑platform.
 
 ### Step 6: Grant Initial Admin Access
 ```bash

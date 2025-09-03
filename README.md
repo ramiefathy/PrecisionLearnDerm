@@ -47,6 +47,11 @@ Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the pr
 - For responsive sizing, use `size={{ xs: n, md: m }}`.
 - Avoid legacy Grid props like `item`, `xs`, and `md` in v7.
 
+### 🔧 Build Tooling Note: Vite 6 + esbuild
+- Pin `esbuild@0.25.9` in `devDependencies` for compatibility with Vite 6.
+- Do not add platform‑specific esbuild packages (e.g., `@esbuild/darwin-arm64`) to `package.json` — they fail on Linux CI.
+- If you hit a host/binary mismatch, clear stale binaries in `web/node_modules` and reinstall.
+
 ## 🏗️ Architecture
 
 ### Frontend
