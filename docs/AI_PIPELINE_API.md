@@ -401,6 +401,7 @@ Per-Test Result: `evaluationJobs/{jobId}/testResults/test_{index}`
 
 Live Logs: `evaluationJobs/{jobId}/liveLogs/*`
 - `test_start`, `test_complete`, `test_error`, `generation_progress`, `batch_transition`, `evaluation_complete`, `evaluation_cancel_request`, `evaluation_cancelled`
+- When `config.logs.enableStreaming=true`, additional `stream` entries capture drafting snippets (stem/options/explanation excerpts) and orchestrator agent summaries. Entries are truncated and rate-limited for quota safety.
 
 ### Frontend Notes
 - Components prefer `normalized.*` and `aiScoresFlat.*` with fallback to original shapes for historical data

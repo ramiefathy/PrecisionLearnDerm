@@ -28,6 +28,7 @@ import { requireAuth, isAdmin } from '../util/auth';
 import { generateBoardStyleMCQ } from '../ai/boardStyleGeneration';
 import { generateQuestionsOptimized } from '../ai/optimizedOrchestrator';
 import { routeHybridGeneration } from '../ai/hybridPipelineRouter';
+import { config } from '../util/config';
 
 // Batch size configuration constants
 const MAX_SAFE_BATCH_SIZE = 3;   // Maximum allowed batch size
@@ -635,6 +636,13 @@ async function executePipelineTestWithLogging(
         optionsCount: boardResult?.options?.length,
         optionsIsArray: Array.isArray(boardResult?.options)
       });
+      if (config.logs.enableStreaming && boardResult) {
+        const streamChunk = (text?: string) => (text ? text.substring(0, 800) : '');
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_stem', message: streamChunk(boardResult.stem) });
+        const opts = Array.isArray(boardResult.options) ? boardResult.options : Object.values(boardResult.options || {});
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_options', message: opts.slice(0,5).join(' | ').substring(0, 800) });
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_explanation', message: streamChunk(boardResult.explanation) });
+      }
       
       // DEBUG: Log the leadIn value
       await captureLog('board_result_leadIn', {
@@ -667,6 +675,15 @@ async function executePipelineTestWithLogging(
         hasResult: !!orchestratorResult,
         hasDifficulty: !!orchestratorResult?.[difficultyKey]
       });
+      if (config.logs.enableStreaming && orchestratorResult?.agentOutputs) {
+        for (const agent of (orchestratorResult.agentOutputs as any[])) {
+          await addLiveLog(jobId, {
+            type: 'stream',
+            stage: `agent:${agent.name || 'unknown'}`,
+            message: JSON.stringify({ status: agent.status, duration: agent.duration, fields: { input: agent.input ? Object.keys(agent.input) : [], result: agent.result ? Object.keys(agent.result) : [] } }).substring(0, 800)
+          });
+        }
+      }
       
       if (orchestratorResult && orchestratorResult[difficultyKey]) {
         return orchestratorResult[difficultyKey];

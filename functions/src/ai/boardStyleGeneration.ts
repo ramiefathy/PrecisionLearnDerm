@@ -353,6 +353,81 @@ Remember: Create an ORIGINAL clinical scenario. Use the KB context for accuracy 
     
     // Convert to expected format using the centralized converter
     const question = convertToLegacyFormat(parsedMCQ, true); // Use array format for compatibility with scoring
+
+    // --- Lightweight option guards (duplicates and homogeneity) ---
+    const toArray = (opts: any): string[] => Array.isArray(opts)
+      ? opts
+      : opts && typeof opts === 'object'
+        ? ['A','B','C','D','E'].map(k => opts[k]).filter((v: any) => typeof v === 'string' && v.length > 0)
+        : [];
+
+    const optionsArray = toArray(question.options);
+    const lcTrim = (s: string) => s.trim().toLowerCase();
+    const hasDuplicates = new Set(optionsArray.map(lcTrim)).size < optionsArray.length;
+
+    const categorize = (s: string): 'test'|'treatment'|'diagnosis' => {
+      const t = lcTrim(s);
+      if (/(biopsy|koh|culture|pcr|dermoscop|test|scan|ct|mri|cbc|histolog)/.test(t)) return 'test';
+      if (/(topical|systemic|corticosteroid|steroid|methotrexate|isotretinoin|therapy|dose|mg|treatment)/.test(t)) return 'treatment';
+      return 'diagnosis';
+    };
+    const categories = new Set(optionsArray.map(categorize));
+    const mixedCategories = categories.size > 1; // prefer pure diagnosis set
+
+    if (optionsArray.length === 5 && (hasDuplicates || mixedCategories)) {
+      try {
+        const ca = question.correctAnswer;
+        const caLetter = typeof ca === 'string' ? ca.toUpperCase()
+          : (typeof ca === 'number' ? String.fromCharCode(65 + ca) : 'A');
+        const repairPrompt = `Regenerate ONLY the five answer options for the following question. Keep the same clinical vignette (STEM) and the same correct answer letter.
+
+STEM:
+${question.stem}
+
+LEAD_IN:
+${question.leadIn || 'What is the most likely diagnosis?'}
+
+CURRENT OPTIONS (for reference):
+${optionsArray.map((o, i) => `${String.fromCharCode(65+i)}) ${o}`).join('\n')}
+
+REQUIREMENTS:
+- Return five options (A–E) that are unique and homogeneous in category (diagnoses only; avoid tests/treatments)
+- Keep the correct answer letter the same (${caLetter})
+- Make distractors plausible but incorrect
+- Output EXACTLY in this format:
+
+OPTIONS:
+A) ...
+B) ...
+C) ...
+D) ...
+E) ...
+
+CORRECT_ANSWER:
+${caLetter}`;
+
+        const client = getRobustGeminiClient({ maxRetries: 2, fallbackToFlash: true, timeout: 60000 });
+        const regen = await client.generateText({
+          prompt: repairPrompt,
+          operation: 'options_regeneration',
+          preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro'|'gemini-2.5-flash'
+        });
+        if (regen.success && regen.text) {
+          const lines = regen.text.split('\n').map(l => l.trim());
+          const newOpts: string[] = [];
+          for (const letter of ['A','B','C','D','E']) {
+            const row = lines.find(l => l.toUpperCase().startsWith(`${letter})`));
+            if (row) newOpts.push(row.slice(2).trim().replace(/^[:\s-]+/, ''));
+          }
+          if (newOpts.length === 5 && new Set(newOpts.map(lcTrim)).size === 5) {
+            question.options = newOpts;
+            question.correctAnswer = caLetter;
+          }
+        }
+      } catch (e) {
+        console.warn('[BOARD_STYLE_GUARD] Option regeneration failed', e);
+      }
+    }
     
     // Override with provided values if not in parsed response
     if (!parsedMCQ.difficulty) {

@@ -15,5 +15,4 @@ Server-side toggles defined in `functions/src/util/config.ts` to control latency
   - Keep final evaluation on `gemini-2.5-pro` to protect output quality. Flip off to use Flash end-to-end.
 
 - `config.logs.enableStreaming` (boolean, default false)
-  - Stream model output tokens to Firestore `liveLogs`. Off by default. When enabled, logs are chunked and rate-limited to avoid quota issues.
-
+  - Stream model output to Firestore `liveLogs`. Off by default. When enabled, logs include drafting snippets (stem/options/explanation excerpts) and orchestrator agent summaries. Entries are truncated (~800 chars) and emitted at key stages to avoid quota issues.

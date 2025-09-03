@@ -597,6 +597,20 @@ async function generateSingleQuestionOptimized(
       return currentMCQ;
     }
 
+    // Targeted refinement: if options quality is low, try regenerating options only once per cycle
+    try {
+      const sb = (scoreDetails?.scores?.singleBestAnswer ?? 0);
+      if (sb < 3 && currentMCQ) {
+        logger.info('[TARGETED_REFINEMENT] Regenerating options only due to low options quality', { singleBestAnswer: sb });
+        const improved = await regenerateOptionsOnly(currentMCQ);
+        if (improved) {
+          currentMCQ = improved;
+        }
+      }
+    } catch (e) {
+      logger.warn('[TARGETED_REFINEMENT] Options regeneration failed', { error: (e as any)?.message || String(e) });
+    }
+
     refinementAttempts++;
   }
 
@@ -1239,6 +1253,47 @@ function parseStructuredTextResponse(text: string, topic: string, difficulty: st
     
     throw new Error(`Structured text parsing failed for ${difficulty} question on ${topic}: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
   }
+}
+
+// Targeted regeneration: regenerate only the five options with the same correct answer letter
+async function regenerateOptionsOnly(mcq: MCQ): Promise<MCQ | null> {
+  const letterFrom = (ans: any): string => typeof ans === 'string' ? ans.toUpperCase() : String.fromCharCode(65 + (ans || 0));
+  const caLetter = letterFrom(mcq.correctAnswer);
+  const prompt = `Regenerate ONLY the five answer options for the following question. Keep the same clinical vignette (STEM) and the same correct answer letter (${caLetter}). Return diagnoses only for options (no tests/treatments). Ensure options are unique and homogeneous.
+
+STEM:
+${mcq.stem}
+
+EXPLANATION (for context):
+${mcq.explanation}
+
+REQUIREMENTS:
+- Output EXACTLY:
+OPTIONS:
+A) ...
+B) ...
+C) ...
+D) ...
+E) ...
+
+CORRECT_ANSWER:
+${caLetter}`;
+  const client = getRobustGeminiClient({ maxRetries: 2, fallbackToFlash: true, timeout: 60000 });
+  const regen = await client.generateText({
+    prompt,
+    operation: 'options_regeneration_orchestrator',
+    preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro'|'gemini-2.5-flash'
+  });
+  if (!regen.success || !regen.text) return null;
+  const lines = regen.text.split('\n').map(l => l.trim());
+  const newOpts: { [k: string]: string } = {};
+  for (const letter of ['A','B','C','D','E']) {
+    const row = lines.find(l => l.toUpperCase().startsWith(`${letter})`));
+    if (row) newOpts[letter] = row.slice(2).trim().replace(/^[:\s-]+/, '');
+  }
+  if (Object.keys(newOpts).length !== 5) return null;
+  const out: MCQ = { ...mcq, options: { ...mcq.options, ...newOpts }, correctAnswer: caLetter };
+  return out;
 }
 
 async function finalValidationAgent(mcq: MCQ): Promise<string> {
