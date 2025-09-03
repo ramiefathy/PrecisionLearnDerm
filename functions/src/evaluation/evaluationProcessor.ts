@@ -20,7 +20,7 @@ import {
 import { calculateDetailedQualityScore, type DetailedQualityScore } from './questionScorer';
 import { evaluateQuestionWithAI, type BoardStyleQualityScore } from './aiQuestionScorer';
 import { systemLoadService } from '../services/systemLoadService';
-import { requireAuth } from '../util/auth';
+import { requireAuth, isAdmin } from '../util/auth';
 // Lazy import taxonomyComplexityService to avoid initialization timeout
 // import { taxonomyComplexityService } from '../services/taxonomyComplexityService';
 
@@ -28,6 +28,7 @@ import { requireAuth } from '../util/auth';
 import { generateBoardStyleMCQ } from '../ai/boardStyleGeneration';
 import { generateQuestionsOptimized } from '../ai/optimizedOrchestrator';
 import { routeHybridGeneration } from '../ai/hybridPipelineRouter';
+import { config } from '../util/config';
 
 // Batch size configuration constants
 const MAX_SAFE_BATCH_SIZE = 3;   // Maximum allowed batch size
@@ -635,6 +636,13 @@ async function executePipelineTestWithLogging(
         optionsCount: boardResult?.options?.length,
         optionsIsArray: Array.isArray(boardResult?.options)
       });
+      if (config.logs.enableStreaming && boardResult) {
+        const streamChunk = (text?: string) => (text ? text.substring(0, 800) : '');
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_stem', message: streamChunk(boardResult.stem) });
+        const opts = Array.isArray(boardResult.options) ? boardResult.options : Object.values(boardResult.options || {});
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_options', message: opts.slice(0,5).join(' | ').substring(0, 800) });
+        await addLiveLog(jobId, { type: 'stream', stage: 'draft_explanation', message: streamChunk(boardResult.explanation) });
+      }
       
       // DEBUG: Log the leadIn value
       await captureLog('board_result_leadIn', {
@@ -667,6 +675,15 @@ async function executePipelineTestWithLogging(
         hasResult: !!orchestratorResult,
         hasDifficulty: !!orchestratorResult?.[difficultyKey]
       });
+      if (config.logs.enableStreaming && orchestratorResult?.agentOutputs) {
+        for (const agent of (orchestratorResult.agentOutputs as any[])) {
+          await addLiveLog(jobId, {
+            type: 'stream',
+            stage: `agent:${agent.name || 'unknown'}`,
+            message: JSON.stringify({ status: agent.status, duration: agent.duration, fields: { input: agent.input ? Object.keys(agent.input) : [], result: agent.result ? Object.keys(agent.result) : [] } }).substring(0, 800)
+          });
+        }
+      }
       
       if (orchestratorResult && orchestratorResult[difficultyKey]) {
         return orchestratorResult[difficultyKey];
@@ -695,6 +712,13 @@ async function executePipelineTestWithLogging(
         hasResult: !!hybridResult,
         hasQuestions: !!hybridResult?.questions
       });
+      if (hybridResult?.routing) {
+        await captureLog('routing_metadata', {
+          decision: hybridResult.routing.decision,
+          reason: hybridResult.routing.reason,
+          routeLatency: hybridResult.routing.totalLatency
+        });
+      }
       
       if (hybridResult && hybridResult.questions && hybridResult.questions[difficulty]) {
         return hybridResult.questions[difficulty];
@@ -753,6 +777,16 @@ async function storeTestResult(
       cueingAbsence: ai?.technicalQuality?.cueingAbsence ?? ai?.cueingAbsence ?? null
     };
 
+    // Concise trace for insight (no streaming required)
+    const trace = {
+      draftModel: config.generation.useFlashForDraft ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      reviewModel: config.generation.useFlashForReview ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      finalEvalModel: config.scoring.useProForFinal ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
+      latencyMs: result?.latency ?? undefined,
+      aiOverall: aiScoresFlat.overall,
+      boardReadiness: aiScoresFlat.boardReadiness
+    };
+
     await db.collection('evaluationJobs').doc(jobId)
       .collection('testResults').doc(`test_${testIndex}`).set({
         ...result,
@@ -762,6 +796,7 @@ async function storeTestResult(
           correctAnswerLetter
         },
         aiScoresFlat,
+        trace,
         createdAt: admin.firestore.Timestamp.now()
       });
 
@@ -791,6 +826,15 @@ export const cancelEvaluationJob = functions
     }
 
     try {
+      // Only the job owner or an admin may cancel
+      const jobSnap = await db.collection('evaluationJobs').doc(jobId).get();
+      const job = jobSnap.exists ? jobSnap.data() as any : null;
+      const isOwner = job?.userId === uid;
+      const userIsAdmin = isAdmin(context);
+      if (!isOwner && !userIsAdmin) {
+        throw new functions.https.HttpsError('permission-denied', 'Only the job owner or an admin can cancel this evaluation');
+      }
+
       await db.collection('evaluationJobs').doc(jobId).set({
         cancelRequested: true,
         cancellationReason: reason,

@@ -28,4 +28,3 @@ export function TimelinePanel({ aiSeries, latencySeries }:{ aiSeries: { x:number
     </Card>
   );
 }
-

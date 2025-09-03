@@ -19,9 +19,9 @@ import {
   Divider,
   Card,
   CardContent,
-  Stack,
-  Grid
+  Stack
 } from '@mui/material';
+import { Grid } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,

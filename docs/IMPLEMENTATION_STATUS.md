@@ -11,13 +11,13 @@
 - Tutor: Domain guard, per-user limit, crude global throttle, NCBI caching; labeled citations.
 - PE: Elo/BKT math, time percentiles, exclude-recent; next-item scoring with mastery/quality and exploration.
 - Flashcards: FSRS update; due queue with topic filters and hover hint.
-- Admin: Guarded routes; propose/revise/promote implemented server-side (UI wiring next).
+- Admin: Guarded routes; propose/revise/promote implemented server-side (UI wiring next). Evaluation Admin Panel live with logs/dashboards; MUI Grid v7 standardized in UI.
 - Logging: Structured logs to `ops/runLogs/entries`.
 
 ## Completed (highlights)
 - Functions: ai.tutor, pe.{recordAnswer,nextItem,srsUpdate,srsDue}, items.{get,propose,revise,promote}, util.{rateLimit,cache,logging}.
 - Web: Pages for Auth, Dashboard, Topics, Config, Quiz (immediate/batch), Summary, Flashcards, Admin, Mock, Patient Sim stubs.
-- Build: Web and Functions builds are green.
+- Build: Web and Functions builds are green. CI runs on Ubuntu/Node 20; web uses Vite 6 + esbuild 0.25.9 (no platform-specific deps).
 
 ## Remaining
 - Ratings/notes/flashcard persistence to Firestore; flashcard content mapping.

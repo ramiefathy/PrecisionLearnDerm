@@ -17,9 +17,9 @@ import {
   Button,
   Alert,
   Chip,
-  Slider,
-  Grid
+  Slider
 } from '@mui/material';
+import { Grid } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SettingsIcon from '@mui/icons-material/Settings';
 

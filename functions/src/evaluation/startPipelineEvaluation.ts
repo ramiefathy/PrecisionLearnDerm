@@ -5,7 +5,7 @@
 
 import * as functions from 'firebase-functions';
 import * as logger from 'firebase-functions/logger';
-import { requireAuth } from '../util/auth';
+import { requireAdmin } from '../util/auth';
 import { createEvaluationJob } from './evaluationJobManager';
 
 /**
@@ -20,8 +20,8 @@ export const startPipelineEvaluation = functions
   })
   .https.onCall(async (data, context) => {
     try {
-      // Require authentication
-      requireAuth(context);
+      // Require admin to start evaluation jobs
+      requireAdmin(context);
       const userId = context.auth!.uid;
       
       // Validate input
