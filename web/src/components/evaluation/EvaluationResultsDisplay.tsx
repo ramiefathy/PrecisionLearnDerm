@@ -26,7 +26,7 @@ import {
   AccordionDetails,
   Stack
 } from '@mui/material';
-import Grid from '@mui/material/Unstable_Grid2';
+import { Grid } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
   Download as DownloadIcon,
@@ -215,7 +215,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
 
         {/* Summary Cards */}
         <Grid container spacing={2}>
-          <Grid xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -234,7 +234,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -253,7 +253,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -272,7 +272,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
             </Card>
           </Grid>
 
-          <Grid xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -318,7 +318,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 0 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Success Rate by Pipeline</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={pipelineChartData}>
@@ -331,7 +331,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={pipelineChartData}>
@@ -394,7 +394,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 1 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Success Rate by Category</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={categoryChartData}>
@@ -407,7 +407,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Quality by Category</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={categoryChartData}>
@@ -494,7 +494,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 3 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Success Distribution</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -517,7 +517,7 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Overall Statistics</Typography>
                 <TableContainer>
                   <Table>

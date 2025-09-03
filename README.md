@@ -42,6 +42,11 @@ Canonical fields saved per test for robust UI/analytics:
 
 Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the processor stops at batch boundaries.
 
+### ⚠️ Frontend UI Note: MUI Grid v7
+- Use `Grid` from `@mui/material` (not `Grid2` or `Unstable_Grid2`).
+- For responsive sizing, use `size={{ xs: n, md: m }}`.
+- Avoid legacy Grid props like `item`, `xs`, and `md` in v7.
+
 ## 🏗️ Architecture
 
 ### Frontend

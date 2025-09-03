@@ -795,8 +795,8 @@ export const cancelEvaluationJob = functions
       const jobSnap = await db.collection('evaluationJobs').doc(jobId).get();
       const job = jobSnap.exists ? jobSnap.data() as any : null;
       const isOwner = job?.userId === uid;
-      const admin = isAdmin(context);
-      if (!isOwner && !admin) {
+      const userIsAdmin = isAdmin(context);
+      if (!isOwner && !userIsAdmin) {
         throw new functions.https.HttpsError('permission-denied', 'Only the job owner or an admin can cancel this evaluation');
       }
 
