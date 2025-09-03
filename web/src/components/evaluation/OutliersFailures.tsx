@@ -19,15 +19,15 @@ export function OutliersFailures({ worstAI, slowest, failures, onOpen }:{ worstA
       <CardContent>
         <Typography variant="h6" gutterBottom>Outliers & Failures</Typography>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Lowest AI Scores</Typography>
             {renderList(worstAI, s=>`AI ${s.ai.toFixed(1)}% • ${(s.latency/1000).toFixed(1)}s`)}
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Slowest Latency</Typography>
             {renderList(slowest, s=>`${(s.latency/1000).toFixed(1)}s • AI ${s.ai.toFixed(1)}%`)}
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Failures (Major/Reject)</Typography>
             {renderList(failures, s=>`${s.ready ?? 'N/A'} • AI ${s.ai.toFixed(1)}% • ${(s.latency/1000).toFixed(1)}s`)}
           </Grid>

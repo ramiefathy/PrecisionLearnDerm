@@ -10,28 +10,28 @@ export function OverviewKPIs({ overall }: { overall: PipelineAggregate | null })
 
   return (
     <Grid container spacing={2} sx={{ mb: 2 }}>
-      <Grid item xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <Card><CardContent>
           <Typography variant="subtitle2" color="text.secondary">Success Rate</Typography>
           <Typography variant="h4">{successRate.toFixed(1)}%</Typography>
           <Typography variant="caption" color="text.secondary">ready + minor / total</Typography>
         </CardContent></Card>
       </Grid>
-      <Grid item xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <Card><CardContent>
           <Typography variant="subtitle2" color="text.secondary">Avg AI Score</Typography>
           <Typography variant="h4">{avgAI.toFixed(1)}%</Typography>
           <Typography variant="caption" color="text.secondary">mean over tests</Typography>
         </CardContent></Card>
       </Grid>
-      <Grid item xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <Card><CardContent>
           <Typography variant="subtitle2" color="text.secondary">Avg Latency</Typography>
           <Typography variant="h4">{(avgLatency/1000).toFixed(1)}s</Typography>
           <Typography variant="caption" color="text.secondary">per question</Typography>
         </CardContent></Card>
       </Grid>
-      <Grid item xs={12} md={3}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <Card><CardContent>
           <Typography variant="subtitle2" color="text.secondary">Total Tests</Typography>
           <Typography variant="h4">{totalTests}</Typography>
