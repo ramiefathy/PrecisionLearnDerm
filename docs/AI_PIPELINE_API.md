@@ -406,6 +406,26 @@ Live Logs: `evaluationJobs/{jobId}/liveLogs/*`
 - Components prefer `normalized.*` and `aiScoresFlat.*` with fallback to original shapes for historical data
 - Quality values are percentages (0–100%) across charts and summaries
 
+### UI Data Mapping (Evaluation Dashboard)
+- Board-Ready: Derived from `aiScoresFlat.boardReadiness` with buckets `ready`, `minor_revision`, `major_revision`, `reject` (stacked bars per pipeline).
+- Score Progression: X-axis is discrete test index (“Test #”); plotted series include AI Overall and may include additional series (rule-based/detailed scores) when present.
+- Quality Radar: One polygon per pipeline within the current job. Each polygon plots the pipeline’s average across dimensions: Clinical Realism, Medical Accuracy, Distractor Quality, Cueing Absence (and Clarity when available).
+
+### Feature Flags (Server)
+Flags are read from `functions/src/util/config.ts`:
+```ts
+config.generation.useFlashForDraft = true      // Prefer Gemini Flash for drafting to reduce latency
+config.generation.useFlashForReview = true     // Prefer Gemini Flash for review for speed
+config.generation.disableKBContext = true      // Skip KB context while KB is under development
+config.scoring.useProForFinal = true           // Keep Pro for final evaluation to protect quality
+config.logs.enableStreaming = false            // Streaming model output to Firestore logs (off by default)
+```
+Defaults prioritize latency reductions while preserving final quality checks.
+
+### Review Queue Enrichment
+When a test result is below threshold or flagged (e.g., boardReadiness ∈ {`major_revision`,`reject`}):
+- Add an entry to `questionQueue` with fields: `pipeline`, `topic`, `difficulty`, `jobId`, `testIndex`, `aiScoresFlat.*`, `metadata.boardReadiness`, and final MCQ (`result` after normalization). These are additive fields for Admin review.
+
 ### Deployment Tips (short-timeout safe)
 ```bash
 npm --prefix functions run build

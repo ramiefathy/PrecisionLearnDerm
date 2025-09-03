@@ -146,7 +146,7 @@ async function callGeminiAPI(prompt: string): Promise<string> {
   const result = await client.generateText({
     prompt,
     operation: 'board_style_generation_structured', // Use structured text to avoid JSON truncation
-    preferredModel: 'gemini-2.5-pro' // Use 2.5 pro as requested
+    preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
   });
 
   if (result.success && result.text) {
@@ -157,6 +157,11 @@ async function callGeminiAPI(prompt: string): Promise<string> {
 }
 
 function getKnowledgeContext(topic: string): string {
+  if (config.generation.disableKBContext) {
+    return `TOPIC: ${topic}
+
+Create a board-style question about this dermatological condition. Use medical knowledge to create an accurate clinical scenario.`;
+  }
   // Normalize topic for lookup
   const normalizedTopic = topic.toLowerCase().replace(/[^a-z0-9]/g, '_');
   
@@ -229,7 +234,7 @@ export async function generateBoardStyleMCQ(
 ): Promise<any> {
   try {
     // Initialize knowledge base if not already done
-    if (!initialized) {
+    if (!initialized && !config.generation.disableKBContext) {
       await initializeKB();
       initialized = true;
     }

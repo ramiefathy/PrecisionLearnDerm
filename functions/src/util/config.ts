@@ -101,5 +101,16 @@ export const config = {
     getApiKey: getNcbiApiKey,
     hasApiKey: hasNcbiApiKey,
     baseUrl: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
+  },
+  generation: {
+    useFlashForDraft: true,
+    useFlashForReview: true,
+    disableKBContext: true
+  },
+  scoring: {
+    useProForFinal: true
+  },
+  logs: {
+    enableStreaming: false
   }
 };

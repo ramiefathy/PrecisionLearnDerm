@@ -5,6 +5,7 @@
  */
 
 import { getRobustGeminiClient } from '../util/robustGeminiClient';
+import { config } from '../util/config';
 // import { getStreamingGeminiClient, StreamingGeminiClient } from '../util/streamingGeminiClient';
 import { searchNCBI, searchOpenAlex } from '../util/externalSearch';
 import { reviewMCQInternal } from './review';
@@ -17,7 +18,6 @@ import {
   getCachedContext, 
   setCachedContext 
 } from '../util/sharedCache';
-import { config } from '../util/config';
 import { executeAIAgentsWithTimeout, DEFAULT_TIMEOUT_CONFIG } from '../util/timeoutProtection';
 import { executeConcurrently, ConcurrentOperation } from '../util/concurrentExecutor';
 import { ProgressTracker } from '../util/progressTracker';
@@ -853,7 +853,7 @@ Example output: "Psoriasis"[Mesh] OR "Psoriatic Arthritis" AND treatment`;
     const result = await client.generateText({
       prompt,
       operation: 'search_query_optimization',
-      preferredModel: 'gemini-2.5-flash' // Using Flash for simple query optimization
+      preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
     });
     
     if (result.success && result.text) {
@@ -899,7 +899,7 @@ Write a synthesized summary paragraph that combines the most important informati
     const result = await client.generateText({
       prompt,
       operation: 'summarization',
-      preferredModel: 'gemini-2.5-flash' // Using Flash for summarization
+      preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
     });
     
     if (result.success && result.text) {
@@ -1094,7 +1094,7 @@ KEY_TAKEAWAYS:
     const result = await client.generateText({
       prompt,
       operation: 'enhanced_drafting_structured', // Uses structured text instead of JSON mode
-      preferredModel: 'gemini-2.5-pro'
+      preferredModel: (config.generation.useFlashForDraft ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
     });
     
     if (!result.success || !result.text) {
@@ -1221,9 +1221,9 @@ function parseStructuredTextResponse(text: string, topic: string, difficulty: st
       });
       
       return validatedMCQ;
-    } catch (zodError) {
+    } catch (zodError: any) {
       if (zodError instanceof z.ZodError) {
-        const errors = zodError.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const errors = zodError.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
         throw new Error(`MCQ validation failed: ${errors}`);
       }
       throw zodError;
@@ -1278,7 +1278,7 @@ Your response:`;
     const result = await client.generateText({
       prompt,
       operation: 'final_validation',
-      preferredModel: 'gemini-2.5-flash' // Using Flash for simple validation
+      preferredModel: (config.generation.useFlashForReview ? config.gemini.flashModel : config.gemini.proModel) as 'gemini-2.5-pro' | 'gemini-2.5-flash'
     });
     
     if (result.success && result.text) {

@@ -271,7 +271,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       labels,
       datasets: [
         {
-          label: 'AI Score (%)',
+          label: 'AI Overall (%)',
           data: testResults.map(r => r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? 0),
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -289,6 +289,20 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
           data: testResults.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0),
           borderColor: 'rgb(255, 99, 132)',
           backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          tension: 0.1
+        },
+        {
+          label: 'Distractor Quality (%)',
+          data: testResults.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0),
+          borderColor: 'rgb(255, 206, 86)',
+          backgroundColor: 'rgba(255, 206, 86, 0.2)',
+          tension: 0.1
+        },
+        {
+          label: 'Cueing Absence (%)',
+          data: testResults.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0),
+          borderColor: 'rgb(153, 102, 255)',
+          backgroundColor: 'rgba(153, 102, 255, 0.2)',
           tension: 0.1
         }
       ]
@@ -324,53 +338,30 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   };
 
   const prepareRadarData = () => {
-    const latestTest = testResults[testResults.length - 1];
-    if (!latestTest?.aiScores) {
+    const pipelines = Array.from(new Set(testResults.map(r => r.testCase.pipeline)));
+    const labels = ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 'Cueing Absence'];
+    const datasets = pipelines.map((p, idx) => {
+      const prs = testResults.filter(r => r.testCase.pipeline === p);
+      const avg = (arr: number[]) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? 0));
+      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? 0));
+      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? 0));
+      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? 0));
+      const colors = [
+        'rgba(255,99,132,1)','rgba(54,162,235,1)','rgba(255,206,86,1)','rgba(75,192,192,1)','rgba(153,102,255,1)'
+      ];
       return {
-        labels: ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 
-                 'Cueing Absence', 'Overall Score', 'Generation Time'],
-        datasets: [{
-          label: 'No Data',
-          data: [0, 0, 0, 0, 0, 0],
-          backgroundColor: 'rgba(200, 200, 200, 0.2)',
-          borderColor: 'rgba(200, 200, 200, 1)',
-          pointBackgroundColor: 'rgba(200, 200, 200, 1)'
-        }]
-      };
+        label: p,
+        data: [cr, ma, dq, ca],
+        borderColor: colors[idx % colors.length],
+        backgroundColor: 'rgba(0,0,0,0)',
+        pointBackgroundColor: colors[idx % colors.length]
+      } as any;
+    });
+    if (datasets.length === 0) {
+      datasets.push({ label: 'No Data', data: [0,0,0,0], borderColor: 'rgba(200,200,200,1)', backgroundColor: 'rgba(0,0,0,0)' } as any);
     }
-
-    // Flatten nested AI scores safely
-    const clinicalRealism = latestTest.aiScoresFlat?.clinicalRealism ?? (latestTest.aiScores as any)?.coreQuality?.clinicalRealism ?? (latestTest.aiScores as any)?.clinicalRealism ?? 0;
-    const medicalAccuracy = latestTest.aiScoresFlat?.medicalAccuracy ?? (latestTest.aiScores as any)?.coreQuality?.medicalAccuracy ?? (latestTest.aiScores as any)?.medicalAccuracy ?? 0;
-    const distractorQuality = latestTest.aiScoresFlat?.distractorQuality ?? (latestTest.aiScores as any)?.technicalQuality?.distractorQuality ?? (latestTest.aiScores as any)?.distractorQuality ?? 0;
-    const cueingAbsence = latestTest.aiScoresFlat?.cueingAbsence ?? (latestTest.aiScores as any)?.technicalQuality?.cueingAbsence ?? (latestTest.aiScores as any)?.cueingAbsence ?? 0;
-    const overall = latestTest.aiScoresFlat?.overall ?? (latestTest.aiScores as any)?.overall ?? 0;
-    
-    // Normalize latency to 0-100 scale (30s max, where faster is better)
-    const latencyMs = latestTest.latency || 0;
-    const latencyScore = Math.max(0, Math.min(100, 100 - (latencyMs / 30000) * 100));
-
-    return {
-      labels: ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 
-               'Cueing Absence', 'Overall Score', 'Generation Time'],
-      datasets: [{
-        label: 'Latest Question Quality (Streamlined)',
-        data: [
-          clinicalRealism,
-          medicalAccuracy,
-          distractorQuality,
-          cueingAbsence,
-          overall,
-          latencyScore
-        ],
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        borderColor: 'rgba(255, 99, 132, 1)',
-        pointBackgroundColor: 'rgba(255, 99, 132, 1)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
-      }]
-    };
+    return { labels, datasets };
   };
 
   const prepareScoreComparisonData = () => {
@@ -673,6 +664,9 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
+                    x: {
+                      title: { display: true, text: 'Test # (discrete)' }
+                    },
                     y: {
                       beginAtZero: true,
                       max: 100
