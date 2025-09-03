@@ -114,6 +114,6 @@ export const config = {
     enableStreaming: false
   },
   routing: {
-    hybridEarlyFallback: false
+    hybridEarlyFallback: true
   }
 };

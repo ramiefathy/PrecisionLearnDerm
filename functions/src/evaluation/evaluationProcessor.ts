@@ -712,6 +712,13 @@ async function executePipelineTestWithLogging(
         hasResult: !!hybridResult,
         hasQuestions: !!hybridResult?.questions
       });
+      if (hybridResult?.routing) {
+        await captureLog('routing_metadata', {
+          decision: hybridResult.routing.decision,
+          reason: hybridResult.routing.reason,
+          routeLatency: hybridResult.routing.totalLatency
+        });
+      }
       
       if (hybridResult && hybridResult.questions && hybridResult.questions[difficulty]) {
         return hybridResult.questions[difficulty];
