@@ -1,9 +1,5 @@
-<<<<<<< HEAD
 import { Card, CardContent, Typography } from '@mui/material';
 import Grid from '@mui/material/Grid';
-=======
-import { Card, CardContent, Typography, Grid } from '@mui/material';
->>>>>>> origin/main
 import type { PipelineAggregate } from '../../types';
 
 export function OverviewKPIs({ overall }: { overall: PipelineAggregate | null }) {
