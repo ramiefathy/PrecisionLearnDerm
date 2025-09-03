@@ -57,7 +57,6 @@ interface EvaluationJob {
 const AdminEvaluationPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = true; // TODO: Check admin role properly
   
   const [currentStep, setCurrentStep] = useState<EvaluationStep>('configure');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -67,16 +66,12 @@ const AdminEvaluationPage: React.FC = () => {
   const [previousJobs, setPreviousJobs] = useState<EvaluationJob[]>([]);
   const [runningJob, setRunningJob] = useState<EvaluationJob | null>(null);
 
-  // Check admin access and load existing jobs
+  // Load existing jobs when user is available (route already enforces admin)
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    } else if (!isAdmin) {
-      navigate('/');
-    } else {
+    if (user) {
       loadExistingJobs();
     }
-  }, [user, isAdmin, navigate]);
+  }, [user]);
   
   const loadExistingJobs = async () => {
     try {
@@ -201,15 +196,7 @@ const AdminEvaluationPage: React.FC = () => {
     }
   };
 
-  if (!user || !isAdmin) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert severity="error">
-          You must be an admin to access this page.
-        </Alert>
-      </Container>
-    );
-  }
+  // AdminRoute and ProtectedRoute gate access; no local guard needed
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

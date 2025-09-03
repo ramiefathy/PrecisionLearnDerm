@@ -156,6 +156,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [selectedTab, setSelectedTab] = useState(0);
   const [selectedQuestion, setSelectedQuestion] = useState<TestResult | null>(null);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
@@ -202,7 +203,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       jobUnsubscribe();
       resultsUnsubscribe();
     };
-  }, [jobId]);
+  }, [jobId, refreshTick]);
 
   // Calculate aggregate metrics
   const calculateMetrics = () => {
@@ -490,7 +491,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
               color={jobData?.status === 'completed' ? 'success' : 
                      jobData?.status === 'running' ? 'primary' : 'default'}
             />
-            <IconButton onClick={() => window.location.reload()} size="small">
+            <IconButton aria-label="Refresh data" onClick={() => setRefreshTick((t) => t + 1)} size="small">
               <RefreshIcon />
             </IconButton>
             <Button
@@ -866,6 +867,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                           size="small"
                           disabled={!result.result || !result.result.stem}
                           title={result.result?.stem ? "View Question" : "Question content not available"}
+                          aria-label="View question"
                         >
                           <VisibilityIcon fontSize="small" />
                         </IconButton>

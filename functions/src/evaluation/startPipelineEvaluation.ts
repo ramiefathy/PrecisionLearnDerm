@@ -6,7 +6,7 @@
 import * as functions from 'firebase-functions';
 import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
-import { requireAuth } from '../util/auth';
+import { requireAuth, requireAdmin } from '../util/auth';
 import { createEvaluationJob } from './evaluationJobManager';
 
 /**
@@ -23,6 +23,8 @@ export const startPipelineEvaluation = functions
     try {
       // Require authentication
       requireAuth(context);
+      // Enforce admin-only access to start evaluations
+      requireAdmin(context);
       const userId = context.auth!.uid;
       
       // Validate input
