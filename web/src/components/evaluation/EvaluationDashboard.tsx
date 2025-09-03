@@ -31,11 +31,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
-<<<<<<< HEAD
 import Grid from '@mui/material/Grid';
-=======
-import { Grid } from '@mui/material';
->>>>>>> origin/main
 import {
   collection,
   doc,
@@ -359,23 +355,22 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   };
 
   const prepareRadarData = () => {
-<<<<<<< HEAD
-    const latestTest = testResults[testResults.length - 1];
-    if (!(latestTest?.aiScoresFlat || latestTest?.aiScores)) {
-=======
     const pipelines = Array.from(new Set(testResults.map(r => r.testCase.pipeline)));
     const labels = ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 'Cueing Absence'];
     const datasets = pipelines.map((p, idx) => {
       const prs = testResults.filter(r => r.testCase.pipeline === p);
-      const avg = (arr: number[]) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
-      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? 0));
-      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? 0));
-      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? 0));
-      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? 0));
+      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0));
+      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0));
+      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0));
+      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0));
       const colors = [
-        'rgba(255,99,132,1)','rgba(54,162,235,1)','rgba(255,206,86,1)','rgba(75,192,192,1)','rgba(153,102,255,1)'
+        'rgba(255,99,132,1)',
+        'rgba(54,162,235,1)',
+        'rgba(255,206,86,1)',
+        'rgba(75,192,192,1)',
+        'rgba(153,102,255,1)'
       ];
->>>>>>> origin/main
       return {
         label: p,
         data: [cr, ma, dq, ca],
@@ -385,7 +380,12 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       } as any;
     });
     if (datasets.length === 0) {
-      datasets.push({ label: 'No Data', data: [0,0,0,0], borderColor: 'rgba(200,200,200,1)', backgroundColor: 'rgba(0,0,0,0)' } as any);
+      datasets.push({
+        label: 'No Data',
+        data: [0, 0, 0, 0],
+        borderColor: 'rgba(200,200,200,1)',
+        backgroundColor: 'rgba(0,0,0,0)'
+      } as any);
     }
     return { labels, datasets };
   };
