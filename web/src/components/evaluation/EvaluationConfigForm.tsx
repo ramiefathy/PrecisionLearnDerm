@@ -141,7 +141,7 @@ export const EvaluationConfigForm: React.FC<EvaluationConfigFormProps> = ({
         <Box sx={{ mt: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>Questions per Difficulty</Typography>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <FormLabel>Basic Questions</FormLabel>
                 <Slider
@@ -158,7 +158,7 @@ export const EvaluationConfigForm: React.FC<EvaluationConfigFormProps> = ({
                 </Typography>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <FormLabel>Advanced Questions</FormLabel>
                 <Slider
@@ -175,7 +175,7 @@ export const EvaluationConfigForm: React.FC<EvaluationConfigFormProps> = ({
                 </Typography>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <FormLabel>Very Difficult Questions</FormLabel>
                 <Slider
