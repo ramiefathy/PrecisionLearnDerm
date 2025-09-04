@@ -4,6 +4,7 @@
  */
 
 import * as functions from 'firebase-functions';
+import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
 import { requireAdmin } from '../util/auth';
 import { createEvaluationJob } from './evaluationJobManager';
@@ -93,34 +94,32 @@ export const startPipelineEvaluation = functions
         }
       });
       
-      // Trigger complete evaluation processing using single-function approach
-      // Use setImmediate to break out of current function context and avoid timeout cascade
-      setImmediate(async () => {
-        try {
-          logger.info('[START_EVAL] Starting complete evaluation processing via single function', {
-            jobId,
-            method: 'processBatchTestsLogic_with_processAllRemaining_true'
-          });
-          
-          // Import and call with processAllRemaining=true to process everything in one function
-          const { processBatchTestsLogic } = await import('./evaluationProcessor');
-          await processBatchTestsLogic(jobId, 0, 1, true);
-          
-          logger.info('[START_EVAL] Complete evaluation processing finished successfully', {
-            jobId
-          });
-          
-        } catch (err) {
-          logger.error('[START_EVAL] Complete evaluation processing failed', {
-            jobId,
-            error: err instanceof Error ? err.message : String(err)
-          });
-        }
-      });
-      
-      logger.info('[START_EVAL] Started background batch processing', {
-        jobId
-      });
+      // Queue the first batch using Cloud Tasks for reliable processing
+      try {
+        const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+        await taskQueue.enqueue({
+          jobId,
+          startIndex: 0,
+          batchSize: 3 // Start with a conservative batch size
+        }, {
+          scheduleDelaySeconds: 1, // Start processing after 1 second
+          dispatchDeadlineSeconds: 1800 // 30 minute deadline
+        });
+        
+        logger.info('[START_EVAL] Queued first batch for processing', {
+          jobId,
+          totalTests: basicCount + advancedCount + veryDifficultCount,
+          pipelines: pipelines.length
+        });
+      } catch (queueError) {
+        logger.error('[START_EVAL] Failed to queue batch processing', {
+          jobId,
+          error: queueError instanceof Error ? queueError.message : String(queueError)
+        });
+        
+        // Don't fail the job creation, just log the error
+        // The recovery job will pick it up later
+      }
       
       // Return immediately with job ID
       return {

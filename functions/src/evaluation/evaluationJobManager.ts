@@ -36,6 +36,7 @@ export interface EvaluationJob {
     currentPipeline?: string;
     currentTopic?: string;
     currentDifficulty?: string;
+    lastProcessedIndex?: number;
   };
   // Cancellation support
   cancelRequested?: boolean;

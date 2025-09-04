@@ -37,7 +37,8 @@ import {
   doc,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  limit as fsLimit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import {
@@ -156,6 +157,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [selectedTab, setSelectedTab] = useState(0);
   const [selectedQuestion, setSelectedQuestion] = useState<TestResult | null>(null);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
@@ -180,7 +182,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     // Listen to test results
     const resultsQuery = query(
       collection(db, 'evaluationJobs', jobId, 'testResults'),
-      orderBy('createdAt', 'asc')
+      orderBy('createdAt', 'asc'),
+      fsLimit(1000)
     );
 
     const resultsUnsubscribe = onSnapshot(
@@ -202,7 +205,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       jobUnsubscribe();
       resultsUnsubscribe();
     };
-  }, [jobId]);
+  }, [jobId, refreshTick]);
 
   // Calculate aggregate metrics
   const calculateMetrics = () => {
@@ -324,7 +327,10 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     const pipelines = [...new Set(testResults.map(r => r.testCase.pipeline))];
     const avgScoresByPipeline = pipelines.map(pipeline => {
       const pipelineTests = testResults.filter(r => r.testCase.pipeline === pipeline);
-      return pipelineTests.reduce((sum, r) => sum + (r.aiScores?.overall || 0), 0) / 
+      return pipelineTests.reduce(
+        (sum, r) => sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
+        0
+      ) / 
              (pipelineTests.length || 1);
     });
 
@@ -353,13 +359,17 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
     const labels = ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 'Cueing Absence'];
     const datasets = pipelines.map((p, idx) => {
       const prs = testResults.filter(r => r.testCase.pipeline === p);
-      const avg = (arr: number[]) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
-      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? 0));
-      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? 0));
-      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? 0));
-      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? 0));
+      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0));
+      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0));
+      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0));
+      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0));
       const colors = [
-        'rgba(255,99,132,1)','rgba(54,162,235,1)','rgba(255,206,86,1)','rgba(75,192,192,1)','rgba(153,102,255,1)'
+        'rgba(255,99,132,1)',
+        'rgba(54,162,235,1)',
+        'rgba(255,206,86,1)',
+        'rgba(75,192,192,1)',
+        'rgba(153,102,255,1)'
       ];
       return {
         label: p,
@@ -370,7 +380,12 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       } as any;
     });
     if (datasets.length === 0) {
-      datasets.push({ label: 'No Data', data: [0,0,0,0], borderColor: 'rgba(200,200,200,1)', backgroundColor: 'rgba(0,0,0,0)' } as any);
+      datasets.push({
+        label: 'No Data',
+        data: [0, 0, 0, 0],
+        borderColor: 'rgba(200,200,200,1)',
+        backgroundColor: 'rgba(0,0,0,0)'
+      } as any);
     }
     return { labels, datasets };
   };
@@ -383,7 +398,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       datasets: [
         {
           label: 'AI Score (%)',
-          data: testResults.map(r => r.aiScores?.overall || 0),
+          data: testResults.map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.1
@@ -489,7 +504,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
               color={jobData?.status === 'completed' ? 'success' : 
                      jobData?.status === 'running' ? 'primary' : 'default'}
             />
-            <IconButton onClick={() => window.location.reload()} size="small">
+            <IconButton aria-label="Refresh data" onClick={() => setRefreshTick((t) => t + 1)} size="small">
               <RefreshIcon />
             </IconButton>
             <Button
@@ -880,6 +895,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                           size="small"
                           disabled={!result.result || !result.result.stem}
                           title={result.result?.stem ? "View Question" : "Question content not available"}
+                          aria-label="View question"
                         >
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
@@ -918,7 +934,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
             <Typography variant="subtitle2" color="text.secondary">
               Pipeline: {selectedQuestion.testCase.pipeline} | Topic: {selectedQuestion.testCase.topic} | 
               Difficulty: {selectedQuestion.testCase.difficulty} | 
-              AI Score: {selectedQuestion.aiScores?.overall || 0}%
+              AI Score: {selectedQuestion.aiScoresFlat?.overall ?? (selectedQuestion.aiScores as any)?.overall ?? 0}%
             </Typography>
           )}
         </DialogTitle>

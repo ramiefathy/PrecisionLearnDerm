@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, limit as fsLimit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { EvaluationFilters, PipelineAggregate, PipelineId, ScoreSample, TopicDifficultyCell } from '../types';
 
@@ -24,18 +24,24 @@ export interface EvaluationDataResult {
 
 export function useEvaluationData(jobId: string, filters: EvaluationFilters): EvaluationDataResult {
   const [samples, setSamples] = useState<ScoreSample[]>([]);
+  const MAX_RESULTS = 1000;
 
   useEffect(() => {
     if (!jobId) return;
     const ref = collection(db, 'evaluationJobs', jobId, 'testResults');
-    const q = query(ref, orderBy('createdAt', 'asc'));
+    const q = query(ref, orderBy('createdAt', 'asc'), fsLimit(MAX_RESULTS));
     const unsub = onSnapshot(q, snap => {
       const arr: ScoreSample[] = [];
       snap.forEach(doc => {
         const d: any = doc.data();
-        const ai = Number(d.aiScoresFlat?.overall ?? 0);
+        const ai = Number(d.aiScoresFlat?.overall ?? d.aiScores?.overall ?? 0);
         const latency = Number(d.latency ?? 0);
-        const ready = (d.aiScoresFlat?.boardReadiness ?? null) as string | null;
+        const ready = (
+          d.aiScoresFlat?.boardReadiness ??
+          d.aiScores?.boardReadiness ??
+          d.aiScores?.metadata?.boardReadiness ??
+          null
+        ) as string | null;
         const createdAt = (d.createdAt?.toMillis?.() ?? (typeof d.createdAt === 'number' ? d.createdAt : Date.now())) as number;
         const topic = d.testCase?.topic ?? 'Unknown';
         const difficulty = d.testCase?.difficulty ?? 'Unknown';
@@ -134,4 +140,3 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
 
   return { samples: filtered, aggregates, outliers, failures };
 }
-

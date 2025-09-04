@@ -1,4 +1,5 @@
-import { Card, CardContent, List, ListItem, ListItemButton, ListItemText, Typography, Grid } from '@mui/material';
+import { Card, CardContent, List, ListItem, ListItemButton, ListItemText, Typography } from '@mui/material';
+import { Grid } from '@mui/material';
 import type { ScoreSample } from '../../types';
 
 export function OutliersFailures({ worstAI, slowest, failures, onOpen }:{ worstAI: ScoreSample[]; slowest: ScoreSample[]; failures: ScoreSample[]; onOpen: (s: ScoreSample)=>void }){
