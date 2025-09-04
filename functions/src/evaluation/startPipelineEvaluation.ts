@@ -7,7 +7,8 @@ import * as functions from 'firebase-functions';
 import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
 import { requireAdmin } from '../util/auth';
-import { createEvaluationJob } from './evaluationJobManager';
+import { createEvaluationJob, failJob } from './evaluationJobManager';
+import { processBatchTestsLogic } from './evaluationProcessor';
 
 /**
  * Firebase Function to start pipeline evaluation
@@ -116,9 +117,16 @@ export const startPipelineEvaluation = functions
           jobId,
           error: queueError instanceof Error ? queueError.message : String(queueError)
         });
-        
-        // Don't fail the job creation, just log the error
-        // The recovery job will pick it up later
+        try {
+          await processBatchTestsLogic(jobId, 0, 3, true);
+        } catch (fallbackError) {
+          await failJob(jobId, 'Queue dispatch failed');
+        }
+
+        throw new functions.https.HttpsError(
+          'internal',
+          'Queue dispatch failed'
+        );
       }
       
       // Return immediately with job ID
