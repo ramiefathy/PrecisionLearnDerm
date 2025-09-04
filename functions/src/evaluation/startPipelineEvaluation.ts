@@ -15,7 +15,7 @@ import { createEvaluationJob } from './evaluationJobManager';
  */
 export const startPipelineEvaluation = functions
   .runWith({
-    timeoutSeconds: 60,
+    timeoutSeconds: 180, // allow up to 3 minutes to create job and optionally process fallback batch
     memory: '512MB',
     secrets: ['GEMINI_API_KEY']
   })
@@ -112,13 +112,13 @@ export const startPipelineEvaluation = functions
           pipelines: pipelines.length
         });
       } catch (queueError) {
-        logger.error('[START_EVAL] Failed to queue batch processing', {
+        logger.error('[START_EVAL] Failed to queue batch processing, falling back to direct processing of first batch', {
           jobId,
           error: queueError instanceof Error ? queueError.message : String(queueError)
         });
-        
-        // Don't fail the job creation, just log the error
-        // The recovery job will pick it up later
+        // Fallback: process a small first batch synchronously so the job makes progress
+        const { processBatchTestsLogic } = await import('./evaluationProcessor');
+        await processBatchTestsLogic(jobId, 0, 1, false);
       }
       
       // Return immediately with job ID

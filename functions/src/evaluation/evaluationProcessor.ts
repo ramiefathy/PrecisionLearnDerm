@@ -217,20 +217,28 @@ export const processEvaluationBatch = functions
       // If not finished, queue the next batch
       if (!result.finished && result.nextStartIndex < result.totalTests) {
         const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
-        await taskQueue.enqueue({
-          jobId,
-          startIndex: result.nextStartIndex,
-          batchSize: batchSize
-        }, {
-          scheduleDelaySeconds: 2, // Small delay between batches
-          dispatchDeadlineSeconds: 1800 // 30 minutes deadline
-        });
-        
-        logger.info('[EVAL_PROCESSOR] Queued next batch', {
-          jobId,
-          nextStartIndex: result.nextStartIndex,
-          remainingTests: result.totalTests - result.nextStartIndex
-        });
+        try {
+          await taskQueue.enqueue({
+            jobId,
+            startIndex: result.nextStartIndex,
+            batchSize: batchSize
+          }, {
+            scheduleDelaySeconds: 2, // Small delay between batches
+            dispatchDeadlineSeconds: 1800 // 30 minutes deadline
+          });
+          logger.info('[EVAL_PROCESSOR] Queued next batch', {
+            jobId,
+            nextStartIndex: result.nextStartIndex,
+            remainingTests: result.totalTests - result.nextStartIndex
+          });
+        } catch (enqueueError) {
+          logger.error('[EVAL_PROCESSOR] Failed to enqueue next batch, falling back to direct processing', {
+            jobId,
+            nextStartIndex: result.nextStartIndex,
+            error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError)
+          });
+          await processBatchTestsLogic(jobId, result.nextStartIndex, batchSize, false);
+        }
       }
       
       return result;
@@ -539,9 +547,9 @@ export async function processBatchTestsLogic(
       // Update progress (excluding completedTests which is handled atomically)
       await updateJobProgress(jobId, {
         totalTests: testCases.length,
-        currentPipeline: 'batch processing',
-        currentTopic: `Batch ${Math.floor(startIndex / batchSize) + 1}`,
-        currentDifficulty: `${batchSuccesses}/${batchTests.length} succeeded`,
+        batchNumber: Math.floor(startIndex / batchSize) + 1,
+        batchSuccesses,
+        batchSize: batchTests.length,
         lastProcessedIndex: endIndex - 1
       });
       
@@ -656,6 +664,13 @@ async function executePipelineTestWithLogging(
   topic: string,
   difficulty: string
 ): Promise<any> {
+  // Timeout helper for external API calls (Gemini)
+  async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))
+    ]) as Promise<T>;
+  }
   
   // Create a wrapper that captures generation logs
   const captureLog = async (stage: string, details: any) => {
@@ -683,10 +698,13 @@ async function executePipelineTestWithLogging(
       
       await captureLog('calling_gemini', { model: 'gemini-2.5-pro', operation: 'board_style_generation' });
       
-      const boardResult = await generateBoardStyleMCQ(
+      const boardResult = await withTimeout(
+        generateBoardStyleMCQ(
         topic,
         boardDifficulty as any,
         undefined
+        ),
+        180000
       );
       
       // Ensure options is an array for scoring compatibility
@@ -734,12 +752,15 @@ async function executePipelineTestWithLogging(
         useCache: true 
       });
       
-      const orchestratorResult = await generateQuestionsOptimized(
+      const orchestratorResult = await withTimeout(
+        generateQuestionsOptimized(
         topic,
         [difficulty] as any,
         true,
         false,
         'evaluation-test'
+        ),
+        180000
       );
       
       const difficultyKey = difficulty as 'Basic' | 'Advanced' | 'Very Difficult';
@@ -772,14 +793,14 @@ async function executePipelineTestWithLogging(
         quality: 'standard'
       });
       
-      const hybridResult = await routeHybridGeneration({
+      const hybridResult = await withTimeout(routeHybridGeneration({
         topic,
         difficulties: [difficulty],
         urgency: 'normal',
         quality: 'standard',
         features: {},
         userId: 'evaluation-test'
-      });
+      }), 180000);
       
       await captureLog('routing_complete', { 
         hasResult: !!hybridResult,

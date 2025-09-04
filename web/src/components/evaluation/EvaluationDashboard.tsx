@@ -210,40 +210,38 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   // Calculate aggregate metrics
   const calculateMetrics = () => {
     const successfulTests = testResults.filter(r => r.success);
-    const avgAIScore = successfulTests.reduce((sum, r) => 
-      sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0), 0) / (successfulTests.length || 1);
-    
+    // Helper to average non-null numbers
+    const avg = (arr: Array<number | null | undefined>) => {
+      const nums = arr.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+    };
+
+    const overallArr = successfulTests.map(r => (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? null) as number | null);
+    const avgAIScore = avg(overallArr);
+
     const boardReadyCount = successfulTests.filter(r => {
       const br = r.aiScoresFlat?.boardReadiness ?? (r.aiScores as any)?.metadata?.boardReadiness ?? (r.aiScores as any)?.boardReadiness;
       return br === 'ready';
     }).length;
-    
-    const avgClinicalRealism = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
-    
-    const avgMedicalAccuracy = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
 
-    // Critical Min: minimum of core dimensions per test, averaged across tests
+    const clinicalArr = successfulTests.map(r => (r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? null) as number | null);
+    const medicalArr = successfulTests.map(r => (r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? null) as number | null);
+    const avgClinicalRealism = avg(clinicalArr);
+    const avgMedicalAccuracy = avg(medicalArr);
+
     const criticalMinArr = successfulTests.map(r => {
-      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0;
-      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0;
-      return Math.min(cr, ma, dq, ca);
-    });
+      const dims = [
+        r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? null,
+        r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? null,
+        r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? null,
+        r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? null
+      ].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      return dims.length ? Math.min(...dims) : null;
+    }).filter((v): v is number => typeof v === 'number');
     const avgCriticalMin = criticalMinArr.length ? (criticalMinArr.reduce((a,b)=>a+b,0)/criticalMinArr.length) : 0;
 
-    // Calculate rule-based scores averages
-    const avgRuleBasedScore = successfulTests.reduce((sum, r) => 
-      sum + (r.quality || 0), 0) / (successfulTests.length || 1);
-    
-    const avgDetailedScore = successfulTests.reduce((sum, r) => 
-      sum + (r.detailedScores?.overall || 0), 0) / (successfulTests.length || 1);
+    const avgRuleBasedScore = avg(successfulTests.map(r => (r.quality ?? null) as number | null));
+    const avgDetailedScore = avg(successfulTests.map(r => (r.detailedScores?.overall ?? null) as number | null));
 
     return {
       avgAIScore,
@@ -253,7 +251,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       avgCriticalMin,
       avgRuleBasedScore,
       avgDetailedScore,
-      totalTests: testResults.length,
+      totalTests: jobData?.progress?.totalTests ?? testResults.length,
       successfulTests: successfulTests.length
     };
   };

@@ -175,8 +175,8 @@ export async function updateJobProgress(
     if (progress) {
       // Update individual progress fields, avoiding overwrite of atomic completedTests
       Object.keys(progress).forEach(key => {
-        if (key !== 'completedTests' || !updates[`progress.${key}`]) {
-          updates[`progress.${key}`] = progress[key as keyof typeof progress];
+        if (key !== 'completedTests') {
+          updates[`progress.${key}`] = (progress as any)[key];
         }
       });
     }

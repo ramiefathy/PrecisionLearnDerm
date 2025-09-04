@@ -308,6 +308,29 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
         </Card>
       )}
 
+      {/* Batch Summary (if available) */}
+      {job.status === 'running' && (job as any).progress?.batchNumber && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle2" gutterBottom>Batch Summary</Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Batch</Typography>
+                <Typography variant="body2">{(job as any).progress.batchNumber}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Successes</Typography>
+                <Typography variant="body2">{(job as any).progress.batchSuccesses}/{(job as any).progress.batchSize}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Last Processed Index</Typography>
+                <Typography variant="body2">{(job as any).progress.lastProcessedIndex ?? 'N/A'}</Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Configuration Summary */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" gutterBottom>Configuration</Typography>
