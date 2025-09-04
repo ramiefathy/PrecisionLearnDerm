@@ -7,7 +7,7 @@ import * as functions from 'firebase-functions';
 import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
 import { requireAdmin } from '../util/auth';
-import { createEvaluationJob } from './evaluationJobManager';
+import { createEvaluationJob, failJob } from './evaluationJobManager';
 
 /**
  * Firebase Function to start pipeline evaluation
@@ -112,13 +112,19 @@ export const startPipelineEvaluation = functions
           pipelines: pipelines.length
         });
       } catch (queueError) {
+        const errorMessage = queueError instanceof Error ? queueError.message : String(queueError);
         logger.error('[START_EVAL] Failed to queue batch processing', {
           jobId,
-          error: queueError instanceof Error ? queueError.message : String(queueError)
+          error: errorMessage
         });
-        
-        // Don't fail the job creation, just log the error
-        // The recovery job will pick it up later
+
+        await failJob(jobId, errorMessage);
+
+        // Surface failure to caller so admin UI can notify immediately
+        throw new functions.https.HttpsError(
+          'internal',
+          `Failed to queue batch processing: ${errorMessage}`
+        );
       }
       
       // Return immediately with job ID
