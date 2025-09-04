@@ -78,6 +78,7 @@ Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the pr
 - Pipelines: `functions/src/ai/boardStyleGeneration.ts`, `functions/src/ai/optimizedOrchestrator.ts`, `functions/src/ai/hybridPipelineRouter.ts`
 - Evaluation (backend): `functions/src/evaluation/startPipelineEvaluation.ts`, `functions/src/evaluation/evaluationProcessor.ts`, `functions/src/evaluation/evaluationJobManager.ts`, `functions/src/evaluation/aiQuestionScorer.ts`
 - Evaluation (frontend): `web/src/pages/AdminEvaluationPage.tsx` + components under `web/src/components/evaluation/`
+- Approved question dataset: `functions/src/data/approved_dermatology_questions.json`
 
 ## 🚀 Quick Start
 
