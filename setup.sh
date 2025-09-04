@@ -2,7 +2,7 @@
 set -euxo pipefail
 
 # 0) If your app lives in a subfolder, set it here
-APP_DIR="."   # e.g., "web" or "app"
+APP_DIR="functions"   # e.g., "web" or "app"
 cd "$APP_DIR"
 
 # 1) Make setup non-interactive and skip heavy postinstalls
