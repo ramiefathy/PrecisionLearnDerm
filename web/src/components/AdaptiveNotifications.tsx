@@ -4,6 +4,26 @@ import { api } from '../lib/api';
 import { auth } from '../lib/firebase';
 import type { User } from 'firebase/auth';
 
+interface PersonalizedQuestion {
+  generatedAt: string;
+}
+
+interface PersonalizedQuestionsResponse {
+  success: boolean;
+  questions: PersonalizedQuestion[];
+  count: number;
+  totalAvailable: number;
+  error?: string;
+}
+
+function isPersonalizedQuestionsResponse(value: unknown): value is PersonalizedQuestionsResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as Record<string, unknown>).questions)
+  );
+}
+
 interface AdaptiveNotification {
   id: string;
   type: 'personalized_questions' | 'gap_analysis' | 'quality_improvement' | 'milestone';
@@ -14,7 +34,7 @@ interface AdaptiveNotification {
   priority: 'low' | 'medium' | 'high';
   createdAt: Date;
   read: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 interface PersonalizedQueueStatus {
@@ -50,10 +70,13 @@ export default function AdaptiveNotifications() {
   const checkAdaptiveStatus = async () => {
     try {
       setLoading(true);
-      
+
       // Get personalized question status
-      const personalizedResult: any = await api.pe.getPersonalizedQuestions({ limit: 10 });
-      const personalizedQuestions = personalizedResult.questions || [];
+      const result: unknown = await api.pe.getPersonalizedQuestions({ limit: 10 });
+      if (!isPersonalizedQuestionsResponse(result)) {
+        throw new Error('Invalid personalized questions response');
+      }
+      const personalizedQuestions = result.questions || [];
       
       // Create notifications based on adaptive status
       const newNotifications: AdaptiveNotification[] = [];
@@ -81,8 +104,9 @@ export default function AdaptiveNotifications() {
         topGaps: []
       });
 
-    } catch (error: any) {
-      console.error('Failed to check adaptive status:', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to check adaptive status:', message);
     } finally {
       setLoading(false);
     }
