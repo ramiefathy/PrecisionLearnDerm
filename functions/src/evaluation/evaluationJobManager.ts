@@ -344,13 +344,15 @@ export function generateTestCases(config: EvaluationJob['config']): TestCase[] {
     'Alopecia areata': 'hair'
   };
 
+  const DEFAULT_CATEGORY = 'general';
+
   // Use provided topics or defaults
-  const topics = config.topics.length > 0 ? 
-    config.topics : 
-    Object.keys(categories).slice(0, 5);
+  const topics = config.topics.length > 0
+    ? config.topics
+    : Object.keys(categories).slice(0, 5);
 
   for (const topic of topics) {
-    const category = categories[topic as keyof typeof categories] || 'general';
+    const category = categories[topic as keyof typeof categories] ?? DEFAULT_CATEGORY;
     
     // Generate Basic questions
     for (let i = 0; i < config.basicCount; i++) {
