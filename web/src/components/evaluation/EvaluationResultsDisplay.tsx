@@ -86,6 +86,11 @@ interface OverallMetrics {
   totalDuration: number;
 }
 
+interface PartialResult {
+  testIndex?: number;
+  [key: string]: unknown;
+}
+
 interface ErrorEntry {
   timestamp: string;
   pipeline: string;
@@ -98,7 +103,7 @@ interface ErrorEntry {
   };
   context?: {
     attemptNumber?: number;
-    partialResult?: unknown;
+    partialResult?: PartialResult;
   };
 }
 
@@ -488,7 +493,22 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                             </Paper>
                           </Grid>
                         )}
-                        
+
+                        {error.context?.partialResult && (
+                          <Grid size={{ xs: 12 }}>
+                            <Typography variant="subtitle2">Partial Result</Typography>
+                            <Paper sx={{ p: 2, bgcolor: 'grey.100', mt: 1 }}>
+                              <Typography
+                                variant="caption"
+                                component="pre"
+                                sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                              >
+                                {JSON.stringify(error.context.partialResult, null, 2)}
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                        )}
+
                         <Grid size={{ xs: 12 }}>
                           <Typography variant="caption" color="text.secondary">
                             Timestamp: {new Date(error.timestamp).toLocaleString()}
