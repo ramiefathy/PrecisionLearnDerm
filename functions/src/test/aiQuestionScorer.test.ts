@@ -45,4 +45,19 @@ IMPROVEMENTS:
     expect(result.distractorQuality).to.equal(70);
     expect(result.cueingAbsence).to.equal(65);
   });
+
+  it('parses scores without section headers', async () => {
+    const responseText = `MEDICAL_ACCURACY: 88\nCLINICAL_REALISM: 77\nSTEM_COMPLETENESS: 66\nDIFFICULTY_CALIBRATION: 55\nDISTRACTOR_QUALITY: 44\nCUEING_ABSENCE: 33\nCLARITY: 22\nCLINICAL_RELEVANCE: 11\nEDUCATIONAL_VALUE: 99\nBOARD_READINESS: minor_revision\nSTRENGTHS:\n- Good\nWEAKNESSES:\n- Bad\nIMPROVEMENTS:\n- Better`;
+
+    const stubClient = { generateText: sinon.stub().resolves({ text: responseText }) } as any;
+    sinon.stub(geminiClient, 'getRobustGeminiClient').returns(stubClient);
+
+    const mcq = { stem: 'stub', options: ['a', 'b'], correctAnswer: 0, explanation: 'because' };
+    const result = await evaluateQuestionWithAI(mcq, 'p1', 'topic', 'Basic');
+
+    expect(result.medicalAccuracy).to.equal(88);
+    expect(result.clinicalRealism).to.equal(77);
+    expect(result.distractorQuality).to.equal(44);
+    expect(result.metadata.boardReadiness).to.equal('minor_revision');
+  });
 });

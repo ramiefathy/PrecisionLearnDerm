@@ -11,10 +11,12 @@ export async function scoreWithAIFallback(
   detailed: DetailedQualityScore
 ): Promise<BoardStyleQualityScore> {
   const maxAttempts = 3;
+  let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await evaluateQuestionWithAI(mcq, pipeline, topic, difficulty);
     } catch (error) {
+      lastError = error;
       logger.warn('[AI_FALLBACK_SCORER] AI scoring attempt failed', { attempt, error });
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, attempt * 1000));
@@ -22,12 +24,13 @@ export async function scoreWithAIFallback(
     }
   }
   logger.warn('[AI_FALLBACK_SCORER] Using rule-based fallback scores');
-  return createFallbackScore(quality, detailed);
+  return createFallbackScore(quality, detailed, (lastError as Error | undefined)?.message);
 }
 
 export function createFallbackScore(
   quality: number,
-  detailed: DetailedQualityScore
+  detailed: DetailedQualityScore,
+  failureReason?: string
 ): BoardStyleQualityScore {
   return {
     overall: Math.round(quality),
@@ -63,7 +66,8 @@ export function createFallbackScore(
           ? 'minor_revision'
           : quality >= 40
           ? 'major_revision'
-          : 'reject'
+          : 'reject',
+      failureReason
     }
   };
 }
