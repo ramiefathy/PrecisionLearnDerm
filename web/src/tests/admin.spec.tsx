@@ -8,7 +8,8 @@ vi.mock("../lib/api", () => ({
     items: {
       propose: vi.fn().mockResolvedValue({ draftId: "d1" }),
       revise: vi.fn().mockResolvedValue({ draftId: "d2" }),
-      promote: vi.fn().mockResolvedValue({ ok: true })
+      promote: vi.fn().mockResolvedValue({ ok: true }),
+      list: vi.fn().mockResolvedValue({ items: [{ id: 'i1', stem: 'Q1', options: [] }] })
     }
   }
 }));
@@ -28,11 +29,15 @@ vi.mock("../lib/firebase", () => ({ db: {} }));
 describe("AdminItemsPage", () => {
   it("propose and revise actions are clickable", async () => {
     render(<AdminItemsPage/>);
-    await userEvent.type(screen.getByPlaceholderText(/topicids/i), "psoriasis.plaque");
-    await userEvent.click(screen.getByRole("button", { name: /propose/i }));
-    await userEvent.type(screen.getByPlaceholderText(/itemid/i), "it1");
-    await userEvent.type(screen.getByPlaceholderText(/instructions/i), "shorten stem");
-    await userEvent.click(screen.getByRole("button", { name: /revise/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /actions/i }));
+    const topicInput = await screen.findByPlaceholderText(/psoriasis, acne, melanoma/i);
+    await userEvent.type(topicInput, "psoriasis.plaque");
+    await userEvent.click(screen.getByRole("button", { name: /propose topics/i }));
+
+    const selectItemBtn = screen.getByText(/click to select an item/i);
+    await userEvent.click(selectItemBtn);
+    await userEvent.type(screen.getByPlaceholderText(/describe the specific changes/i), "shorten stem");
+    await userEvent.click(screen.getByRole("button", { name: /request revision/i }));
     expect(true).toBe(true);
   });
 });
