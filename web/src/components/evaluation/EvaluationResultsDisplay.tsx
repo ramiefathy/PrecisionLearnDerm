@@ -39,6 +39,8 @@ import {
 import {
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -334,15 +336,23 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={pipelineChartData}>
+                  <ComposedChart data={pipelineChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
-                    <YAxis />
+                    <YAxis
+                      yAxisId="left"
+                      label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{ value: 'Quality (%)', angle: -90, position: 'insideRight' }}
+                    />
                     <ChartTooltip />
                     <Legend />
-                    <Bar dataKey="avgLatency" fill="#2196F3" name="Latency (ms)" />
-                    <Bar dataKey="avgQuality" fill="#FF9800" name="Quality (%)" />
-                  </BarChart>
+                    <Bar yAxisId="left" dataKey="avgLatency" fill="#2196F3" name="Latency (ms)" />
+                    <Line yAxisId="right" type="monotone" dataKey="avgQuality" stroke="#FF9800" name="Quality (%)" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </Grid>
 
