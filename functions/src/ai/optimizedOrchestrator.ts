@@ -1292,7 +1292,7 @@ ${caLetter}`;
     if (row) newOpts[letter] = row.slice(2).trim().replace(/^[:\s-]+/, '');
   }
   if (Object.keys(newOpts).length !== 5) return null;
-  const out: MCQ = { ...mcq, options: { ...mcq.options, ...newOpts }, correctAnswer: caLetter };
+  const out: MCQ = { ...mcq, options: { ...mcq.options, ...newOpts }, correctAnswer: caLetter as 'A' | 'B' | 'C' | 'D' | 'E' };
   return out;
 }
 

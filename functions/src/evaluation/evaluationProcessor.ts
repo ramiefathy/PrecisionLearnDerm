@@ -19,7 +19,8 @@ import {
   type ErrorEntry
 } from './evaluationJobManager';
 import { calculateDetailedQualityScore, type DetailedQualityScore } from './questionScorer';
-import { evaluateQuestionWithAI, type BoardStyleQualityScore } from './aiQuestionScorer';
+import { type BoardStyleQualityScore } from './aiQuestionScorer';
+import { scoreWithAIFallback } from './aiFallbackScorer';
 import { systemLoadService } from '../services/systemLoadService';
 import { requireAuth, isAdmin } from '../util/auth';
 // Lazy import taxonomyComplexityService to avoid initialization timeout
@@ -197,7 +198,7 @@ export const processEvaluationBatch = functions
       maxAttempts: 3,
       minBackoffSeconds: 10,
       maxBackoffSeconds: 300,
-      maxRetryDuration: 1800 // 30 minutes total
+      maxRetrySeconds: 1800 // 30 minutes total
     }
   })
   .onDispatch(async (data) => {
@@ -395,19 +396,16 @@ export async function processBatchTestsLogic(
             // Calculate detailed quality scores (rule-based)
             const detailedScores = calculateDetailedQualityScore(result);
             
-            // Get AI-powered board-style evaluation
-            let aiScores: BoardStyleQualityScore | null = null;
-            try {
-              aiScores = await evaluateQuestionWithAI(
-                result,
-                testCase.pipeline,
-                testCase.topic,
-                testCase.difficulty
-              );
-            } catch (error) {
-              logger.warn('[EVAL_PROCESSOR] AI scoring failed, using rule-based only', { error });
-            }
-            
+            // Get AI-powered board-style evaluation with retry/fallback
+            const aiScores: BoardStyleQualityScore = await scoreWithAIFallback(
+              result,
+              testCase.pipeline,
+              testCase.topic,
+              testCase.difficulty,
+              quality,
+              detailedScores
+            );
+
             // Store test result with all scores
             await storeTestResult(jobId, testIndex, {
               success: true,
