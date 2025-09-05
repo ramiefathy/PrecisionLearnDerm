@@ -121,24 +121,28 @@ vi.mock('firebase/app', () => ({
   initializeApp: vi.fn(() => ({
     name: 'test-app',
     options: {}
-  }))
+  })),
+  getApps: vi.fn(() => [])
 }));
 
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => mockAuth),
   onAuthStateChanged: vi.fn((_auth, callback) => mockAuth.onAuthStateChanged(callback)),
-  signInWithEmailAndPassword: vi.fn((_auth, email, password) => 
+  signInWithEmailAndPassword: vi.fn((_auth, email, password) =>
     mockAuth.signInWithEmailAndPassword(email, password)
   ),
   createUserWithEmailAndPassword: vi.fn((_auth, email, password) =>
     mockAuth.createUserWithEmailAndPassword(email, password)
   ),
   signOut: vi.fn((_auth) => mockAuth.signOut()),
-  sendPasswordResetEmail: vi.fn((_auth, email) => mockAuth.sendPasswordResetEmail(email))
+  sendPasswordResetEmail: vi.fn((_auth, email) => mockAuth.sendPasswordResetEmail(email)),
+  setPersistence: vi.fn().mockResolvedValue(undefined),
+  browserLocalPersistence: {}
 }));
 
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => mockFirestore),
+  connectFirestoreEmulator: vi.fn(),
   collection: vi.fn((_db, path) => mockFirestore.collection(path)),
   doc: vi.fn((_db, path) => mockFirestore.doc(path)),
   getDoc: vi.fn((docRef) => docRef.get()),

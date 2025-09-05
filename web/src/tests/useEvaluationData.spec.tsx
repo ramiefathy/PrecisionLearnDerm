@@ -1,3 +1,4 @@
+import './firebase-mocks';
 import { useEffect } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@testing-library/react';
@@ -20,7 +21,7 @@ describe('useEvaluationData', () => {
     vi.clearAllMocks();
   });
 
-  it('maps ai using aiScoresFlat with fallback to aiScores and aggregates by pipeline', async () => {
+  it('uses aiScoresFlat for all results and aggregates by pipeline', async () => {
     const docs = [
       {
         id: 't1',
@@ -34,13 +35,16 @@ describe('useEvaluationData', () => {
       {
         id: 't2',
         data: () => ({
-          aiScores: { overall: 70, metadata: { boardReadiness: 'minor_revision' } },
+          aiScoresFlat: { overall: 50, boardReadiness: 'minor_revision' },
           latency: 10000,
           createdAt: Date.now(),
           testCase: { topic: 'Melanoma diagnosis', difficulty: 'Advanced', pipeline: 'optimizedOrchestrator' }
         })
       }
     ];
+
+    // Ensure every mocked doc contains aiScoresFlat
+    docs.forEach(d => expect(d.data().aiScoresFlat).toBeTruthy());
 
     // Override onSnapshot to feed our dataset regardless of ref
     vi.spyOn(firestore, 'onSnapshot').mockImplementation((_ref: any, callback: any) => {
@@ -60,16 +64,16 @@ describe('useEvaluationData', () => {
       expect(latest.samples.length).toBe(2);
     });
 
-    // Samples: first uses aiScoresFlat (80), second falls back to aiScores (70)
+    // Samples should reflect aiScoresFlat values [50, 80]
     const aiValues = latest.samples.map((s:any) => s.ai).sort((a:number,b:number)=>a-b);
-    expect(aiValues).toEqual([70, 80]);
+    expect(aiValues).toEqual([50, 80]);
 
     // Aggregates: byPipeline should contain both pipelines with avgAI equal to their sample
     const byPipeline = latest.aggregates.byPipeline;
     const bs = byPipeline.find((p:any) => p.pipeline === 'boardStyle');
     const oo = byPipeline.find((p:any) => p.pipeline === 'optimizedOrchestrator');
     expect(Math.round(bs.avgAI)).toBe(80);
-    expect(Math.round(oo.avgAI)).toBe(70);
+    expect(Math.round(oo.avgAI)).toBe(50);
 
     // Failures proxy uses readiness; none should be major/reject so empty
     expect(latest.failures.length).toBe(0);
