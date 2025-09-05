@@ -2,13 +2,27 @@ import { useEffect, useMemo, useState } from 'react';
 import PageShell from '../components/ui/PageShell';
 import SectionCard from '../components/ui/SectionCard';
 import { auth, db } from '../lib/firebase';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, type Timestamp } from 'firebase/firestore';
+import type { StoredQuestionAttempt } from '../lib/attempts';
 
 interface TopicMasteryRow {
   topicId: string;
   correct: number;
   total: number;
 }
+
+interface AttemptItem extends Omit<StoredQuestionAttempt, 'itemRef'> {
+  itemRef: string;
+}
+
+interface QuizAttempt {
+  id: string;
+  score: number;
+  finishedAt: Timestamp | Date | number;
+  items: AttemptItem[];
+}
+
+type LoadAttempts = () => Promise<void>;
 
 export default function Page() {
   const [loading, setLoading] = useState(true);
@@ -18,13 +32,13 @@ export default function Page() {
   const [mastery, setMastery] = useState<TopicMasteryRow[]>([]);
 
   useEffect(() => {
-    async function load() {
+    const load: LoadAttempts = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) { setLoading(false); return; }
       try {
         const attemptsQ = query(collection(db, 'quizzes', uid, 'attempts'), orderBy('finishedAt', 'desc'));
         const snaps = await getDocs(attemptsQ);
-        const items = snaps.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        const items: QuizAttempt[] = snaps.docs.map(d => ({ id: d.id, ...(d.data() as Omit<QuizAttempt, 'id'>) }));
 
         setCount(items.length);
 
@@ -57,7 +71,7 @@ export default function Page() {
         // Topic mastery: aggregate by topicId across last N attempts
         const topicStats: Record<string, { correct: number; total: number }> = {};
         items.slice(0, 20).forEach(it => {
-          (it.items || []).forEach((qi: any) => {
+          (it.items || []).forEach((qi: AttemptItem) => {
             const tIds: string[] = qi.topicIds || [];
             tIds.forEach(tid => {
               if (!topicStats[tid]) topicStats[tid] = { correct: 0, total: 0 };
@@ -75,7 +89,7 @@ export default function Page() {
       } finally {
         setLoading(false);
       }
-    }
+    };
     load();
   }, []);
 

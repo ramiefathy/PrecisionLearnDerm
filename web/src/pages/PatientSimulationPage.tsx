@@ -4,26 +4,29 @@ import PageShell from "../components/ui/PageShell";
 import SectionCard from "../components/ui/SectionCard";
 import { GradientButton, MutedButton } from "../components/ui/Buttons";
 
-type LogEntry = { who: 'user'|'tutor'; text: string; at: number };
+type LogEntry = { who: 'user' | 'tutor'; text: string; at: number };
+interface ChatResponse { answerMarkdown?: string }
+type SendHandler = () => Promise<void>;
+type ExportHandler = () => void;
 
-export default function PatientSimulationPage(){
-  const [log,setLog]=useState<LogEntry[]>([]);
-  const [input,setInput]=useState("");
+export default function PatientSimulationPage() {
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [input, setInput] = useState("");
 
-  async function send(){
-    if(!input.trim()) return;
-    setLog(l=>[...l,{who:'user', text: input, at: Date.now()}]);
-    const res:any = await (api as any).ai.chatExplain({ userQuery: input });
-    setLog(l=>[...l,{ who:'tutor', text: String(res?.answerMarkdown||''), at: Date.now() }]);
+  const send: SendHandler = async () => {
+    if (!input.trim()) return;
+    setLog(l => [...l, { who: 'user', text: input, at: Date.now() }]);
+    const res = await (api as { ai: { chatExplain: (payload: { userQuery: string }) => Promise<ChatResponse> } }).ai.chatExplain({ userQuery: input });
+    setLog(l => [...l, { who: 'tutor', text: String(res?.answerMarkdown || ''), at: Date.now() }]);
     setInput("");
-  }
+  };
 
-  function exportNotes(){
-    const text = log.map(l=>`[${new Date(l.at).toLocaleTimeString()}] ${l.who.toUpperCase()}: ${l.text}`).join("\n");
+  const exportNotes: ExportHandler = () => {
+    const text = log.map(l => `[${new Date(l.at).toLocaleTimeString()}] ${l.who.toUpperCase()}: ${l.text}`).join("\n");
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download = 'patient_sim_notes.txt'; a.click(); URL.revokeObjectURL(url);
-  }
+    const a = document.createElement('a'); a.href = url; a.download = 'patient_sim_notes.txt'; a.click(); URL.revokeObjectURL(url);
+  };
 
   return (
     <PageShell title="Patient Simulation" subtitle="Practice clinical conversations with an AI tutor" maxWidth="5xl">

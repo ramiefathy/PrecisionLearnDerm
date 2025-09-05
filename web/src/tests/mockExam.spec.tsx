@@ -11,8 +11,8 @@ const mockItem = { stem: "Mock Q", leadIn: "Which?", options: [{text:"A"},{text:
 
 describe("MockExamPage", () => {
   it("submits attempt with injected loaders and correct payload shape", async () => {
-    const loadBatch = async () => [{ itemId: "m1" }];
-    const loadItem = async () => mockItem;
+    const loadBatch = async (_topicIds: string[], _count: number) => [{ itemId: "m1" }];
+    const loadItem = async (_id: string) => mockItem;
     const { saveAttempt } = await import("../lib/attempts");
 
     const hrefSetter = vi.spyOn(window, 'location', 'set');
