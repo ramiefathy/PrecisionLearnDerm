@@ -16,7 +16,7 @@ const db = admin.firestore();
 // Interfaces
 export interface EvaluationJob {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   config: {
     basicCount: number;
     advancedCount: number;
@@ -41,6 +41,7 @@ export interface EvaluationJob {
   // Cancellation support
   cancelRequested?: boolean;
   cancellationReason?: string;
+  taskIds?: string[];
   results?: {
     byPipeline: Record<string, PipelineResult>;
     byCategory: Record<string, CategoryResult>;
@@ -183,7 +184,7 @@ export async function updateJobProgress(
 
     if (status) {
       updates['status'] = status;
-      if (status === 'completed' || status === 'failed') {
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         updates['completedAt'] = admin.firestore.Timestamp.now();
       }
     }
@@ -302,6 +303,30 @@ export async function failJob(
     logger.error('[EVAL_MANAGER] Failed job', { jobId, error });
   } catch (error) {
     logger.error('[EVAL_MANAGER] Failed to mark job as failed', { jobId, error });
+  }
+}
+
+/**
+ * Cancel a job
+ */
+export async function cancelJob(
+  jobId: string,
+  reason: string
+): Promise<void> {
+  try {
+    await db.collection('evaluationJobs').doc(jobId).update({
+      status: 'cancelled',
+      cancelRequested: true,
+      cancellationReason: reason,
+      taskIds: [],
+      completedAt: admin.firestore.Timestamp.now(),
+      updatedAt: admin.firestore.Timestamp.now()
+    });
+
+    logger.info('[EVAL_MANAGER] Cancelled job', { jobId, reason });
+  } catch (error) {
+    logger.error('[EVAL_MANAGER] Failed to cancel job', { jobId, error });
+    throw error;
   }
 }
 

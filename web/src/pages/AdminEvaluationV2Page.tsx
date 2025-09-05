@@ -42,7 +42,7 @@ interface EvaluationConfig {
 
 interface EvaluationJob {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   results?: any;
   createdAt?: any;
   config?: {
@@ -97,7 +97,7 @@ const AdminEvaluationV2Page: React.FC = () => {
       // Load previous completed jobs
       const historyQuery = query(
         collection(db, 'evaluationJobs'),
-        where('status', 'in', ['completed', 'failed']),
+        where('status', 'in', ['completed', 'failed', 'cancelled']),
         orderBy('createdAt', 'desc'),
         limit(10)
       );

@@ -7,12 +7,14 @@ import * as functions from 'firebase-functions';
 import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
 import * as admin from 'firebase-admin';
+import * as crypto from 'node:crypto';
 import { 
   getJob,
   updateJobProgress,
   updateJobResults,
   completeJob,
   failJob,
+  cancelJob,
   addErrorToJob,
   calculateQualityScore,
   type EvaluationJob,
@@ -202,7 +204,13 @@ export const processEvaluationBatch = functions
     }
   })
   .onDispatch(async (data) => {
-    const { jobId, startIndex, batchSize = 3 } = data;
+    const { jobId, taskId, startIndex, batchSize = 3 } = data;
+
+    if (taskId) {
+      await db.collection('evaluationJobs').doc(jobId).update({
+        taskIds: admin.firestore.FieldValue.arrayRemove(taskId)
+      });
+    }
     
     logger.info('[EVAL_PROCESSOR] Cloud Task: Processing batch', {
       jobId,
@@ -218,13 +226,20 @@ export const processEvaluationBatch = functions
       // If not finished, queue the next batch
       if (!result.finished && result.nextStartIndex < result.totalTests) {
         const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+        const nextTaskId = crypto.randomUUID();
         await taskQueue.enqueue({
           jobId,
+          taskId: nextTaskId,
           startIndex: result.nextStartIndex,
           batchSize: batchSize
         }, {
+          id: nextTaskId,
           scheduleDelaySeconds: 2, // Small delay between batches
           dispatchDeadlineSeconds: 1800 // 30 minutes deadline
+        });
+
+        await db.collection('evaluationJobs').doc(jobId).update({
+          taskIds: admin.firestore.FieldValue.arrayUnion(nextTaskId)
         });
         
         logger.info('[EVAL_PROCESSOR] Queued next batch', {
@@ -297,22 +312,24 @@ export async function processBatchTestsLogic(
         throw new Error('Job not found');
       }
       
-      if (job.status === 'failed' || job.status === 'completed') {
-        logger.info('[EVAL_PROCESSOR] Job already finished', { 
-          jobId, 
-          status: job.status 
+      if (job.status === 'failed' || job.status === 'completed' || job.status === 'cancelled') {
+        logger.info('[EVAL_PROCESSOR] Job already finished', {
+          jobId,
+          status: job.status
         });
         return { success: true, finished: true };
       }
-      
+
       // Cancellation check before starting work
-      if ((job as any).cancelRequested) {
+      if (job.status === 'cancelled' || (job as any).cancelRequested) {
         await addLiveLog(jobId, {
           type: 'evaluation_cancelled',
           timestamp: new Date().toISOString(),
           message: '🛑 Evaluation cancelled by user before starting batch'
         });
-        await failJob(jobId, 'Cancelled by user');
+        if (job.status !== 'cancelled') {
+          await cancelJob(jobId, (job as any).cancellationReason || 'Cancelled by user');
+        }
         return { success: true, finished: true };
       }
       
@@ -575,13 +592,15 @@ export async function processBatchTestsLogic(
       // Cancellation check after batch completes
       try {
         const currentJob = await getJob(jobId);
-        if ((currentJob as any)?.cancelRequested) {
+        if (currentJob?.status === 'cancelled' || (currentJob as any)?.cancelRequested) {
           await addLiveLog(jobId, {
             type: 'evaluation_cancelled',
             timestamp: new Date().toISOString(),
             message: '🛑 Evaluation cancelled by user during batch processing'
           });
-          await failJob(jobId, 'Cancelled by user');
+          if (currentJob?.status !== 'cancelled') {
+            await cancelJob(jobId, (currentJob as any)?.cancellationReason || 'Cancelled by user');
+          }
           return { success: true, finished: true };
         }
       } catch (e) {
@@ -921,22 +940,28 @@ export const cancelEvaluationJob = functions
         throw new functions.https.HttpsError('permission-denied', 'Only the job owner or an admin can cancel this evaluation');
       }
 
-      await db.collection('evaluationJobs').doc(jobId).set({
-        cancelRequested: true,
-        cancellationReason: reason,
-        updatedAt: admin.firestore.Timestamp.now()
-      }, { merge: true });
+      const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+      const taskIds: string[] = job?.taskIds || [];
+      for (const id of taskIds) {
+        try {
+          await taskQueue.delete(id);
+        } catch (e) {
+          logger.warn('[EVAL_PROCESSOR] Failed to delete task', { jobId, taskId: id, error: e });
+        }
+      }
+
+      await cancelJob(jobId, reason);
 
       await addLiveLog(jobId, {
-        type: 'evaluation_cancel_request',
+        type: 'evaluation_cancelled',
         timestamp: new Date().toISOString(),
-        message: `⏹️ Cancellation requested by user ${uid}`,
+        message: `🛑 Evaluation cancelled by user ${uid}`,
         reason
       });
 
       return { success: true };
     } catch (error: any) {
-      logger.error('[EVAL_PROCESSOR] Failed to request cancellation', { error });
+      logger.error('[EVAL_PROCESSOR] Failed to cancel evaluation', { error });
       throw new functions.https.HttpsError('internal', error?.message || 'Failed to cancel');
     }
   });
@@ -1410,7 +1435,8 @@ export const recoverStalledJobs = functions
         
         // Check if job has cancelRequested
         if ((job as any).cancelRequested) {
-          logger.info('[EVAL_PROCESSOR] Skipping cancelled job recovery', { jobId: job.id });
+          await cancelJob(job.id, (job as any).cancellationReason || 'Cancelled by user');
+          logger.info('[EVAL_PROCESSOR] Cancelled job during recovery', { jobId: job.id });
           continue;
         }
         
@@ -1437,13 +1463,20 @@ export const recoverStalledJobs = functions
           stalledDuration: Date.now() - (job.updatedAt as any).toDate().getTime()
         });
         
+        const taskId = crypto.randomUUID();
         await taskQueue.enqueue({
           jobId: job.id,
+          taskId,
           startIndex: lastProcessedIndex,
           batchSize: 3
         }, {
+          id: taskId,
           scheduleDelaySeconds: recoveredCount * 5, // Stagger recovery
           dispatchDeadlineSeconds: 1800
+        });
+
+        await db.collection('evaluationJobs').doc(job.id).update({
+          taskIds: admin.firestore.FieldValue.arrayUnion(taskId)
         });
         
         // Add recovery log
