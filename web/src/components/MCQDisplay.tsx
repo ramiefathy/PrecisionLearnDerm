@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+type OptionKey = 'A' | 'B' | 'C' | 'D';
+
+interface Option {
+  text: unknown;
+}
 
 export interface MCQData {
   stem: string;
-  options: { A: string; B: string; C: string; D: string };
-  correctAnswer: 'A' | 'B' | 'C' | 'D';
+  options: Record<OptionKey, Option>;
+  correctAnswer: OptionKey;
   explanation: string;
   difficulty?: 'Basic' | 'Advanced' | 'Very Difficult';
   topic?: string;
@@ -110,7 +116,7 @@ export default function MCQDisplay({
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Select the Best Answer</h3>
         <div className="space-y-2">
-          {Object.entries(question.options).map(([letter, text]) => (
+          {(Object.entries(question.options) as Array<[OptionKey, Option]>).map(([letter, option]) => (
             <motion.div
               key={letter}
               whileHover={!revealAnswer ? { scale: 1.01 } : {}}
@@ -127,12 +133,16 @@ export default function MCQDisplay({
                   </span>
                   <span className={`flex-1 ${compact ? 'text-sm' : 'text-base'}`}>
                     {(() => {
+                      const { text } = option;
                       // Ensure text is always a string to prevent React Error #31
                       if (typeof text === 'string' || typeof text === 'number') {
                         return String(text);
                       }
-                      if (typeof text === 'object' && text !== null && typeof (text as any).text === 'string') {
-                        return (text as any).text;
+                      if (typeof text === 'object' && text !== null && 'text' in text) {
+                        const nested = (text as { text: unknown }).text;
+                        return typeof nested === 'string' || typeof nested === 'number'
+                          ? String(nested)
+                          : JSON.stringify(nested);
                       }
                       if (typeof text === 'object') {
                         return JSON.stringify(text);
@@ -208,7 +218,7 @@ export default function MCQDisplay({
 
 // Batch display component for multiple questions
 interface MCQBatchDisplayProps {
-  questions: {
+  questions?: {
     Basic?: MCQData;
     Advanced?: MCQData;
     'Very Difficult'?: MCQData;
@@ -216,28 +226,29 @@ interface MCQBatchDisplayProps {
   topic: string;
 }
 
-export function MCQBatchDisplay({ questions, topic }: MCQBatchDisplayProps) {
-  // Handle null/undefined questions gracefully
-  if (!questions) {
+export function MCQBatchDisplay({ questions = {}, topic }: MCQBatchDisplayProps) {
+  const [activeTab, setActiveTab] = useState<OptionKey>('Basic');
+
+  const validDifficulties: Array<OptionKey> = ['Basic', 'Advanced', 'Very Difficult'];
+  const availableTabs = validDifficulties.filter(difficulty => {
+    const question = questions[difficulty];
+    return question && question.stem && question.options && question.correctAnswer && question.explanation;
+  });
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [availableTabs, activeTab]);
+
+  if (Object.keys(questions).length === 0) {
     return (
       <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-lg">
         <p className="text-yellow-800">No questions available to display.</p>
       </div>
     );
   }
-  
-  // Filter out only valid difficulty keys and ensure they have valid MCQ data
-  const validDifficulties: Array<'Basic' | 'Advanced' | 'Very Difficult'> = ['Basic', 'Advanced', 'Very Difficult'];
-  const availableTabs = validDifficulties.filter(difficulty => {
-    const question = questions[difficulty];
-    return question && question.stem && question.options && question.correctAnswer && question.explanation;
-  });
-  
-  const [activeTab, setActiveTab] = useState<'Basic' | 'Advanced' | 'Very Difficult'>(
-    availableTabs.length > 0 ? availableTabs[0] : 'Basic'
-  );
-  
-  // Handle case where no questions were successfully generated
+
   if (availableTabs.length === 0) {
     return (
       <div className="p-6 bg-red-50 border border-red-300 rounded-lg">
