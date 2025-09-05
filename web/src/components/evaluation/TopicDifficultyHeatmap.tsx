@@ -6,7 +6,7 @@ export function TopicDifficultyHeatmap({ cells }:{ cells: TopicDifficultyCell[] 
   const [metric, setMetric] = useState<Metric>('successRate');
   const difficulties = ['Basic','Advanced','Very Difficult'];
   const topics = useMemo(()=> Array.from(new Set(cells.map(c=>c.topic))).sort(), [cells]);
-  const value = (c: TopicDifficultyCell) => metric==='successRate' ? (c.successRate*100) : metric==='ai' ? c.ai : c.latency;
+  const value = (c: TopicDifficultyCell) => metric==='successRate' ? (c.successRate*100) : metric==='ai' ? (c.ai ?? 0) : c.latency;
 
   const cellMap = new Map<string, TopicDifficultyCell>();
   cells.forEach(c=> cellMap.set(`${c.topic}||${c.difficulty}`, c));

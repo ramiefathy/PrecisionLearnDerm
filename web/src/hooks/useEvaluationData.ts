@@ -76,54 +76,53 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
     let overallCount = 0, overallAISum = 0, overallAICount = 0, overallLatSum = 0;
     let overallReady = 0, overallMinor = 0, overallMajor = 0, overallReject = 0;
     byPipeMap.forEach((arr, pipeline) => {
-      const aiArr = arr
-        .map(a => a.ai)
-        .filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
+      const withAI = arr.filter(s => typeof s.ai === 'number');
+      const aiArr = withAI
+        .map(a => a.ai as number)
         .sort((a,b)=>a-b);
-      const latArr = arr.map(a => a.latency).filter(n => Number.isFinite(n)).sort((a,b)=>a-b);
-      const avgAI = aiArr.length ? aiArr.reduce((a,b)=>a+b,0)/aiArr.length : 0;
-      const p50AI = quantile(aiArr, 0.5);
-      const p90AI = quantile(aiArr, 0.9);
+      const latArr = withAI.map(a => a.latency).filter(n => Number.isFinite(n)).sort((a,b)=>a-b);
+      const avgAI = aiArr.length ? aiArr.reduce((a,b)=>a+b,0)/aiArr.length : null;
+      const p50AI = aiArr.length ? quantile(aiArr, 0.5) : null;
+      const p90AI = aiArr.length ? quantile(aiArr, 0.9) : null;
       const avgLatency = latArr.length ? latArr.reduce((a,b)=>a+b,0)/latArr.length : 0;
       const p50Latency = quantile(latArr, 0.5);
       const p90Latency = quantile(latArr, 0.9);
       const readiness = { ready:0, minor:0, major:0, reject:0 };
-      arr.forEach(s => {
+      withAI.forEach(s => {
         if (s.ready === 'ready') readiness.ready++;
         else if (s.ready === 'minor_revision') readiness.minor++;
         else if (s.ready === 'major_revision') readiness.major++;
         else if (s.ready === 'reject') readiness.reject++;
       });
-      overallCount += arr.length;
+      overallCount += withAI.length;
       overallAISum += aiArr.reduce((a,b)=>a+b,0);
       overallAICount += aiArr.length;
-      overallLatSum += avgLatency * arr.length;
+      overallLatSum += avgLatency * withAI.length;
       overallReady += readiness.ready; overallMinor += readiness.minor; overallMajor += readiness.major; overallReject += readiness.reject;
-      byPipeline.push({ pipeline, avgAI, p50AI, p90AI, avgLatency, p50Latency, p90Latency, testCount: arr.length, readiness });
+      byPipeline.push({ pipeline, avgAI, p50AI, p90AI, avgLatency, p50Latency, p90Latency, testCount: withAI.length, readiness });
     });
 
-    const topicDiffMap = new Map<string, { sumAI:number; sumLat:number; count:number; success:number; aiCount:number }>();
+    const topicDiffMap = new Map<string, { sumAI:number; sumLat:number; count:number; success:number }>();
     filtered.forEach(s => {
+      if (typeof s.ai !== 'number') return;
       const key = `${s.topic}||${s.difficulty}`;
-      if (!topicDiffMap.has(key)) topicDiffMap.set(key, { sumAI:0, sumLat:0, count:0, success:0, aiCount:0 });
+      if (!topicDiffMap.has(key)) topicDiffMap.set(key, { sumAI:0, sumLat:0, count:0, success:0 });
       const cell = topicDiffMap.get(key)!;
-      if (typeof s.ai === 'number') { cell.sumAI += s.ai; cell.aiCount += 1; }
-      cell.sumLat += s.latency || 0; cell.count += 1;
-      // Approximate success: ready or minor as success; tweak as needed
+      cell.sumAI += s.ai as number; cell.sumLat += s.latency || 0; cell.count += 1;
       if (s.ready === 'ready' || s.ready === 'minor_revision') cell.success += 1;
     });
     const topicDifficulty: TopicDifficultyCell[] = [];
     topicDiffMap.forEach((v, key) => {
       const [topic, difficulty] = key.split('||');
-      topicDifficulty.push({ topic, difficulty, successRate: v.count? v.success/v.count:0, ai: v.aiCount? v.sumAI/v.aiCount:0, latency: v.count? v.sumLat/v.count:0, count: v.count });
+      topicDifficulty.push({ topic, difficulty, successRate: v.count? v.success/v.count:0, ai: v.count? v.sumAI/v.count:0, latency: v.count? v.sumLat/v.count:0, count: v.count });
     });
 
     const overall: PipelineAggregate | null = overallCount ? {
       pipeline: 'overall',
-      avgAI: overallAICount ? overallAISum/overallAICount : 0,
-      p50AI: 0, // optional: compute across all
-      p90AI: 0,
-      avgLatency: overallLatSum/overallCount,
+      avgAI: overallAICount ? overallAISum/overallAICount : null,
+      p50AI: null,
+      p90AI: null,
+      avgLatency: overallCount ? overallLatSum/overallCount : 0,
       p50Latency: 0,
       p90Latency: 0,
       testCount: overallCount,

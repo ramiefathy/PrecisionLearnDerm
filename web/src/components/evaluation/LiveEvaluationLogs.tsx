@@ -358,25 +358,27 @@ export const LiveEvaluationLogs: React.FC<LiveEvaluationLogsProps> = ({
                             color={log.quality >= 7 ? 'success' : 'warning'}
                           />
                         )}
-                        {log.aiScores && (
+                        {log.aiScores ? (
                           <>
-                            <Chip 
-                              label={`AI: ${log.aiScores.overall}%`} 
-                              size="small" 
+                            <Chip
+                              label={`AI: ${log.aiScores.overall}%`}
+                              size="small"
                               variant="filled"
                               color={log.aiScores.overall >= 70 ? 'success' : log.aiScores.overall >= 50 ? 'warning' : 'error'}
                             />
-                            <Chip 
-                              label={log.aiScores.boardReady} 
-                              size="small" 
+                            <Chip
+                              label={log.aiScores.boardReady}
+                              size="small"
                               variant="outlined"
                               color={
-                                log.aiScores.boardReady === 'ready' ? 'success' : 
+                                log.aiScores.boardReady === 'ready' ? 'success' :
                                 log.aiScores.boardReady === 'minor_revision' ? 'info' :
                                 log.aiScores.boardReady === 'major_revision' ? 'warning' : 'error'
                               }
                             />
                           </>
+                        ) : (
+                          <Chip label="AI: N/A" size="small" variant="filled" />
                         )}
                       </Box>
                     }

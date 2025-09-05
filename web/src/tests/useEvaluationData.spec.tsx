@@ -78,4 +78,47 @@ describe('useEvaluationData', () => {
     // Failures proxy uses readiness; none should be major/reject so empty
     expect(latest.failures.length).toBe(0);
   });
+
+  it('ignores entries without AI scores in aggregates', async () => {
+    const docs = [
+      {
+        id: 't1',
+        data: () => ({
+          aiScoresFlat: { overall: 80, boardReadiness: 'ready' },
+          latency: 5000,
+          createdAt: Date.now(),
+          testCase: { topic: 'Psoriasis', difficulty: 'Basic', pipeline: 'boardStyle' }
+        })
+      },
+      {
+        id: 't2',
+        data: () => ({
+          latency: 10000,
+          createdAt: Date.now(),
+          testCase: { topic: 'Psoriasis', difficulty: 'Basic', pipeline: 'boardStyle' }
+        })
+      }
+    ];
+
+    vi.spyOn(firestore, 'onSnapshot').mockImplementation((_ref: any, callback: any) => {
+      const snapshot = {
+        forEach: (fn: (d:any)=>void) => docs.forEach(d => fn(d))
+      } as any;
+      callback(snapshot);
+      return vi.fn();
+    });
+
+    let latest: any = null;
+    const onResult = (res:any) => { latest = res; };
+    render(<TestHarness jobId="job2" onResult={onResult} />);
+
+    await waitFor(() => {
+      expect(latest).toBeTruthy();
+      expect(latest.samples.length).toBe(2);
+    });
+
+    const agg = latest.aggregates.byPipeline[0];
+    expect(agg.testCount).toBe(1);
+    expect(Math.round(agg.avgAI)).toBe(80);
+  });
 });

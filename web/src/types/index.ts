@@ -48,9 +48,9 @@ export interface ScoreSample {
 
 export interface PipelineAggregate {
   pipeline: PipelineId;
-  avgAI: number;
-  p50AI: number;
-  p90AI: number;
+  avgAI: number | null;
+  p50AI: number | null;
+  p90AI: number | null;
   avgLatency: number;
   p50Latency: number;
   p90Latency: number;
@@ -62,7 +62,7 @@ export interface TopicDifficultyCell {
   topic: string;
   difficulty: string;
   successRate: number; // 0..1
-  ai: number;          // 0..100
+  ai: number | null;          // 0..100 or null when unavailable
   latency: number;     // ms
   count: number;
 }

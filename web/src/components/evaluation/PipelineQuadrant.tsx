@@ -3,10 +3,11 @@ import { Bubble } from 'react-chartjs-2';
 import type { PipelineAggregate } from '../../types';
 
 export function PipelineQuadrant({ data, onSelect }:{ data: PipelineAggregate[]; onSelect?: (pipeline: string)=>void }) {
+  const valid = data.filter(p => p.avgAI !== null);
   const chartData = {
-    datasets: data.map((p, idx) => ({
+    datasets: valid.map((p, idx) => ({
       label: p.pipeline,
-      data: [{ x: p.avgLatency, y: p.avgAI, r: Math.max(4, Math.sqrt(p.testCount)) }],
+      data: [{ x: p.avgLatency, y: p.avgAI as number, r: Math.max(4, Math.sqrt(p.testCount)) }],
       backgroundColor: `hsl(${(idx*97)%360} 70% 55% / 0.5)`,
       borderColor: `hsl(${(idx*97)%360} 70% 45%)`
     }))
@@ -23,7 +24,7 @@ export function PipelineQuadrant({ data, onSelect }:{ data: PipelineAggregate[];
     onClick: (_evt:any, elems:any[]) => {
       if (!onSelect || !elems?.length) return;
       const dsIdx = elems[0].datasetIndex;
-      const pl = data[dsIdx]?.pipeline;
+      const pl = valid[dsIdx]?.pipeline;
       if (pl) onSelect(pl);
     }
   };

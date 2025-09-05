@@ -196,8 +196,7 @@ export const processEvaluationBatch = functions
     retryConfig: {
       maxAttempts: 3,
       minBackoffSeconds: 10,
-      maxBackoffSeconds: 300,
-      maxRetryDuration: 1800 // 30 minutes total
+      maxBackoffSeconds: 300
     }
   })
   .onDispatch(async (data) => {
@@ -1261,16 +1260,22 @@ async function finalizeEvaluation(
       const readinessByPipeline: Record<string, {ready:number; minor:number; major:number; reject:number}> = {};
       results.forEach((r: any) => {
         const p = r.testCase?.pipeline || 'unknown';
-        if (!aiByPipeline[p]) { aiByPipeline[p]=[]; latByPipeline[p]=[]; readinessByPipeline[p]={ ready:0, minor:0, major:0, reject:0 }; }
+        if (!aiByPipeline[p]) {
+          aiByPipeline[p] = [];
+          latByPipeline[p] = [];
+          readinessByPipeline[p] = { ready: 0, minor: 0, major: 0, reject: 0 };
+        }
         if (r.success) {
-          const ai = (r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? r.quality ?? 0) as number;
-          aiByPipeline[p].push(ai);
-          latByPipeline[p].push(r.latency || 0);
-          const br = r.aiScoresFlat?.boardReadiness ?? r.aiScores?.boardReadiness ?? r.aiScores?.metadata?.boardReadiness;
-          if (br === 'ready') readinessByPipeline[p].ready++;
-          else if (br === 'minor_revision') readinessByPipeline[p].minor++;
-          else if (br === 'major_revision') readinessByPipeline[p].major++;
-          else if (br === 'reject') readinessByPipeline[p].reject++;
+          const ai = r.aiScoresFlat?.overall ?? r.aiScores?.overall;
+          if (ai !== undefined && ai !== null) {
+            aiByPipeline[p].push(ai as number);
+            latByPipeline[p].push(r.latency || 0);
+            const br = r.aiScoresFlat?.boardReadiness ?? r.aiScores?.boardReadiness ?? r.aiScores?.metadata?.boardReadiness;
+            if (br === 'ready') readinessByPipeline[p].ready++;
+            else if (br === 'minor_revision') readinessByPipeline[p].minor++;
+            else if (br === 'major_revision') readinessByPipeline[p].major++;
+            else if (br === 'reject') readinessByPipeline[p].reject++;
+          }
         }
       });
       const quant = (arr: number[], q:number) => {
@@ -1299,12 +1304,15 @@ async function finalizeEvaluation(
       // Topic×Difficulty cells
       const topicDiffMap: Record<string, { sumAI:number; sumLat:number; count:number; success:number }> = {};
       results.forEach((r:any) => {
+        const ai = r.aiScoresFlat?.overall ?? r.aiScores?.overall;
+        if (ai === undefined || ai === null) return;
         const topic = r.testCase?.topic || 'Unknown';
         const diff = r.testCase?.difficulty || 'Unknown';
         const key = `${topic}||${diff}`;
         if (!topicDiffMap[key]) topicDiffMap[key] = { sumAI:0, sumLat:0, count:0, success:0 };
-        const ai = (r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? r.quality ?? 0) as number;
-        topicDiffMap[key].sumAI += ai; topicDiffMap[key].sumLat += (r.latency||0); topicDiffMap[key].count += 1;
+        topicDiffMap[key].sumAI += ai as number;
+        topicDiffMap[key].sumLat += (r.latency || 0);
+        topicDiffMap[key].count += 1;
         const br = r.aiScoresFlat?.boardReadiness ?? r.aiScores?.boardReadiness ?? r.aiScores?.metadata?.boardReadiness;
         if (br === 'ready' || br === 'minor_revision') topicDiffMap[key].success += 1;
       });

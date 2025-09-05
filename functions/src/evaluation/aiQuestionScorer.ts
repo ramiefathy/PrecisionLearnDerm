@@ -43,7 +43,7 @@ export async function evaluateQuestionWithAI(
   pipeline: string,
   topic: string,
   difficulty: string
-): Promise<BoardStyleQualityScore> {
+): Promise<BoardStyleQualityScore | null> {
   try {
     const client = getRobustGeminiClient({
       maxRetries: 3,
@@ -65,7 +65,11 @@ export async function evaluateQuestionWithAI(
 
     // Parse the structured response
     const scores = parseEvaluationResponse(result.text);
-    
+    if (!scores) {
+      logger.warn('[AI_SCORER] Parsed scores were null', { pipeline, topic });
+      return generateNullScores();
+    }
+
     logger.info('[AI_SCORER] Question evaluated', {
       pipeline,
       topic,
@@ -76,8 +80,8 @@ export async function evaluateQuestionWithAI(
     return scores;
   } catch (error) {
     logger.error('[AI_SCORER] Evaluation failed', { error });
-    // Return default scores if AI evaluation fails
-    return generateDefaultScores();
+    // Return null if AI evaluation fails
+    return generateNullScores();
   }
 }
 
@@ -186,7 +190,7 @@ IMPROVEMENTS:
 /**
  * Parse the AI evaluation response into structured scores
  */
-function parseEvaluationResponse(text: string): BoardStyleQualityScore {
+function parseEvaluationResponse(text: string): BoardStyleQualityScore | null {
   try {
     // Extract scores section
     const scoresMatch = text.match(/===SCORES===([\s\S]*?)===FEEDBACK===/);
@@ -274,38 +278,13 @@ function parseEvaluationResponse(text: string): BoardStyleQualityScore {
     };
   } catch (error) {
     logger.error('[AI_SCORER] Failed to parse evaluation response', { error });
-    return generateDefaultScores();
+    return null;
   }
 }
 
 /**
- * Generate default scores if AI evaluation fails
+ * Return null scores when AI evaluation fails
  */
-function generateDefaultScores(): BoardStyleQualityScore {
-  return {
-    overall: 50,
-    coreQuality: {
-      medicalAccuracy: 50,
-      clinicalRealism: 50,
-      stemCompleteness: 50,
-      difficultyCalibration: 50
-    },
-    technicalQuality: {
-      distractorQuality: 50,
-      cueingAbsence: 50,
-      clarity: 50
-    },
-    educationalValue: {
-      clinicalRelevance: 50,
-      educationalValue: 50
-    },
-    detailedFeedback: {
-      strengths: ['Question generated successfully'],
-      weaknesses: ['AI evaluation unavailable - requires manual review'],
-      improvementSuggestions: ['Review against ABD guidelines', 'Validate medical accuracy', 'Assess board-style compliance']
-    },
-    metadata: {
-      boardReadiness: 'minor_revision'
-    }
-  };
+function generateNullScores(): null {
+  return null;
 }
