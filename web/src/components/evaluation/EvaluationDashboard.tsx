@@ -117,7 +117,7 @@ interface TestResult {
   };
   aiScores?: {
     overall: number;
-    boardReadiness: string;
+    boardReadiness?: string | null;
     clinicalRealism: number;
     medicalAccuracy: number;
     distractorQuality: number;
@@ -871,16 +871,20 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Chip 
-                          label={(result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness ?? 'N/A')}
-                          size="small"
-                          variant="outlined"
-                          color={
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'ready' ? 'success' :
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'minor_revision' ? 'info' :
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'major_revision' ? 'warning' : 'error'
-                          }
-                        />
+                        {(() => {
+                          const readiness = result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness ?? null;
+                          const label = readiness ?? 'AI evaluation unavailable';
+                          const color = readiness === 'ready'
+                            ? 'success'
+                            : readiness === 'minor_revision'
+                              ? 'info'
+                              : readiness === 'major_revision'
+                                ? 'warning'
+                                : readiness
+                                  ? 'error'
+                                  : 'default';
+                          return <Chip label={label} size="small" variant="outlined" color={color as any} />;
+                        })()}
                       </TableCell>
                       <TableCell align="center">
                         {(result.aiScoresFlat?.clinicalRealism ?? (result.aiScores as any)?.coreQuality?.clinicalRealism ?? (result.aiScores as any)?.clinicalRealism ?? 0)}%
@@ -1072,14 +1076,18 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                     <Chip label={`Overall: ${(selectedQuestion.aiScoresFlat?.overall ?? selectedQuestion.aiScores?.overall ?? 0)}%`} color="primary" />
                     <Chip label={`Clinical Realism: ${(selectedQuestion.aiScoresFlat?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.coreQuality?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.clinicalRealism ?? 0)}%`} />
                     <Chip label={`Medical Accuracy: ${(selectedQuestion.aiScoresFlat?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.coreQuality?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.medicalAccuracy ?? 0)}%`} />
-                    <Chip 
-                      label={`Board Ready: ${(selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness ?? 'N/A')}`}
-                      color={
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'ready' ? 'success' :
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'minor_revision' ? 'info' :
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'major_revision' ? 'warning' : 'default'
-                      }
-                    />
+                    {(() => {
+                      const readiness = selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness ?? null;
+                      const label = readiness ? `Board Ready: ${readiness}` : 'AI evaluation unavailable';
+                      const color = readiness === 'ready'
+                        ? 'success'
+                        : readiness === 'minor_revision'
+                          ? 'info'
+                          : readiness === 'major_revision'
+                            ? 'warning'
+                            : 'default';
+                      return <Chip label={label} color={color as any} />;
+                    })()}
                   </Box>
                 </>
               )}

@@ -405,7 +405,11 @@ export async function processBatchTestsLogic(
                 testCase.difficulty
               );
             } catch (error) {
-              logger.warn('[EVAL_PROCESSOR] AI scoring failed, using rule-based only', { error });
+              // If AI evaluation fails, leave aiScores as null instead of
+              // generating default scores so the UI can indicate the
+              // evaluation was unavailable.
+              logger.warn('[EVAL_PROCESSOR] AI scoring failed, skipping AI scores', { error });
+              aiScores = null;
             }
             
             // Store test result with all scores
@@ -841,9 +845,10 @@ async function storeTestResult(
     const correctAnswerLetter = typeof ca === 'string' ? ca.toUpperCase() : (typeof correctAnswerIndex === 'number' ? String.fromCharCode(65 + correctAnswerIndex) : null);
 
     const ai = result?.aiScores || {};
+    const boardReadiness = ai?.metadata?.boardReadiness ?? ai?.boardReadiness ?? null;
     const aiScoresFlat = {
       overall: ai?.overall ?? null,
-      boardReadiness: ai?.metadata?.boardReadiness ?? ai?.boardReadiness ?? null,
+      boardReadiness,
       clinicalRealism: ai?.coreQuality?.clinicalRealism ?? ai?.clinicalRealism ?? null,
       medicalAccuracy: ai?.coreQuality?.medicalAccuracy ?? ai?.medicalAccuracy ?? null,
       distractorQuality: ai?.technicalQuality?.distractorQuality ?? ai?.distractorQuality ?? null,
@@ -857,7 +862,7 @@ async function storeTestResult(
       finalEvalModel: config.scoring.useProForFinal ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
       latencyMs: result?.latency ?? undefined,
       aiOverall: aiScoresFlat.overall,
-      boardReadiness: aiScoresFlat.boardReadiness
+      boardReadiness
     };
 
     await db.collection('evaluationJobs').doc(jobId)
