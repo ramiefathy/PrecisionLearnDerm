@@ -1024,12 +1024,12 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
               </Typography>
 
               {/* Lead-in Question */}
-              {selectedQuestion.result.leadIn && (
+              {selectedQuestion?.result?.leadIn && (
                 <>
                   <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
                     Question:
                   </Typography>
-                  <Typography variant="body1" paragraph sx={{ 
+                  <Typography variant="body1" paragraph sx={{
                     fontWeight: 'bold',
                     fontSize: '1.1rem',
                     color: 'primary.main',
@@ -1039,7 +1039,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                     border: '1px solid',
                     borderColor: 'primary.200'
                   }}>
-                    {selectedQuestion.result.leadIn}
+                    {selectedQuestion.result?.leadIn}
                   </Typography>
                 </>
               )}
