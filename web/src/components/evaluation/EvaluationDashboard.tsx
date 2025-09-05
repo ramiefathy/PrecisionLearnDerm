@@ -212,40 +212,61 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   // Calculate aggregate metrics
   const calculateMetrics = () => {
     const successfulTests = testResults.filter(r => r.success);
-    const avgAIScore = successfulTests.reduce((sum, r) => 
-      sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0), 0) / (successfulTests.length || 1);
+    const overallTests = successfulTests.filter(r => {
+      const val = r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall;
+      return typeof val === 'number' && !isNaN(val);
+    });
+    const avgAIScore = overallTests.reduce((sum, r) => {
+      const val = r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall;
+      return sum + (val as number);
+    }, 0) / (overallTests.length || 1);
     
     const boardReadyCount = successfulTests.filter(r => {
       const br = r.aiScoresFlat?.boardReadiness ?? (r.aiScores as any)?.metadata?.boardReadiness ?? (r.aiScores as any)?.boardReadiness;
       return br === 'ready';
     }).length;
     
-    const avgClinicalRealism = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
+    const clinicalRealismTests = successfulTests.filter(r => {
+      const val = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism;
+      return typeof val === 'number' && !isNaN(val);
+    });
+    const avgClinicalRealism = clinicalRealismTests.reduce((sum, r) => {
+      const val = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism;
+      return sum + (val as number);
+    }, 0) / (clinicalRealismTests.length || 1);
     
-    const avgMedicalAccuracy = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
+    const medicalAccuracyTests = successfulTests.filter(r => {
+      const val = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy;
+      return typeof val === 'number' && !isNaN(val);
+    });
+    const avgMedicalAccuracy = medicalAccuracyTests.reduce((sum, r) => {
+      const val = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy;
+      return sum + (val as number);
+    }, 0) / (medicalAccuracyTests.length || 1);
 
     // Critical Min: minimum of core dimensions per test, averaged across tests
-    const criticalMinArr = successfulTests.map(r => {
-      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0;
-      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0;
-      return Math.min(cr, ma, dq, ca);
+    const criticalMinTests = successfulTests.filter(r => {
+      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism;
+      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy;
+      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality;
+      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence;
+      return [cr, ma, dq, ca].every(v => typeof v === 'number' && !isNaN(v));
     });
-    const avgCriticalMin = criticalMinArr.length ? (criticalMinArr.reduce((a,b)=>a+b,0)/criticalMinArr.length) : 0;
+    const criticalMinArr = criticalMinTests.map(r => {
+      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism;
+      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy;
+      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality;
+      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence;
+      return Math.min(cr as number, ma as number, dq as number, ca as number);
+    });
+    const avgCriticalMin = criticalMinArr.length ? (criticalMinArr.reduce((a, b) => a + b, 0) / criticalMinArr.length) : 0;
 
     // Calculate rule-based scores averages
-    const avgRuleBasedScore = successfulTests.reduce((sum, r) => 
-      sum + (r.quality || 0), 0) / (successfulTests.length || 1);
-    
-    const avgDetailedScore = successfulTests.reduce((sum, r) => 
-      sum + (r.detailedScores?.overall || 0), 0) / (successfulTests.length || 1);
+    const ruleBasedTests = successfulTests.filter(r => typeof r.quality === 'number' && !isNaN(r.quality));
+    const avgRuleBasedScore = ruleBasedTests.reduce((sum, r) => sum + (r.quality as number), 0) / (ruleBasedTests.length || 1);
+
+    const detailedScoreTests = successfulTests.filter(r => typeof r.detailedScores?.overall === 'number' && !isNaN(r.detailedScores?.overall));
+    const avgDetailedScore = detailedScoreTests.reduce((sum, r) => sum + (r.detailedScores!.overall as number), 0) / (detailedScoreTests.length || 1);
 
     return {
       avgAIScore,
