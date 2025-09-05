@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { User } from 'firebase/auth';
 import type { UserProfile } from '../lib/firebase';
+import type { QuestionItem } from '../types';
 
 export interface QuizConfig {
   numQuestions: number;
@@ -21,10 +23,16 @@ export interface QuizConfig {
   }>;
 }
 
+export interface QuizAnswer {
+  chosenIndex: number;
+  confidence?: string;
+  timeToAnswerSec: number;
+}
+
 export interface ActiveQuizState {
   startedAt: number;
-  items: any[];
-  answers: Record<number, { chosenIndex: number; confidence?: string; timeToAnswerSec: number }>;
+  items: QuestionItem[];
+  answers: Record<number, QuizAnswer>;
   config: QuizConfig;
   currentIndex: number;
   schemaVersion: number;
@@ -32,8 +40,8 @@ export interface ActiveQuizState {
 
 interface AppStore {
   // Auth state
-  authUser: any | null;
-  setAuthUser: (user: any | null) => void;
+  authUser: User | null;
+  setAuthUser: (user: User | null) => void;
   
   // Profile state
   profile: UserProfile | null;
@@ -44,7 +52,7 @@ interface AppStore {
   // Quiz state
   activeQuiz: ActiveQuizState | null;
   setActiveQuiz: (quiz: ActiveQuizState | null) => void;
-  updateQuizAnswer: (index: number, answer: { chosenIndex: number; confidence?: string; timeToAnswerSec: number }) => void;
+  updateQuizAnswer: (index: number, answer: QuizAnswer) => void;
 }
 
 export const useAppStore = create<AppStore>()(
