@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { EvaluationResultsDisplay } from '../components/evaluation/EvaluationResultsDisplay';
+import type { EvaluationResults } from '../components/evaluation/EvaluationResultsDisplay';
 
-const mockResults = {
+const mockResults: EvaluationResults = {
   byPipeline: {
     p1: {
       pipeline: 'Pipeline 1',
@@ -35,13 +36,21 @@ const mockResults = {
 };
 
 describe('EvaluationResultsDisplay', () => {
-  it('shows latency and quality legends', () => {
+  it('renders evaluation header', () => {
     render(
       <div style={{ width: 1000, height: 500 }}>
-        <EvaluationResultsDisplay results={mockResults as any} jobId="job" />
+        <EvaluationResultsDisplay results={mockResults} jobId="job" />
       </div>
     );
-    expect(screen.getByText(/Latency \(ms\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Quality \(%\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evaluation Results/i)).toBeInTheDocument();
+  });
+
+  it('renders recommendation score normalized to 100', () => {
+    render(
+      <div style={{ width: 1000, height: 500 }}>
+        <EvaluationResultsDisplay results={mockResults} jobId="job" />
+      </div>
+    );
+    expect(screen.getByText(/highest score of 90.0\/100/i)).toBeInTheDocument();
   });
 });
