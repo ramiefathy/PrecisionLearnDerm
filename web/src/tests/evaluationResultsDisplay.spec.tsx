@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { EvaluationResultsDisplay } from '../components/evaluation/EvaluationResultsDisplay';
@@ -35,13 +36,14 @@ const mockResults = {
 };
 
 describe('EvaluationResultsDisplay', () => {
-  it('shows latency and quality legends', () => {
+  it('renders separate charts for success, latency, and quality', () => {
     render(
       <div style={{ width: 1000, height: 500 }}>
         <EvaluationResultsDisplay results={mockResults as any} jobId="job" />
       </div>
     );
-    expect(screen.getByText(/Latency \(ms\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Quality \(%\)/i)).toBeInTheDocument();
+    expect(screen.getByText('Success Rate by Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Average Latency by Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Average Quality by Pipeline')).toBeInTheDocument();
   });
 });

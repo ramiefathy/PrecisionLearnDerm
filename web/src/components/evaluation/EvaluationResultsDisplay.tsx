@@ -39,8 +39,6 @@ import {
 import {
   BarChart,
   Bar,
-  ComposedChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -48,7 +46,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as ChartTooltip,
-  Legend,
   ResponsiveContainer
 } from 'recharts';
 
@@ -320,39 +317,87 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
         {activeTab === 0 && (
           <Box sx={{ mt: 3 }}>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Typography variant="h6" gutterBottom>Success Rate by Pipeline</Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={pipelineChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip />
-                    <Bar dataKey="successRate" fill="#4CAF50" name="Success Rate (%)" />
+                    <YAxis
+                      label={{
+                        value: 'Success Rate (%) - higher is better',
+                        angle: -90,
+                        position: 'insideLeft'
+                      }}
+                    />
+                    <ChartTooltip
+                      formatter={(value: number) => [
+                        `${value}`,
+                        'Success Rate (%) - higher is better'
+                      ]}
+                    />
+                    <Bar
+                      dataKey="successRate"
+                      fill="#4CAF50"
+                      name="Success Rate (%)"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="h6" gutterBottom>Average Latency by Pipeline</Typography>
                 <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={pipelineChartData}>
+                  <BarChart data={pipelineChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis
-                      yAxisId="left"
-                      label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft' }}
+                      label={{
+                        value: 'Latency (ms) - lower is better',
+                        angle: -90,
+                        position: 'insideLeft'
+                      }}
                     />
+                    <ChartTooltip
+                      formatter={(value: number) => [
+                        `${value}`,
+                        'Latency (ms) - lower is better'
+                      ]}
+                    />
+                    <Bar
+                      dataKey="avgLatency"
+                      fill="#2196F3"
+                      name="Latency (ms)"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="h6" gutterBottom>Average Quality by Pipeline</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={pipelineChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
                     <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{ value: 'Quality (%)', angle: -90, position: 'insideRight' }}
+                      label={{
+                        value: 'Quality (%) - higher is better',
+                        angle: -90,
+                        position: 'insideLeft'
+                      }}
                     />
-                    <ChartTooltip />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="avgLatency" fill="#2196F3" name="Latency (ms)" />
-                    <Line yAxisId="right" type="monotone" dataKey="avgQuality" stroke="#FF9800" name="Quality (%)" />
-                  </ComposedChart>
+                    <ChartTooltip
+                      formatter={(value: number) => [
+                        `${value}`,
+                        'Quality (%) - higher is better'
+                      ]}
+                    />
+                    <Bar
+                      dataKey="avgQuality"
+                      fill="#FF9800"
+                      name="Quality (%)"
+                    />
+                  </BarChart>
                 </ResponsiveContainer>
               </Grid>
 
@@ -410,8 +455,19 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                   <BarChart data={categoryChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                    <YAxis />
-                    <ChartTooltip />
+                    <YAxis
+                      label={{
+                        value: 'Success Rate (%) - higher is better',
+                        angle: -90,
+                        position: 'insideLeft'
+                      }}
+                    />
+                    <ChartTooltip
+                      formatter={(value: number) => [
+                        `${value}`,
+                        'Success Rate (%) - higher is better'
+                      ]}
+                    />
                     <Bar dataKey="successRate" fill="#4CAF50" name="Success Rate (%)" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -423,8 +479,19 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
                   <BarChart data={categoryChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                    <YAxis />
-                    <ChartTooltip />
+                    <YAxis
+                      label={{
+                        value: 'Quality (%) - higher is better',
+                        angle: -90,
+                        position: 'insideLeft'
+                      }}
+                    />
+                    <ChartTooltip
+                      formatter={(value: number) => [
+                        `${value}`,
+                        'Quality (%) - higher is better'
+                      ]}
+                    />
                     <Bar dataKey="avgQuality" fill="#FF9800" name="Avg Quality" />
                   </BarChart>
                 </ResponsiveContainer>
