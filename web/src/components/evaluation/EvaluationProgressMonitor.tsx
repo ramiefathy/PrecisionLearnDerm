@@ -70,7 +70,7 @@ interface EvaluationJob {
 
 interface EvaluationProgressMonitorProps {
   jobId: string;
-  onComplete?: (job: EvaluationJob) => void;
+  onComplete?: (job: EvaluationJob) => void | Promise<void>;
   onCancel?: () => void;
 }
 
