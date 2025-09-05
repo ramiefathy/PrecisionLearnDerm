@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseStructuredText, StructuredTextDisplay } from './StructuredTextParser';
 
+export interface AgentMessage {
+  text?: string;
+  [key: string]: unknown;
+}
+
+export type AgentChunk = string | AgentMessage;
+
+export interface ViewerContext {
+  onToggle?: () => void;
+}
+
 export interface AgentOutput {
   name: string;
   icon: string;
@@ -9,9 +20,9 @@ export interface AgentOutput {
   startTime?: number;
   endTime?: number;
   duration?: number;
-  streamedChunks: string[];
+  streamedChunks: AgentChunk[];
   fullOutput: string;
-  result?: any;
+  result?: unknown;
   error?: string;
   model?: string;
   promptPreview?: string;
@@ -19,11 +30,21 @@ export interface AgentOutput {
   subAgents?: AgentOutput[];
 }
 
-interface AgentOutputViewerProps {
+interface AgentOutputViewerProps extends ViewerContext {
   agent: AgentOutput;
   isExpanded?: boolean;
-  onToggle?: () => void;
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const chunkToString = (chunk: AgentChunk): string => {
+  if (typeof chunk === 'string') {
+    return chunk;
+  }
+  if (chunk && typeof chunk === 'object') {
+    return typeof chunk.text === 'string' ? chunk.text : JSON.stringify(chunk);
+  }
+  return String(chunk);
+};
 
 export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }: AgentOutputViewerProps) {
   const [localExpanded, setLocalExpanded] = useState(isExpanded);
@@ -33,7 +54,7 @@ export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }
     setLocalExpanded(isExpanded);
   }, [isExpanded]);
 
-  const handleToggle = () => {
+  const handleToggle = (): void => {
     if (onToggle) {
       onToggle();
     } else {
@@ -41,31 +62,33 @@ export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }
     }
   };
 
-  const getStatusColor = () => {
+  const getStatusColor = (): string => {
     switch (agent.status) {
       case 'pending': return 'bg-gray-100 border-gray-300';
       case 'running': return 'bg-blue-50 border-blue-400 animate-pulse';
       case 'complete': return 'bg-green-50 border-green-400';
       case 'error': return 'bg-red-50 border-red-400';
     }
+    return '';
   };
 
-  const getStatusIcon = () => {
+  const getStatusIcon = (): string => {
     switch (agent.status) {
       case 'pending': return '⏳';
       case 'running': return '🔄';
       case 'complete': return '✅';
       case 'error': return '❌';
     }
+    return '';
   };
 
-  const formatDuration = (ms?: number) => {
+  const formatDuration = (ms?: number): string => {
     if (!ms) return '';
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
   };
 
-  const formatJson = (obj: any) => {
+  const formatJson = (obj: unknown): string => {
     try {
       return JSON.stringify(obj, null, 2);
     } catch {
@@ -133,7 +156,7 @@ export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }
                   {!showFullOutput ? (
                     // Try to parse and display structured content
                     (() => {
-                      const fullText = (agent.streamedChunks || []).join('');
+                      const fullText = (agent.streamedChunks || []).map(chunkToString).join('');
                       const parsedContent = parseStructuredText(fullText);
                       
                       // If we can parse it as structured content, show the formatted view
@@ -155,9 +178,7 @@ export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }
                                 <span className="inline-block w-2 h-3 bg-green-400 animate-pulse mr-1" />
                               )}
                               <span className="opacity-90">
-                                {typeof chunk === 'string' ? chunk : 
-                                 typeof chunk === 'object' && chunk !== null && typeof (chunk as any).text === 'string' ? (chunk as any).text :
-                                 typeof chunk === 'object' ? JSON.stringify(chunk) : String(chunk)}
+                                {chunkToString(chunk)}
                               </span>
                             </div>
                           ))}
@@ -171,11 +192,7 @@ export default function AgentOutputViewer({ agent, isExpanded = true, onToggle }
                     // Show raw output when toggled
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-xs max-h-96 overflow-y-auto">
                       <pre className="whitespace-pre-wrap">
-                        {agent.fullOutput || (agent.streamedChunks || []).map(chunk => 
-                          typeof chunk === 'string' ? chunk : 
-                          typeof chunk === 'object' && chunk !== null && typeof (chunk as any).text === 'string' ? (chunk as any).text :
-                          typeof chunk === 'object' ? JSON.stringify(chunk) : String(chunk)
-                        ).join('')}
+                        {agent.fullOutput || (agent.streamedChunks || []).map(chunkToString).join('')}
                       </pre>
                     </div>
                   )}
