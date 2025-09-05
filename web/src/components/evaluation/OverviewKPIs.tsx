@@ -1,14 +1,14 @@
-import { Card, CardContent, Typography } from '@mui/material';
-import { Grid } from '@mui/material';
+import { Card, CardContent, Grid, Typography } from '@mui/material';
 import type { PipelineAggregate } from '../../types';
 
 export function OverviewKPIs({ overall }: { overall: PipelineAggregate | null }) {
   const totalTests = overall?.testCount;
   const avgAI = overall?.avgAI;
   const avgLatency = overall?.avgLatency;
-  const successRate = overall && overall.testCount > 0
-    ? ((overall.readiness.ready + overall.readiness.minor) / overall.testCount) * 100
-    : undefined;
+  const successRate =
+    overall && overall.testCount > 0
+      ? (((overall.readiness?.ready ?? 0) + (overall.readiness?.minor ?? 0)) / overall.testCount) * 100
+      : undefined;
 
   return (
     <Grid container spacing={2} sx={{ mb: 2 }}>
