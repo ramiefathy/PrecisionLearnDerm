@@ -36,7 +36,7 @@ import { httpsCallable } from 'firebase/functions';
 
 interface EvaluationJob {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   config: {
     basicCount: number;
     advancedCount: number;
@@ -51,6 +51,7 @@ interface EvaluationJob {
     currentTopic?: string;
     currentDifficulty?: string;
   };
+  cancelRequested?: boolean;
   results?: {
     errors?: Array<{
       timestamp: string;
@@ -118,6 +119,10 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
                 if (onComplete) {
                   onComplete(jobData);
                 }
+              } else if (jobData.status === 'cancelled') {
+                if (onCancel) {
+                  onCancel();
+                }
               }
             } else {
               setError('Job not found');
@@ -144,7 +149,7 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
         unsubscribe();
       }
     };
-  }, [jobId, onComplete]);
+  }, [jobId, onComplete, onCancel]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -156,6 +161,8 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
         return <CheckCircleIcon color="success" />;
       case 'failed':
         return <ErrorIcon color="error" />;
+      case 'cancelled':
+        return <CancelIcon color="error" />;
       default:
         return null;
     }
@@ -170,6 +177,8 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
       case 'completed':
         return 'success';
       case 'failed':
+        return 'error';
+      case 'cancelled':
         return 'error';
       default:
         return 'default';
@@ -385,11 +394,23 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
             color="error"
             startIcon={<CancelIcon />}
             onClick={handleCancelEvaluation}
-            disabled={cancelling}
+            disabled={cancelling || job.cancelRequested}
           >
             {cancelling ? 'Cancelling...' : 'Cancel Evaluation'}
           </Button>
         </Box>
+      )}
+
+      {job.cancelRequested && job.status !== 'cancelled' && (
+        <Alert severity="info" sx={{ mt: 3 }}>
+          Cancellation requested. Finishing current tasks...
+        </Alert>
+      )}
+
+      {job.status === 'cancelled' && (
+        <Alert severity="warning" sx={{ mt: 3 }}>
+          Evaluation cancelled.
+        </Alert>
       )}
 
       {(job.status === 'completed' || job.status === 'failed') && (

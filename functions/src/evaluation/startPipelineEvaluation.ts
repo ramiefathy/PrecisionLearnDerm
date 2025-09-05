@@ -6,6 +6,8 @@
 import * as functions from 'firebase-functions';
 import { getFunctions } from 'firebase-admin/functions';
 import * as logger from 'firebase-functions/logger';
+import * as admin from 'firebase-admin';
+import * as crypto from 'node:crypto';
 import { requireAdmin } from '../util/auth';
 import { createEvaluationJob, failJob } from './evaluationJobManager';
 
@@ -97,15 +99,22 @@ export const startPipelineEvaluation = functions
       // Queue the first batch using Cloud Tasks for reliable processing
       try {
         const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
+        const taskId = crypto.randomUUID();
         await taskQueue.enqueue({
           jobId,
+          taskId,
           startIndex: 0,
           batchSize: 3 // Start with a conservative batch size
         }, {
+          id: taskId,
           scheduleDelaySeconds: 1, // Start processing after 1 second
           dispatchDeadlineSeconds: 1800 // 30 minute deadline
         });
-        
+
+        await admin.firestore().collection('evaluationJobs').doc(jobId).update({
+          taskIds: admin.firestore.FieldValue.arrayUnion(taskId)
+        });
+
         logger.info('[START_EVAL] Queued first batch for processing', {
           jobId,
           totalTests: basicCount + advancedCount + veryDifficultCount,
