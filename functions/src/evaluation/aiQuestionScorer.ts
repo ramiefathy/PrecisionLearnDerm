@@ -36,6 +36,7 @@ export interface BoardStyleQualityScore {
   };
   metadata: {
     boardReadiness: 'ready' | 'minor_revision' | 'major_revision' | 'reject';
+    failureReason?: string;
   };
 }
 
@@ -80,8 +81,7 @@ export async function evaluateQuestionWithAI(
     return scores;
   } catch (error) {
     logger.error('[AI_SCORER] Evaluation failed', { error });
-    // Return default scores if AI evaluation fails
-    return generateDefaultScores();
+    throw error;
   }
 }
 
@@ -191,133 +191,143 @@ IMPROVEMENTS:
  * Parse the AI evaluation response into structured scores
  */
 function parseEvaluationResponse(text: string): BoardStyleQualityScore {
-  try {
-    // Extract scores section
-    const scoresMatch = text.match(/===SCORES===([\s\S]*?)===FEEDBACK===/);
-    const feedbackMatch = text.match(/===FEEDBACK===([\s\S]*?)$/);
-    
-    if (!scoresMatch || !feedbackMatch) {
-      throw new Error('Invalid response format');
-    }
-    
-    const scoresText = scoresMatch[1];
-    const feedbackText = feedbackMatch[1];
-    
-    // Parse individual scores
-    const parseScore = (pattern: string): number => {
-      const match = scoresText.match(new RegExp(`${pattern}:\\s*(\\d+(?:\\.\\d+)?)`));
-      return match ? parseFloat(match[1]) : 0;
-    };
-    
-    const parseString = (pattern: string, text: string): string => {
-      const match = text.match(new RegExp(`${pattern}:\\s*(.+)`));
-      return match ? match[1].trim() : '';
-    };
-    
-    const parseList = (pattern: string, text: string): string[] => {
-      const match = text.match(new RegExp(`${pattern}:[\\s\\S]*?(?=\\n[A-Z]|$)`));
-      if (!match) return [];
-      return match[0]
-        .split('\n')
-        .slice(1)
-        .filter(line => line.trim().startsWith('-'))
-        .map(line => line.replace(/^-\s*/, '').trim());
-    };
-    
-    // Extract all scores using streamlined structure
-    const coreQuality = {
-      medicalAccuracy: parseScore('MEDICAL_ACCURACY'),
-      clinicalRealism: parseScore('CLINICAL_REALISM'),
-      stemCompleteness: parseScore('STEM_COMPLETENESS'),
-      difficultyCalibration: parseScore('DIFFICULTY_CALIBRATION')
-    };
-    
-    const technicalQuality = {
-      distractorQuality: parseScore('DISTRACTOR_QUALITY'),
-      cueingAbsence: parseScore('CUEING_ABSENCE'),
-      clarity: parseScore('CLARITY')
-    };
-    
-    const educationalValue = {
-      clinicalRelevance: parseScore('CLINICAL_RELEVANCE'),
-      educationalValue: parseScore('EDUCATIONAL_VALUE')
-    };
-    
-    // Calculate overall score (weighted average)
-    const coreAvg = Object.values(coreQuality).reduce((a, b) => a + b, 0) / 4;        // 50% weight
-    const technicalAvg = Object.values(technicalQuality).reduce((a, b) => a + b, 0) / 3; // 30% weight  
-    const educationalAvg = Object.values(educationalValue).reduce((a, b) => a + b, 0) / 2; // 20% weight
-    
-    const overall = (
-      coreAvg * 0.5 +         // 50% weight - core quality most important
-      technicalAvg * 0.3 +    // 30% weight - technical execution
-      educationalAvg * 0.2    // 20% weight - educational value
-    );
-    
-    // Parse feedback
-    const strengths = parseList('STRENGTHS', feedbackText);
-    const weaknesses = parseList('WEAKNESSES', feedbackText);
-    const improvements = parseList('IMPROVEMENTS', feedbackText);
-    
-    // Parse metadata (simplified)
-    const boardReadiness = parseString('BOARD_READINESS', scoresText) as any || 'minor_revision';
-
-    return {
-      overall: Math.round(overall),
-      clinicalRealism: coreQuality.clinicalRealism,
-      medicalAccuracy: coreQuality.medicalAccuracy,
-      distractorQuality: technicalQuality.distractorQuality,
-      cueingAbsence: technicalQuality.cueingAbsence,
-      coreQuality,
-      technicalQuality,
-      educationalValue,
-      detailedFeedback: {
-        strengths,
-        weaknesses,
-        improvementSuggestions: improvements
-      },
-      metadata: {
-        boardReadiness
-      }
-    };
-  } catch (error) {
-    logger.error('[AI_SCORER] Failed to parse evaluation response', { error });
-    return generateDefaultScores();
-  }
+  const strict = tryParseStrict(text);
+  if (strict) return strict;
+  const loose = tryParseLoose(text);
+  if (loose) return loose;
+  throw new Error('Invalid response format');
 }
 
-/**
- * Generate default scores if AI evaluation fails
- */
-function generateDefaultScores(): BoardStyleQualityScore {
+function tryParseStrict(text: string): BoardStyleQualityScore | null {
+  const scoresMatch = text.match(/===SCORES===([\s\S]*?)===FEEDBACK===/);
+  const feedbackMatch = text.match(/===FEEDBACK===([\s\S]*?)$/);
+  if (!scoresMatch || !feedbackMatch) {
+    return null;
+  }
+  const scoresText = scoresMatch[1];
+  const feedbackText = feedbackMatch[1];
+
+  const parseScore = (pattern: string): number => {
+    const match = scoresText.match(new RegExp(`${pattern}:\\s*(\\d+(?:\\.\\d+)?)`));
+    return match ? parseFloat(match[1]) : NaN;
+  };
+  const parseString = (pattern: string, textSection: string): string => {
+    const match = textSection.match(new RegExp(`${pattern}:\\s*(.+)`));
+    return match ? match[1].trim() : '';
+  };
+  const parseList = (pattern: string, textSection: string): string[] => {
+    const match = textSection.match(new RegExp(`${pattern}:[\\s\\S]*?(?=\\n[A-Z]|$)`));
+    if (!match) return [];
+    return match[0]
+      .split('\n')
+      .slice(1)
+      .filter(line => line.trim().startsWith('-'))
+      .map(line => line.replace(/^-\s*/, '').trim());
+  };
+
+  const coreQuality = {
+    medicalAccuracy: parseScore('MEDICAL_ACCURACY'),
+    clinicalRealism: parseScore('CLINICAL_REALISM'),
+    stemCompleteness: parseScore('STEM_COMPLETENESS'),
+    difficultyCalibration: parseScore('DIFFICULTY_CALIBRATION')
+  };
+  if (Object.values(coreQuality).some(isNaN)) return null;
+
+  const technicalQuality = {
+    distractorQuality: parseScore('DISTRACTOR_QUALITY'),
+    cueingAbsence: parseScore('CUEING_ABSENCE'),
+    clarity: parseScore('CLARITY')
+  };
+  if (Object.values(technicalQuality).some(isNaN)) return null;
+
+  const educationalValue = {
+    clinicalRelevance: parseScore('CLINICAL_RELEVANCE'),
+    educationalValue: parseScore('EDUCATIONAL_VALUE')
+  };
+  if (Object.values(educationalValue).some(isNaN)) return null;
+
+  const feedback = {
+    strengths: parseList('STRENGTHS', feedbackText),
+    weaknesses: parseList('WEAKNESSES', feedbackText),
+    improvementSuggestions: parseList('IMPROVEMENTS', feedbackText)
+  };
+  const boardReadiness = parseString('BOARD_READINESS', scoresText) as any || 'minor_revision';
+
+  return constructScore(coreQuality, technicalQuality, educationalValue, feedback, boardReadiness);
+}
+
+function tryParseLoose(text: string): BoardStyleQualityScore | null {
+  const parseScore = (pattern: string): number => {
+    const match = text.match(new RegExp(`${pattern}\\s*[:|-]\\s*(\\d+(?:\\.\\d+)?)`, 'i'));
+    return match ? parseFloat(match[1]) : NaN;
+  };
+  const parseString = (pattern: string): string => {
+    const match = text.match(new RegExp(`${pattern}\\s*[:|-]\\s*(.+)`, 'i'));
+    return match ? match[1].trim() : '';
+  };
+  const parseList = (pattern: string): string[] => {
+    const match = text.match(new RegExp(`${pattern}:[\\s\\S]*?(?=\n[A-Z]|$)`, 'i'));
+    if (!match) return [];
+    return match[0]
+      .split('\n')
+      .slice(1)
+      .filter(line => line.trim().startsWith('-'))
+      .map(line => line.replace(/^-\s*/, '').trim());
+  };
+
+  const coreQuality = {
+    medicalAccuracy: parseScore('MEDICAL_ACCURACY'),
+    clinicalRealism: parseScore('CLINICAL_REALISM'),
+    stemCompleteness: parseScore('STEM_COMPLETENESS'),
+    difficultyCalibration: parseScore('DIFFICULTY_CALIBRATION')
+  };
+  if (Object.values(coreQuality).some(isNaN)) return null;
+
+  const technicalQuality = {
+    distractorQuality: parseScore('DISTRACTOR_QUALITY'),
+    cueingAbsence: parseScore('CUEING_ABSENCE'),
+    clarity: parseScore('CLARITY')
+  };
+  if (Object.values(technicalQuality).some(isNaN)) return null;
+
+  const educationalValue = {
+    clinicalRelevance: parseScore('CLINICAL_RELEVANCE'),
+    educationalValue: parseScore('EDUCATIONAL_VALUE')
+  };
+  if (Object.values(educationalValue).some(isNaN)) return null;
+
+  const feedback = {
+    strengths: parseList('STRENGTHS'),
+    weaknesses: parseList('WEAKNESSES'),
+    improvementSuggestions: parseList('IMPROVEMENTS')
+  };
+  const boardReadiness = parseString('BOARD_READINESS') as any || 'minor_revision';
+
+  return constructScore(coreQuality, technicalQuality, educationalValue, feedback, boardReadiness);
+}
+
+function constructScore(
+  coreQuality: { medicalAccuracy: number; clinicalRealism: number; stemCompleteness: number; difficultyCalibration: number },
+  technicalQuality: { distractorQuality: number; cueingAbsence: number; clarity: number },
+  educationalValue: { clinicalRelevance: number; educationalValue: number },
+  feedback: { strengths: string[]; weaknesses: string[]; improvementSuggestions: string[] },
+  boardReadiness: 'ready' | 'minor_revision' | 'major_revision' | 'reject'
+): BoardStyleQualityScore {
+  const coreAvg = Object.values(coreQuality).reduce((a, b) => a + b, 0) / 4;
+  const technicalAvg = Object.values(technicalQuality).reduce((a, b) => a + b, 0) / 3;
+  const educationalAvg = Object.values(educationalValue).reduce((a, b) => a + b, 0) / 2;
+  const overall = coreAvg * 0.5 + technicalAvg * 0.3 + educationalAvg * 0.2;
+
   return {
-    overall: 50,
-    clinicalRealism: 50,
-    medicalAccuracy: 50,
-    distractorQuality: 50,
-    cueingAbsence: 50,
-    coreQuality: {
-      medicalAccuracy: 50,
-      clinicalRealism: 50,
-      stemCompleteness: 50,
-      difficultyCalibration: 50
-    },
-    technicalQuality: {
-      distractorQuality: 50,
-      cueingAbsence: 50,
-      clarity: 50
-    },
-    educationalValue: {
-      clinicalRelevance: 50,
-      educationalValue: 50
-    },
-    detailedFeedback: {
-      strengths: ['Question generated successfully'],
-      weaknesses: ['AI evaluation unavailable - requires manual review'],
-      improvementSuggestions: ['Review against ABD guidelines', 'Validate medical accuracy', 'Assess board-style compliance']
-    },
-    metadata: {
-      boardReadiness: 'minor_revision'
-    }
+    overall: Math.round(overall),
+    clinicalRealism: coreQuality.clinicalRealism,
+    medicalAccuracy: coreQuality.medicalAccuracy,
+    distractorQuality: technicalQuality.distractorQuality,
+    cueingAbsence: technicalQuality.cueingAbsence,
+    coreQuality,
+    technicalQuality,
+    educationalValue,
+    detailedFeedback: feedback,
+    metadata: { boardReadiness }
   };
 }

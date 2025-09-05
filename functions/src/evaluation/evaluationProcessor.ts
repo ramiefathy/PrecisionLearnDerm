@@ -321,15 +321,13 @@ export async function processBatchTestsLogic(
       }
 
       // Cancellation check before starting work
-      if (job.status === 'cancelled' || (job as any).cancelRequested) {
+      if ((job as any).cancelRequested) {
         await addLiveLog(jobId, {
           type: 'evaluation_cancelled',
           timestamp: new Date().toISOString(),
           message: '🛑 Evaluation cancelled by user before starting batch'
         });
-        if (job.status !== 'cancelled') {
-          await cancelJob(jobId, (job as any).cancellationReason || 'Cancelled by user');
-        }
+        await cancelJob(jobId, (job as any).cancellationReason || 'Cancelled by user');
         return { success: true, finished: true };
       }
       
