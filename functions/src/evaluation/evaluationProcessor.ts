@@ -1214,16 +1214,24 @@ async function finalizeEvaluation(
           successRate: 0,
           avgLatency: 0,
           avgQuality: 0,
-          testCount: 0
+          testCount: 0,
+          successCount: 0,
+          totalLatency: 0,
+          totalQuality: 0
         };
       }
-      
+
       byCategory[category].testCount++;
+      if (result.success) {
+        byCategory[category].successCount++;
+        byCategory[category].totalLatency += result.latency;
+        byCategory[category].totalQuality += result.quality;
+      }
     }
     
     // Calculate pipeline metrics
     for (const pipeline of Object.values(byPipeline) as any[]) {
-      pipeline.successRate = pipeline.totalTests > 0 
+      pipeline.successRate = pipeline.totalTests > 0
         ? pipeline.successCount / pipeline.totalTests : 0;
         
       const pipelineSuccesses = successfulTests.filter(r => r.testCase.pipeline === pipeline.pipeline);
@@ -1233,6 +1241,22 @@ async function finalizeEvaluation(
       pipeline.avgQuality = pipelineSuccesses.length > 0
         ? pipelineSuccesses.reduce((sum, r) => sum + r.quality, 0) / pipelineSuccesses.length
         : 0;
+    }
+
+    // Calculate category metrics
+    for (const category of Object.values(byCategory) as any[]) {
+      category.successRate = category.testCount > 0
+        ? category.successCount / category.testCount : 0;
+
+      category.avgLatency = category.successCount > 0
+        ? category.totalLatency / category.successCount : 0;
+      category.avgQuality = category.successCount > 0
+        ? category.totalQuality / category.successCount : 0;
+
+      // Cleanup temporary fields
+      delete category.successCount;
+      delete category.totalLatency;
+      delete category.totalQuality;
     }
     
     const finalResults = {
