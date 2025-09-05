@@ -34,7 +34,8 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
       const arr: ScoreSample[] = [];
       snap.forEach(doc => {
         const d: any = doc.data();
-        const ai = Number(d.aiScoresFlat?.overall ?? d.aiScores?.overall ?? 0);
+        const aiRaw = d.aiScoresFlat?.overall ?? d.aiScores?.overall;
+        const ai = aiRaw === undefined || aiRaw === null ? null : Number(aiRaw);
         const latency = Number(d.latency ?? 0);
         const ready = (
           d.aiScoresFlat?.boardReadiness ??
@@ -72,10 +73,13 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
       byPipeMap.get(s.pipeline)!.push(s);
     });
     const byPipeline: PipelineAggregate[] = [];
-    let overallCount = 0, overallAISum = 0, overallLatSum = 0;
+    let overallCount = 0, overallAISum = 0, overallAICount = 0, overallLatSum = 0;
     let overallReady = 0, overallMinor = 0, overallMajor = 0, overallReject = 0;
     byPipeMap.forEach((arr, pipeline) => {
-      const aiArr = arr.map(a => a.ai).filter(n => Number.isFinite(n)).sort((a,b)=>a-b);
+      const aiArr = arr
+        .map(a => a.ai)
+        .filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
+        .sort((a,b)=>a-b);
       const latArr = arr.map(a => a.latency).filter(n => Number.isFinite(n)).sort((a,b)=>a-b);
       const avgAI = aiArr.length ? aiArr.reduce((a,b)=>a+b,0)/aiArr.length : 0;
       const p50AI = quantile(aiArr, 0.5);
@@ -91,30 +95,32 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
         else if (s.ready === 'reject') readiness.reject++;
       });
       overallCount += arr.length;
-      overallAISum += avgAI * arr.length;
+      overallAISum += aiArr.reduce((a,b)=>a+b,0);
+      overallAICount += aiArr.length;
       overallLatSum += avgLatency * arr.length;
       overallReady += readiness.ready; overallMinor += readiness.minor; overallMajor += readiness.major; overallReject += readiness.reject;
       byPipeline.push({ pipeline, avgAI, p50AI, p90AI, avgLatency, p50Latency, p90Latency, testCount: arr.length, readiness });
     });
 
-    const topicDiffMap = new Map<string, { sumAI:number; sumLat:number; count:number; success:number }>();
+    const topicDiffMap = new Map<string, { sumAI:number; sumLat:number; count:number; success:number; aiCount:number }>();
     filtered.forEach(s => {
       const key = `${s.topic}||${s.difficulty}`;
-      if (!topicDiffMap.has(key)) topicDiffMap.set(key, { sumAI:0, sumLat:0, count:0, success:0 });
+      if (!topicDiffMap.has(key)) topicDiffMap.set(key, { sumAI:0, sumLat:0, count:0, success:0, aiCount:0 });
       const cell = topicDiffMap.get(key)!;
-      cell.sumAI += s.ai || 0; cell.sumLat += s.latency || 0; cell.count += 1;
+      if (typeof s.ai === 'number') { cell.sumAI += s.ai; cell.aiCount += 1; }
+      cell.sumLat += s.latency || 0; cell.count += 1;
       // Approximate success: ready or minor as success; tweak as needed
       if (s.ready === 'ready' || s.ready === 'minor_revision') cell.success += 1;
     });
     const topicDifficulty: TopicDifficultyCell[] = [];
     topicDiffMap.forEach((v, key) => {
       const [topic, difficulty] = key.split('||');
-      topicDifficulty.push({ topic, difficulty, successRate: v.count? v.success/v.count:0, ai: v.count? v.sumAI/v.count:0, latency: v.count? v.sumLat/v.count:0, count: v.count });
+      topicDifficulty.push({ topic, difficulty, successRate: v.count? v.success/v.count:0, ai: v.aiCount? v.sumAI/v.aiCount:0, latency: v.count? v.sumLat/v.count:0, count: v.count });
     });
 
     const overall: PipelineAggregate | null = overallCount ? {
       pipeline: 'overall',
-      avgAI: overallAISum/overallCount,
+      avgAI: overallAICount ? overallAISum/overallAICount : 0,
       p50AI: 0, // optional: compute across all
       p90AI: 0,
       avgLatency: overallLatSum/overallCount,
@@ -128,7 +134,10 @@ export function useEvaluationData(jobId: string, filters: EvaluationFilters): Ev
   }, [filtered]);
 
   const outliers = useMemo(() => {
-    const worstAI = [...filtered].sort((a,b)=> (a.ai)-(b.ai)).slice(0, 10);
+    const worstAI = filtered
+      .filter(s => typeof s.ai === 'number')
+      .sort((a,b)=> (a.ai as number)-(b.ai as number))
+      .slice(0, 10);
     const slowest = [...filtered].sort((a,b)=> (b.latency)-(a.latency)).slice(0, 10);
     return { worstAI, slowest };
   }, [filtered]);

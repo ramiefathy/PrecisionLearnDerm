@@ -36,7 +36,7 @@ export interface UserProfile {
 export type PipelineId = 'boardStyle' | 'optimizedOrchestrator' | 'hybridRouter' | string;
 
 export interface ScoreSample {
-  ai: number;
+  ai: number | null;
   latency: number;
   ready: string | null;
   createdAt: number;
