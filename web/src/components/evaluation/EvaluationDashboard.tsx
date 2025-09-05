@@ -212,32 +212,37 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   // Calculate aggregate metrics
   const calculateMetrics = () => {
     const successfulTests = testResults.filter(r => r.success);
-    const avgAIScore = successfulTests.reduce((sum, r) => 
-      sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0), 0) / (successfulTests.length || 1);
-    
+    const overallScores = successfulTests
+      .map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall)
+      .filter((v): v is number => v !== null && v !== undefined);
+    const avgAIScore = overallScores.reduce((sum, v) => sum + v, 0) / (overallScores.length || 1);
+
     const boardReadyCount = successfulTests.filter(r => {
       const br = r.aiScoresFlat?.boardReadiness ?? (r.aiScores as any)?.metadata?.boardReadiness ?? (r.aiScores as any)?.boardReadiness;
       return br === 'ready';
     }).length;
-    
-    const avgClinicalRealism = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
-    
-    const avgMedicalAccuracy = successfulTests.reduce((sum, r) => {
-      const val = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      return sum + val;
-    }, 0) / (successfulTests.length || 1);
+
+    const clinicalScores = successfulTests
+      .map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism)
+      .filter((v): v is number => v !== null && v !== undefined);
+    const avgClinicalRealism = clinicalScores.reduce((sum, v) => sum + v, 0) / (clinicalScores.length || 1);
+
+    const accuracyScores = successfulTests
+      .map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy)
+      .filter((v): v is number => v !== null && v !== undefined);
+    const avgMedicalAccuracy = accuracyScores.reduce((sum, v) => sum + v, 0) / (accuracyScores.length || 1);
 
     // Critical Min: minimum of core dimensions per test, averaged across tests
-    const criticalMinArr = successfulTests.map(r => {
-      const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0;
-      const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0;
-      const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0;
-      const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0;
-      return Math.min(cr, ma, dq, ca);
-    });
+    const criticalMinArr = successfulTests
+      .map(r => {
+        const cr = r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism;
+        const ma = r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy;
+        const dq = r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality;
+        const ca = r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence;
+        if ([cr, ma, dq, ca].some(v => v === null || v === undefined)) return null;
+        return Math.min(cr!, ma!, dq!, ca!);
+      })
+      .filter((v): v is number => v !== null);
     const avgCriticalMin = criticalMinArr.length ? (criticalMinArr.reduce((a,b)=>a+b,0)/criticalMinArr.length) : 0;
 
     // Calculate rule-based scores averages
@@ -288,35 +293,35 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       datasets: [
         {
           label: 'AI Overall (%)',
-          data: testResults.map(r => r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.overall ?? r.aiScores?.overall ?? null),
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.1
         },
         {
           label: 'Clinical Realism (%)',
-          data: testResults.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? null),
           borderColor: 'rgb(54, 162, 235)',
           backgroundColor: 'rgba(54, 162, 235, 0.2)',
           tension: 0.1
         },
         {
           label: 'Medical Accuracy (%)',
-          data: testResults.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? null),
           borderColor: 'rgb(255, 99, 132)',
           backgroundColor: 'rgba(255, 99, 132, 0.2)',
           tension: 0.1
         },
         {
           label: 'Distractor Quality (%)',
-          data: testResults.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? null),
           borderColor: 'rgb(255, 206, 86)',
           backgroundColor: 'rgba(255, 206, 86, 0.2)',
           tension: 0.1
         },
         {
           label: 'Cueing Absence (%)',
-          data: testResults.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? null),
           borderColor: 'rgb(153, 102, 255)',
           backgroundColor: 'rgba(153, 102, 255, 0.2)',
           tension: 0.1
@@ -328,12 +333,11 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const preparePipelineComparison = () => {
     const pipelines = [...new Set(testResults.map(r => r.testCase.pipeline))];
     const avgScoresByPipeline = pipelines.map(pipeline => {
-      const pipelineTests = testResults.filter(r => r.testCase.pipeline === pipeline);
-      return pipelineTests.reduce(
-        (sum, r) => sum + (r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
-        0
-      ) / 
-             (pipelineTests.length || 1);
+      const pipelineScores = testResults
+        .filter(r => r.testCase.pipeline === pipeline)
+        .map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall)
+        .filter((v): v is number => v !== null && v !== undefined);
+      return pipelineScores.reduce((sum, v) => sum + v, 0) / (pipelineScores.length || 1);
     });
 
     return {
@@ -416,7 +420,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       datasets: [
         {
           label: 'AI Score (%)',
-          data: testResults.map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? 0),
+          data: testResults.map(r => r.aiScoresFlat?.overall ?? (r.aiScores as any)?.overall ?? null),
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.1
@@ -903,9 +907,9 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                           const readiness = result.aiScoresFlat
                             ? result.aiScoresFlat.boardReadiness
                             : (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness ?? null;
-                          return (
+                          return readiness ? (
                             <Chip
-                              label={readiness ?? '—'}
+                              label={readiness}
                               size="small"
                               variant="outlined"
                               color={
@@ -915,11 +919,11 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                                     ? 'info'
                                     : readiness === 'major_revision'
                                       ? 'warning'
-                                      : readiness
-                                        ? 'error'
-                                        : 'default'
+                                      : 'error'
                               }
                             />
+                          ) : (
+                            <Chip label="AI evaluation unavailable" size="small" variant="outlined" />
                           );
                         })()}
                       </TableCell>
@@ -987,7 +991,12 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
             <Typography variant="subtitle2" color="text.secondary">
               Pipeline: {selectedQuestion.testCase.pipeline} | Topic: {selectedQuestion.testCase.topic} | 
               Difficulty: {selectedQuestion.testCase.difficulty} | 
-              AI Score: {selectedQuestion.aiScoresFlat?.overall ?? (selectedQuestion.aiScores as any)?.overall ?? 0}%
+              AI Score: {
+                (() => {
+                  const score = selectedQuestion.aiScoresFlat?.overall ?? (selectedQuestion.aiScores as any)?.overall;
+                  return score !== null && score !== undefined ? `${score}%` : 'N/A';
+                })()
+              }
             </Typography>
           )}
         </DialogTitle>
@@ -1120,17 +1129,35 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                     AI Quality Assessment:
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    <Chip label={`Overall: ${(selectedQuestion.aiScoresFlat?.overall ?? selectedQuestion.aiScores?.overall ?? 0)}%`} color="primary" />
-                    <Chip label={`Clinical Realism: ${(selectedQuestion.aiScoresFlat?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.coreQuality?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.clinicalRealism ?? 0)}%`} />
-                    <Chip label={`Medical Accuracy: ${(selectedQuestion.aiScoresFlat?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.coreQuality?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.medicalAccuracy ?? 0)}%`} />
-                    <Chip 
-                      label={`Board Ready: ${(selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness ?? 'N/A')}`}
-                      color={
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'ready' ? 'success' :
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'minor_revision' ? 'info' :
-                        (selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness) === 'major_revision' ? 'warning' : 'default'
-                      }
-                    />
+                    {(() => {
+                      const overall = selectedQuestion.aiScoresFlat?.overall ?? selectedQuestion.aiScores?.overall;
+                      return <Chip label={`Overall: ${overall != null ? `${overall}%` : 'N/A'}`} color="primary" />;
+                    })()}
+                    {(() => {
+                      const clinical = selectedQuestion.aiScoresFlat?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.coreQuality?.clinicalRealism ?? (selectedQuestion.aiScores as any)?.clinicalRealism;
+                      return <Chip label={`Clinical Realism: ${clinical != null ? `${clinical}%` : 'N/A'}`} />;
+                    })()}
+                    {(() => {
+                      const accuracy = selectedQuestion.aiScoresFlat?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.coreQuality?.medicalAccuracy ?? (selectedQuestion.aiScores as any)?.medicalAccuracy;
+                      return <Chip label={`Medical Accuracy: ${accuracy != null ? `${accuracy}%` : 'N/A'}`} />;
+                    })()}
+                    {(() => {
+                      const readiness = selectedQuestion.aiScoresFlat?.boardReadiness ?? (selectedQuestion.aiScores as any)?.metadata?.boardReadiness ?? (selectedQuestion.aiScores as any)?.boardReadiness;
+                      return (
+                        <Chip
+                          label={`Board Ready: ${readiness ?? 'AI evaluation unavailable'}`}
+                          color={
+                            readiness === 'ready'
+                              ? 'success'
+                              : readiness === 'minor_revision'
+                                ? 'info'
+                                : readiness === 'major_revision'
+                                  ? 'warning'
+                                  : 'default'
+                          }
+                        />
+                      );
+                    })()}
                   </Box>
                 </>
               )}
