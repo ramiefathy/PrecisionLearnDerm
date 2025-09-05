@@ -859,10 +859,10 @@ async function storeTestResult(
     const aiScoresFlat = {
       overall: ai?.overall ?? null,
       boardReadiness: ai?.metadata?.boardReadiness ?? ai?.boardReadiness ?? null,
-      clinicalRealism: ai?.coreQuality?.clinicalRealism ?? ai?.clinicalRealism ?? null,
-      medicalAccuracy: ai?.coreQuality?.medicalAccuracy ?? ai?.medicalAccuracy ?? null,
-      distractorQuality: ai?.technicalQuality?.distractorQuality ?? ai?.distractorQuality ?? null,
-      cueingAbsence: ai?.technicalQuality?.cueingAbsence ?? ai?.cueingAbsence ?? null
+      clinicalRealism: ai?.clinicalRealism ?? ai?.coreQuality?.clinicalRealism ?? null,
+      medicalAccuracy: ai?.medicalAccuracy ?? ai?.coreQuality?.medicalAccuracy ?? null,
+      distractorQuality: ai?.distractorQuality ?? ai?.technicalQuality?.distractorQuality ?? null,
+      cueingAbsence: ai?.cueingAbsence ?? ai?.technicalQuality?.cueingAbsence ?? null
     };
 
     // Concise trace for insight (no streaming required)

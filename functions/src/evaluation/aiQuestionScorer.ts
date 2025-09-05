@@ -10,6 +10,10 @@ import { config } from '../util/config';
 
 export interface BoardStyleQualityScore {
   overall: number; // 0-100 percentage score
+  clinicalRealism: number; // Flattened convenience fields
+  medicalAccuracy: number;
+  distractorQuality: number;
+  cueingAbsence: number;
   coreQuality: {
     medicalAccuracy: number; // 0-100 Medical correctness and current guidelines
     clinicalRealism: number; // 0-100 Realistic board-style scenario with proper ABD format
@@ -257,9 +261,13 @@ function parseEvaluationResponse(text: string): BoardStyleQualityScore {
     
     // Parse metadata (simplified)
     const boardReadiness = parseString('BOARD_READINESS', scoresText) as any || 'minor_revision';
-    
+
     return {
       overall: Math.round(overall),
+      clinicalRealism: coreQuality.clinicalRealism,
+      medicalAccuracy: coreQuality.medicalAccuracy,
+      distractorQuality: technicalQuality.distractorQuality,
+      cueingAbsence: technicalQuality.cueingAbsence,
       coreQuality,
       technicalQuality,
       educationalValue,
@@ -284,6 +292,10 @@ function parseEvaluationResponse(text: string): BoardStyleQualityScore {
 function generateDefaultScores(): BoardStyleQualityScore {
   return {
     overall: 50,
+    clinicalRealism: 50,
+    medicalAccuracy: 50,
+    distractorQuality: 50,
+    cueingAbsence: 50,
     coreQuality: {
       medicalAccuracy: 50,
       clinicalRealism: 50,
