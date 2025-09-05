@@ -5,7 +5,7 @@ import type { Timestamp } from 'firebase/firestore';
 export interface UserProfile {
   displayName: string;
   email: string;
-  createdAt: Timestamp | any;
+  createdAt: Timestamp | number;
   role?: 'admin' | 'user';
   isAdmin?: boolean;
   preferences: {
@@ -28,7 +28,7 @@ export interface UserProfile {
     weakTopics: string[];
     strongTopics: string[];
     studyStreak: number;
-    lastStudied: Timestamp | any;
+    lastStudied: Timestamp | number;
   };
 }
 
@@ -92,13 +92,7 @@ export interface QuestionItem {
   difficulty: number;
   tags: string[];
   status?: 'draft' | 'review' | 'approved' | 'rejected' | 'retired';
-  metadata?: {
-    source?: string;
-    created?: Timestamp;
-    updated?: Timestamp;
-    author?: string;
-    version?: number;
-  };
+  metadata?: Record<string, unknown>;
   qualityMetrics?: {
     overallScore: number;
     clinicalRelevance: number;
@@ -170,7 +164,7 @@ export interface AppActions {
 }
 
 // API Response types
-export interface APIResponse<T = any> {
+export interface APIResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -203,7 +197,7 @@ export interface NextItemRequest {
   };
   excludeIds?: string[];
   limit?: number; // Add optional limit field
-  [key: string]: any; // Allow additional fields for backward compatibility
+  [key: string]: unknown; // Allow additional fields for backward compatibility
 }
 
 export interface NextItemResponse extends APIResponse {
@@ -226,7 +220,7 @@ export interface RecordAnswerRequest {
   timeToAnswer?: number; // Add alternative field name for timeSpent
   timeToAnswerSec?: number; // Add field from existing usage
   correctIndex?: number; // Add field from existing usage
-  topicIds?: any; // Add field from existing usage
+  topicIds?: string[]; // Add field from existing usage
   confidence?: 'Low' | 'Medium' | 'High'; // Add missing field from existing usage
   sessionType?: 'quiz' | 'flashcard' | 'mock_exam'; // Add missing field from existing usage
   sessionData?: {
@@ -237,7 +231,7 @@ export interface RecordAnswerRequest {
     sessionTitle?: string;
   };
   // Index signature for backward compatibility with additional fields
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SRSUpdateRequest {
@@ -272,7 +266,7 @@ export interface QualityFeedbackRequest {
   reportedIssues?: string[];
   feedbackText?: string;
   // Index signature for backward compatibility with additional fields
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface QualityReviewItem {
@@ -376,8 +370,8 @@ export interface TaxonomyItem {
 export interface ActivityLogRequest {
   userId: string;
   action: string;
-  context?: any;
-  metadata?: Record<string, any>;
+  context?: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ActivitySummaryResponse extends APIResponse {
@@ -547,10 +541,14 @@ export type DeepPartial<T> = {
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 // Advanced backward compatibility types
-export type BackwardCompatible<T> = T & { [key: string]: any };
+export type BackwardCompatible<T> = T & Record<string, unknown>;
 
-export type FlexibleRequest<T, OptionalKeys extends keyof T = never> = 
-  Omit<T, OptionalKeys> & Partial<Pick<T, OptionalKeys>> & { [key: string]: any };
+export type FlexibleRequest<
+  T,
+  OptionalKeys extends keyof T = never
+> = Omit<T, OptionalKeys> &
+  Partial<Pick<T, OptionalKeys>> &
+  Record<string, unknown>;
 
 // Legacy-compatible versions of request types
 export type LegacyQualityFeedbackRequest = FlexibleRequest<
@@ -594,47 +592,50 @@ export interface StrictRecordAnswerRequest {
 }
 
 // Type guards and validators
-export function isQuestionItem(obj: any): obj is QuestionItem {
-  return obj && 
-    typeof obj.id === 'string' &&
-    typeof obj.question === 'string' &&
-    Array.isArray(obj.options) &&
-    typeof obj.correctIndex === 'number' &&
-    typeof obj.explanation === 'string';
+export function isQuestionItem(obj: unknown): obj is QuestionItem {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const q = obj as Partial<QuestionItem>;
+  return typeof q.id === 'string' &&
+    typeof q.question === 'string' &&
+    Array.isArray(q.options) &&
+    typeof q.correctIndex === 'number' &&
+    typeof q.explanation === 'string';
 }
 
-export function isUserProfile(obj: any): obj is UserProfile {
-  return obj &&
-    typeof obj.displayName === 'string' &&
-    typeof obj.email === 'string' &&
-    obj.preferences &&
-    obj.stats;
+export function isUserProfile(obj: unknown): obj is UserProfile {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const u = obj as Partial<UserProfile>;
+  return typeof u.displayName === 'string' &&
+    typeof u.email === 'string' &&
+    typeof u.preferences === 'object' && u.preferences !== undefined &&
+    typeof u.stats === 'object' && u.stats !== undefined;
 }
 
-export function isValidQualityFeedbackRequest(obj: any): obj is QualityFeedbackRequest {
-  return obj &&
-    typeof obj.itemId === 'string' &&
-    (obj.rating === undefined || (typeof obj.rating === 'number' && obj.rating >= 1 && obj.rating <= 5)) &&
-    (obj.questionQuality === undefined || (typeof obj.questionQuality === 'number' && obj.questionQuality >= 1 && obj.questionQuality <= 5)) &&
-    (obj.explanationQuality === undefined || (typeof obj.explanationQuality === 'number' && obj.explanationQuality >= 1 && obj.explanationQuality <= 5));
+export function isValidQualityFeedbackRequest(obj: unknown): obj is QualityFeedbackRequest {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const q = obj as Partial<QualityFeedbackRequest>;
+  return typeof q.itemId === 'string' &&
+    (q.rating === undefined || (typeof q.rating === 'number' && q.rating >= 1 && q.rating <= 5)) &&
+    (q.questionQuality === undefined || (typeof q.questionQuality === 'number' && q.questionQuality >= 1 && q.questionQuality <= 5)) &&
+    (q.explanationQuality === undefined || (typeof q.explanationQuality === 'number' && q.explanationQuality >= 1 && q.explanationQuality <= 5));
 }
 
-export function isValidRecordAnswerRequest(obj: any): obj is RecordAnswerRequest {
-  return obj &&
-    typeof obj.itemId === 'string' &&
-    (typeof obj.answer === 'number' || typeof obj.chosenIndex === 'number' || obj.answer === undefined) &&
-    (typeof obj.timeSpent === 'number' || typeof obj.timeToAnswer === 'number' || typeof obj.timeToAnswerSec === 'number' || obj.timeSpent === undefined);
+export function isValidRecordAnswerRequest(obj: unknown): obj is RecordAnswerRequest {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const r = obj as Partial<RecordAnswerRequest>;
+  return typeof r.itemId === 'string' &&
+    (typeof r.answer === 'number' || typeof r.chosenIndex === 'number' || r.answer === undefined) &&
+    (typeof r.timeSpent === 'number' || typeof r.timeToAnswer === 'number' || typeof r.timeToAnswerSec === 'number' || r.timeSpent === undefined);
 }
 
 // Transformation utilities for backward compatibility
-export function normalizeQualityFeedbackRequest(data: any): StrictQualityFeedbackRequest {
+export function normalizeQualityFeedbackRequest(data: unknown): StrictQualityFeedbackRequest {
   if (!isValidQualityFeedbackRequest(data)) {
     throw new Error('Invalid quality feedback request data');
   }
-  
-  // Provide defaults for required fields
+
   const rating = data.rating ?? data.questionQuality ?? data.explanationQuality ?? 3;
-  
+
   return {
     itemId: data.itemId,
     userId: data.userId || 'anonymous',
@@ -646,15 +647,15 @@ export function normalizeQualityFeedbackRequest(data: any): StrictQualityFeedbac
   };
 }
 
-export function normalizeRecordAnswerRequest(data: any): StrictRecordAnswerRequest {
+export function normalizeRecordAnswerRequest(data: unknown): StrictRecordAnswerRequest {
   if (!isValidRecordAnswerRequest(data)) {
     throw new Error('Invalid record answer request data');
   }
-  
+
   const chosenIndex = data.chosenIndex ?? data.answer ?? 0;
   const timeSpent = data.timeToAnswerSec ?? data.timeToAnswer ?? data.timeSpent ?? 0;
   const correctAnswer = data.correctAnswer ?? data.correctIndex ?? 0;
-  
+
   return {
     userId: data.userId || 'anonymous',
     itemId: data.itemId,
@@ -663,7 +664,7 @@ export function normalizeRecordAnswerRequest(data: any): StrictRecordAnswerReque
     timeSpent,
     correct: data.correct ?? (chosenIndex === correctAnswer),
     chosenIndex,
-    confidence: data.confidence as 'Low' | 'Medium' | 'High' | undefined,
+    confidence: data.confidence,
     sessionType: data.sessionType,
     sessionData: data.sessionData ? {
       totalQuestions: data.sessionData.totalQuestions ?? 0,
@@ -681,7 +682,7 @@ export type QualityFeedbackInput = QualityFeedbackRequest | LegacyQualityFeedbac
   rating: number;
   questionQuality?: number;
   explanationQuality?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type RecordAnswerInput = RecordAnswerRequest | LegacyRecordAnswerRequest | {
@@ -691,5 +692,5 @@ export type RecordAnswerInput = RecordAnswerRequest | LegacyRecordAnswerRequest 
   timeSpent?: number;
   timeToAnswer?: number;
   correctAnswer?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };
