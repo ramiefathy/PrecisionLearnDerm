@@ -844,7 +844,9 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         {selectedTab === 6 && (
           <Box>
             <TimelinePanel
-              aiSeries={aggSamples.map(s=> ({ x: s.createdAt, y: s.ai }))}
+              aiSeries={aggSamples
+                .filter(s=> typeof s.ai === 'number')
+                .map(s=> ({ x: s.createdAt, y: s.ai as number }))}
               latencySeries={aggSamples.map(s=> ({ x: s.createdAt, y: s.latency }))}
             />
           </Box>

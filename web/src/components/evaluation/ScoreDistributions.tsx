@@ -29,7 +29,7 @@ export function ScoreDistributions({ samples }:{ samples: ScoreSample[] }){
     };
     samples.forEach(s => {
       const val = metric==='ai' ? s.ai : s.latency;
-      if (!Number.isFinite(val)) return;
+      if (typeof val !== 'number' || !Number.isFinite(val)) return;
       if (!map.has(s.pipeline)) map.set(s.pipeline, Array(labels.length).fill(0));
       const idx = binIndex(val);
       map.get(s.pipeline)![idx] += 1;

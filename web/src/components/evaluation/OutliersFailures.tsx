@@ -21,15 +21,15 @@ export function OutliersFailures({ worstAI, slowest, failures, onOpen }:{ worstA
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Lowest AI Scores</Typography>
-            {renderList(worstAI, s=>`AI ${s.ai.toFixed(1)}% • ${(s.latency/1000).toFixed(1)}s`)}
+            {renderList(worstAI, s=>`AI ${s.ai !== null ? s.ai.toFixed(1) : 'N/A'}% • ${(s.latency/1000).toFixed(1)}s`)}
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Slowest Latency</Typography>
-            {renderList(slowest, s=>`${(s.latency/1000).toFixed(1)}s • AI ${s.ai.toFixed(1)}%`)}
+            {renderList(slowest, s=>`${(s.latency/1000).toFixed(1)}s • AI ${s.ai !== null ? s.ai.toFixed(1) : 'N/A'}%`)}
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle2">Failures (Major/Reject)</Typography>
-            {renderList(failures, s=>`${s.ready ?? 'N/A'} • AI ${s.ai.toFixed(1)}% • ${(s.latency/1000).toFixed(1)}s`)}
+            {renderList(failures, s=>`${s.ready ?? 'N/A'} • AI ${s.ai !== null ? s.ai.toFixed(1) : 'N/A'}% • ${(s.latency/1000).toFixed(1)}s`)}
           </Grid>
         </Grid>
       </CardContent>
