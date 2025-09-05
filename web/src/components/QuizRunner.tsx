@@ -81,12 +81,15 @@ export function QuizRunner() {
   // Attempt accumulation in memory
   const [attemptItems, setAttemptItems] = useState<StoredQuestionAttempt[]>([]);
 
+  useEffect(() => {
+    if (activeQuiz?.config?.numQuestions) {
+      setTotalQuestions(activeQuiz.config.numQuestions);
+    }
+  }, [activeQuiz]);
+
   const loadNext = useCallback(async () => {
     setLoading(true);
     try {
-      if (activeQuiz?.config?.numQuestions && totalQuestions === 1 && questionIndex === 0) {
-        setTotalQuestions(activeQuiz.config.numQuestions);
-      }
       const personalizedResult: { questions?: Array<FullItem & { personalQuestionId: string; personalizedFor?: string; gapTargeted?: { gapType: string }; focusArea?: string; difficulty?: number; stem?: string; leadIn?: string }> } =
         await api.pe.getPersonalizedQuestions({ limit: 1 });
 
@@ -110,19 +113,36 @@ export function QuizRunner() {
         const nextItemRequest: NextItemRequest = {};
 
         if (activeQuiz?.config?.taxonomyFilter) {
-          nextItemRequest.taxonomyFilter = activeQuiz.config.taxonomyFilter;
-        } else if (activeQuiz?.config?.topicIds?.length && activeQuiz.config.topicIds.length > 0) {
+          if (Array.isArray(activeQuiz.config.taxonomyFilter)) {
+            const first = activeQuiz.config.taxonomyFilter[0];
+            if (first) {
+              const subcategory = first.subcategories?.[0];
+              const subSubcategory = subcategory ? first.subSubcategories?.[subcategory]?.[0] : undefined;
+              nextItemRequest.taxonomyFilter = {
+                category: first.category,
+                subcategory,
+                subSubcategory,
+              };
+            }
+          } else {
+            nextItemRequest.taxonomyFilter = activeQuiz.config.taxonomyFilter;
+          }
+        } else if (activeQuiz?.config?.topicIds?.length) {
           nextItemRequest.topicIds = activeQuiz.config.topicIds;
         }
 
         const res = await api.pe.nextItem(nextItemRequest);
-        if (res && res.itemId) {
-          const full = await api.items.get(res.itemId);
+        if (res?.item) {
+          const full = res.item as unknown as (FullItem & { id: string; difficulty?: number; question?: string });
           setItem({
-            itemId: res.itemId,
+            itemId: full.id,
             isPersonalized: false,
-            preview: res.preview,
-            fullItem: full as FullItem,
+            preview: {
+              difficulty: full.difficulty,
+              stem: full.stem ?? full.question,
+              leadIn: full.leadIn,
+            },
+            fullItem: full,
           });
         } else {
           setItem(null);
@@ -145,7 +165,7 @@ export function QuizRunner() {
     } finally {
       setLoading(false);
     }
-  }, [activeQuiz, questionIndex, totalQuestions]);
+  }, [activeQuiz]);
 
   useEffect(() => {
     loadNext();
@@ -217,10 +237,10 @@ export function QuizRunner() {
 
       if (!correct && !item.isPersonalized && !adaptiveTriggered) {
         try {
-          const adaptiveResult: SubmissionResponse = await api.pe.triggerAdaptiveGeneration({
+          const adaptiveResult = await api.pe.triggerAdaptiveGeneration({
             missedQuestionId: item.itemId,
             userSpecifiedFocus: item.gapTargeted?.gapType || undefined,
-          });
+          }) as SubmissionResponse;
 
           if (adaptiveResult.questionsGenerated && adaptiveResult.questionsGenerated > 0) {
             toast.success(

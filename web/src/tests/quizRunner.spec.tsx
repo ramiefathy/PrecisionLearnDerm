@@ -7,13 +7,22 @@ vi.mock('../lib/api', () => ({
   api: {
     pe: {
       getPersonalizedQuestions: vi.fn().mockResolvedValue({ questions: [] }),
-      nextItem: vi.fn().mockResolvedValue({ itemId: 'x1', preview: { difficulty: 0.5, stem: 'S', leadIn: 'L' } }),
+      nextItem: vi.fn().mockResolvedValue({
+        item: {
+          id: 'x1',
+          stem: 'S',
+          leadIn: 'L',
+          options: [{ text: 'A' }, { text: 'B' }],
+          keyIndex: 0,
+          explanation: 'E',
+          topicIds: [],
+          difficulty: 0.5,
+        }
+      }),
       recordAnswer: vi.fn().mockResolvedValue({ success: true }),
       triggerAdaptiveGeneration: vi.fn().mockResolvedValue({ success: true, questionsGenerated: 0 })
     },
-    items: {
-      get: vi.fn().mockResolvedValue({ stem: 'S', leadIn: 'L', options: [{ text: 'A' }, { text: 'B' }], keyIndex: 0, explanation: 'E', topicIds: [] })
-    }
+    items: {}
   }
 }));
 
@@ -22,7 +31,8 @@ vi.mock('../components/QuestionFeedback', () => ({ default: () => null }));
 vi.mock('../components/Toast', () => ({ toast: { success: () => {}, error: () => {} } }));
 vi.mock('../lib/markdown', () => ({ renderSafeMarkdown: (s: string) => s }));
 vi.mock('../app/store', () => ({
-  useAppStore: (selector: any) => selector({ activeQuiz: { config: { numQuestions: 1 } } })
+  useAppStore: (selector: (state: unknown) => unknown) =>
+    selector({ activeQuiz: { config: { numQuestions: 1 } } })
 }));
 
 vi.mock('firebase/firestore', () => ({ addDoc: vi.fn(), collection: vi.fn() }));
