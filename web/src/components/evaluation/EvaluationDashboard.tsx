@@ -861,32 +861,67 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                       <TableCell>{result.testCase.topic}</TableCell>
                       <TableCell>{result.testCase.difficulty}</TableCell>
                       <TableCell align="center">
-                        <Chip 
-                          label={`${(result.aiScoresFlat?.overall ?? result.aiScores?.overall ?? 0)}%`}
-                          size="small"
-                          color={
-                            ((result.aiScoresFlat?.overall ?? result.aiScores?.overall ?? 0) as number) >= 70 ? 'success' :
-                            ((result.aiScoresFlat?.overall ?? result.aiScores?.overall ?? 0) as number) >= 50 ? 'warning' : 'error'
-                          }
-                        />
+                        {(() => {
+                          const overall = result.aiScoresFlat
+                            ? result.aiScoresFlat.overall
+                            : (result.aiScores as any)?.overall ?? null;
+                          return (
+                            <Chip
+                              label={overall !== null && overall !== undefined ? `${overall}%` : '—'}
+                              size="small"
+                              color={
+                                overall !== null && overall !== undefined
+                                  ? overall >= 70
+                                    ? 'success'
+                                    : overall >= 50
+                                      ? 'warning'
+                                      : 'error'
+                                  : 'default'
+                              }
+                            />
+                          );
+                        })()}
                       </TableCell>
                       <TableCell align="center">
-                        <Chip 
-                          label={(result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness ?? 'N/A')}
-                          size="small"
-                          variant="outlined"
-                          color={
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'ready' ? 'success' :
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'minor_revision' ? 'info' :
-                            (result.aiScoresFlat?.boardReadiness ?? (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness) === 'major_revision' ? 'warning' : 'error'
-                          }
-                        />
+                        {(() => {
+                          const readiness = result.aiScoresFlat
+                            ? result.aiScoresFlat.boardReadiness
+                            : (result.aiScores as any)?.metadata?.boardReadiness ?? (result.aiScores as any)?.boardReadiness ?? null;
+                          return (
+                            <Chip
+                              label={readiness ?? '—'}
+                              size="small"
+                              variant="outlined"
+                              color={
+                                readiness === 'ready'
+                                  ? 'success'
+                                  : readiness === 'minor_revision'
+                                    ? 'info'
+                                    : readiness === 'major_revision'
+                                      ? 'warning'
+                                      : readiness
+                                        ? 'error'
+                                        : 'default'
+                              }
+                            />
+                          );
+                        })()}
                       </TableCell>
                       <TableCell align="center">
-                        {(result.aiScoresFlat?.clinicalRealism ?? (result.aiScores as any)?.coreQuality?.clinicalRealism ?? (result.aiScores as any)?.clinicalRealism ?? 0)}%
+                        {(() => {
+                          const clinical = result.aiScoresFlat
+                            ? result.aiScoresFlat.clinicalRealism
+                            : (result.aiScores as any)?.coreQuality?.clinicalRealism ?? (result.aiScores as any)?.clinicalRealism ?? null;
+                          return clinical !== null && clinical !== undefined ? `${clinical}%` : '—';
+                        })()}
                       </TableCell>
                       <TableCell align="center">
-                        {(result.aiScoresFlat?.medicalAccuracy ?? (result.aiScores as any)?.coreQuality?.medicalAccuracy ?? (result.aiScores as any)?.medicalAccuracy ?? 0)}%
+                        {(() => {
+                          const accuracy = result.aiScoresFlat
+                            ? result.aiScoresFlat.medicalAccuracy
+                            : (result.aiScores as any)?.coreQuality?.medicalAccuracy ?? (result.aiScores as any)?.medicalAccuracy ?? null;
+                          return accuracy !== null && accuracy !== undefined ? `${accuracy}%` : '—';
+                        })()}
                       </TableCell>
                       <TableCell align="center">
                         {(result.latency / 1000).toFixed(1)}
