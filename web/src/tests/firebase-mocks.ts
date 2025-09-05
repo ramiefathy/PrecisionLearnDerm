@@ -1,9 +1,28 @@
 import { vi } from 'vitest';
 
+interface MockTokenResult {
+  token: string;
+  claims: Record<string, unknown>;
+}
+
+export interface MockUser {
+  uid: string;
+  email: string;
+  displayName?: string;
+  emailVerified?: boolean;
+  getIdToken: () => Promise<string>;
+  getIdTokenResult: () => Promise<MockTokenResult>;
+}
+
+type AuthStateCallback = (user: MockUser | null) => void;
+
+const authStateCallbacks: AuthStateCallback[] = [];
+
 // Mock Firebase Auth
 export const mockAuth = {
-  currentUser: null,
-  onAuthStateChanged: vi.fn((callback) => {
+  currentUser: null as MockUser | null,
+  onAuthStateChanged: vi.fn((callback: AuthStateCallback) => {
+    authStateCallbacks.push(callback);
     callback(null);
     return vi.fn(); // unsubscribe function
   }),
@@ -41,14 +60,14 @@ export const mockFirestore = {
       set: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
-      onSnapshot: vi.fn((callback) => {
-        callback({
-          exists: () => true,
-          data: () => ({ id: 'test-doc', name: 'Test Document' }),
-          id: 'test-doc'
-        });
-        return vi.fn(); // unsubscribe function
-      })
+    onSnapshot: vi.fn((callback: (snap: unknown) => void) => {
+      callback({
+        exists: () => true,
+        data: () => ({ id: 'test-doc', name: 'Test Document' }),
+        id: 'test-doc'
+      });
+      return vi.fn(); // unsubscribe function
+    })
     })),
     add: vi.fn().mockResolvedValue({ id: 'new-doc-id' }),
     get: vi.fn().mockResolvedValue({
@@ -66,7 +85,7 @@ export const mockFirestore = {
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
-    onSnapshot: vi.fn((callback) => {
+    onSnapshot: vi.fn((callback: (snap: unknown) => void) => {
       callback({
         docs: [
           {
@@ -127,15 +146,15 @@ vi.mock('firebase/app', () => ({
 
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => mockAuth),
-  onAuthStateChanged: vi.fn((_auth, callback) => mockAuth.onAuthStateChanged(callback)),
-  signInWithEmailAndPassword: vi.fn((_auth, email, password) =>
+  onAuthStateChanged: vi.fn((_auth: unknown, callback: AuthStateCallback) => mockAuth.onAuthStateChanged(callback)),
+  signInWithEmailAndPassword: vi.fn((_auth: unknown, email: string, password: string) =>
     mockAuth.signInWithEmailAndPassword(email, password)
   ),
-  createUserWithEmailAndPassword: vi.fn((_auth, email, password) =>
+  createUserWithEmailAndPassword: vi.fn((_auth: unknown, email: string, password: string) =>
     mockAuth.createUserWithEmailAndPassword(email, password)
   ),
-  signOut: vi.fn((_auth) => mockAuth.signOut()),
-  sendPasswordResetEmail: vi.fn((_auth, email) => mockAuth.sendPasswordResetEmail(email)),
+  signOut: vi.fn((_auth: unknown) => mockAuth.signOut()),
+  sendPasswordResetEmail: vi.fn((_auth: unknown, email: string) => mockAuth.sendPasswordResetEmail(email)),
   setPersistence: vi.fn().mockResolvedValue(undefined),
   browserLocalPersistence: {}
 }));
@@ -143,43 +162,43 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => mockFirestore),
   connectFirestoreEmulator: vi.fn(),
-  collection: vi.fn((_db, path) => mockFirestore.collection(path)),
-  doc: vi.fn((_db, path) => mockFirestore.doc(path)),
-  getDoc: vi.fn((docRef) => docRef.get()),
-  getDocs: vi.fn((collectionRef) => collectionRef.get()),
-  setDoc: vi.fn((docRef, data) => docRef.set(data)),
-  updateDoc: vi.fn((docRef, data) => docRef.update(data)),
-  deleteDoc: vi.fn((docRef) => docRef.delete()),
-  addDoc: vi.fn((collectionRef, data) => collectionRef.add(data)),
-  query: vi.fn((ref, ..._constraints) => ref),
-  where: vi.fn((field, op, value) => ({ field, op, value })),
-  orderBy: vi.fn((field, direction) => ({ field, direction })),
-  limit: vi.fn((num) => ({ limit: num })),
-  onSnapshot: vi.fn((ref, callback) => ref.onSnapshot(callback)),
-  runTransaction: vi.fn((_db, updateFunction) => 
+  collection: vi.fn((_db: unknown, path: string) => mockFirestore.collection(path)),
+  doc: vi.fn((_db: unknown, path: string) => mockFirestore.doc(path)),
+  getDoc: vi.fn((docRef: { get: () => unknown }) => docRef.get()),
+  getDocs: vi.fn((collectionRef: { get: () => unknown }) => collectionRef.get()),
+  setDoc: vi.fn((docRef: { set: (data: unknown) => unknown }, data: unknown) => docRef.set(data)),
+  updateDoc: vi.fn((docRef: { update: (data: unknown) => unknown }, data: unknown) => docRef.update(data)),
+  deleteDoc: vi.fn((docRef: { delete: () => unknown }) => docRef.delete()),
+  addDoc: vi.fn((collectionRef: { add: (data: unknown) => unknown }, data: unknown) => collectionRef.add(data)),
+  query: vi.fn((ref: unknown, ..._constraints: unknown[]) => ref),
+  where: vi.fn((field: string, op: unknown, value: unknown) => ({ field, op, value })),
+  orderBy: vi.fn((field: string, direction: unknown) => ({ field, direction })),
+  limit: vi.fn((num: number) => ({ limit: num })),
+  onSnapshot: vi.fn((ref: { onSnapshot: (cb: unknown) => unknown }, callback: unknown) => ref.onSnapshot(callback)),
+  runTransaction: vi.fn((_db: unknown, updateFunction: unknown) =>
     mockFirestore.runTransaction(updateFunction)
   ),
-  writeBatch: vi.fn((_db) => mockFirestore.batch())
+  writeBatch: vi.fn((_db: unknown) => mockFirestore.batch())
 }));
 
 vi.mock('firebase/functions', () => ({
   getFunctions: vi.fn(() => mockFunctions),
-  httpsCallable: vi.fn((_functions, name) => mockFunctions.httpsCallable(name))
+  httpsCallable: vi.fn((_functions: unknown, name: string) => mockFunctions.httpsCallable(name))
 }));
 
 vi.mock('firebase/analytics', () => ({
   getAnalytics: vi.fn(() => mockAnalytics),
-  logEvent: vi.fn((_analytics, eventName, eventParams) => 
+  logEvent: vi.fn((_analytics: unknown, eventName: string, eventParams: Record<string, unknown>) =>
     mockAnalytics.logEvent(eventName, eventParams)
   ),
-  setUserId: vi.fn((_analytics, userId) => mockAnalytics.setUserId(userId)),
-  setUserProperties: vi.fn((_analytics, properties) => 
+  setUserId: vi.fn((_analytics: unknown, userId: string) => mockAnalytics.setUserId(userId)),
+  setUserProperties: vi.fn((_analytics: unknown, properties: Record<string, unknown>) =>
     mockAnalytics.setUserProperties(properties)
   )
 }));
 
 // Test utilities
-export const createMockUser = (overrides = {}) => ({
+export const createMockUser = (overrides: Partial<MockUser> = {}): MockUser => ({
   uid: 'test-uid',
   email: 'test@example.com',
   displayName: 'Test User',
@@ -187,25 +206,25 @@ export const createMockUser = (overrides = {}) => ({
   getIdToken: vi.fn().mockResolvedValue('mock-token'),
   getIdTokenResult: vi.fn().mockResolvedValue({
     token: 'mock-token',
-    claims: {}
+    claims: {},
   }),
-  ...overrides
+  ...overrides,
 });
 
-export const createMockAdminUser = () => createMockUser({
-  uid: 'admin-uid',
-  email: 'admin@example.com',
-  getIdTokenResult: vi.fn().mockResolvedValue({
-    token: 'mock-admin-token',
-    claims: { admin: true }
-  })
-});
+export const createMockAdminUser = (): MockUser =>
+  createMockUser({
+    uid: 'admin-uid',
+    email: 'admin@example.com',
+    getIdTokenResult: vi.fn().mockResolvedValue({
+      token: 'mock-admin-token',
+      claims: { admin: true },
+    }),
+  });
 
-export const setMockCurrentUser = (user: any) => {
+export const setMockCurrentUser = (user: MockUser | null): void => {
   mockAuth.currentUser = user;
 };
 
-export const triggerAuthStateChange = (user: any) => {
-  const callbacks = (mockAuth.onAuthStateChanged as any).mock.calls.map((call: any) => call[0]);
-  callbacks.forEach((callback: any) => callback(user));
+export const triggerAuthStateChange = (user: MockUser | null): void => {
+  authStateCallbacks.forEach(cb => cb(user));
 };
