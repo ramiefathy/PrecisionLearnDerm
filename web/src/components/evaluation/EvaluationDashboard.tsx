@@ -359,13 +359,26 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   const prepareRadarData = () => {
     const pipelines = Array.from(new Set(testResults.map(r => r.testCase.pipeline)));
     const labels = ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 'Cueing Absence'];
-    const datasets = pipelines.map((p, idx) => {
+
+    const datasets = pipelines.reduce((acc: any[], p, idx) => {
       const prs = testResults.filter(r => r.testCase.pipeline === p);
-      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-      const cr = avg(prs.map(r => r.aiScoresFlat?.clinicalRealism ?? (r.aiScores as any)?.coreQuality?.clinicalRealism ?? (r.aiScores as any)?.clinicalRealism ?? 0));
-      const ma = avg(prs.map(r => r.aiScoresFlat?.medicalAccuracy ?? (r.aiScores as any)?.coreQuality?.medicalAccuracy ?? (r.aiScores as any)?.medicalAccuracy ?? 0));
-      const dq = avg(prs.map(r => r.aiScoresFlat?.distractorQuality ?? (r.aiScores as any)?.technicalQuality?.distractorQuality ?? (r.aiScores as any)?.distractorQuality ?? 0));
-      const ca = avg(prs.map(r => r.aiScoresFlat?.cueingAbsence ?? (r.aiScores as any)?.technicalQuality?.cueingAbsence ?? (r.aiScores as any)?.cueingAbsence ?? 0));
+      const isNumber = (val: unknown): val is number => typeof val === 'number' && !Number.isNaN(val);
+      const validPrs = prs.filter(r => {
+        const s = r.aiScoresFlat;
+        return s &&
+          isNumber(s.clinicalRealism) &&
+          isNumber(s.medicalAccuracy) &&
+          isNumber(s.distractorQuality) &&
+          isNumber(s.cueingAbsence);
+      });
+
+      if (validPrs.length === 0) return acc; // Skip pipelines with no valid scores
+
+      const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      const cr = avg(validPrs.map(r => r.aiScoresFlat!.clinicalRealism!));
+      const ma = avg(validPrs.map(r => r.aiScoresFlat!.medicalAccuracy!));
+      const dq = avg(validPrs.map(r => r.aiScoresFlat!.distractorQuality!));
+      const ca = avg(validPrs.map(r => r.aiScoresFlat!.cueingAbsence!));
       const colors = [
         'rgba(255,99,132,1)',
         'rgba(54,162,235,1)',
@@ -373,14 +386,16 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         'rgba(75,192,192,1)',
         'rgba(153,102,255,1)'
       ];
-      return {
+      acc.push({
         label: p,
         data: [cr, ma, dq, ca],
         borderColor: colors[idx % colors.length],
         backgroundColor: 'rgba(0,0,0,0)',
         pointBackgroundColor: colors[idx % colors.length]
-      } as any;
-    });
+      } as any);
+      return acc;
+    }, []);
+
     if (datasets.length === 0) {
       datasets.push({
         label: 'No Data',
@@ -389,6 +404,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         backgroundColor: 'rgba(0,0,0,0)'
       } as any);
     }
+
     return { labels, datasets };
   };
 
