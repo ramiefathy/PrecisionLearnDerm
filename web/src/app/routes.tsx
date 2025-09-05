@@ -40,11 +40,15 @@ function AdminNavigation() {
       icon: '📚', 
       description: 'Statistics & question library'
     },
-    { 
-      name: 'Pipeline Evaluation', 
-      href: '/admin/evaluation', 
-      icon: '📊', 
-      description: 'Test & compare AI pipelines'
+    {
+      name: 'Pipeline Evaluation',
+      href: '/admin/evaluation',
+      icon: '📊',
+      description: 'Test & compare AI pipelines',
+      subPages: [
+        { name: 'Legacy', href: '/admin/evaluation', icon: '🕰️' },
+        { name: 'V2 (Beta)', href: '/admin/evaluation-v2', icon: '🆕' }
+      ]
     },
     { 
       name: 'Development', 

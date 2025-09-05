@@ -74,7 +74,7 @@ Functions Coding Note
 Pipeline Evaluation System (Admin)
 
 Entry points
-- Web page: `web/src/pages/AdminEvaluationPage.tsx` → renders config form, live dashboard, logs
+- Web page: `web/src/pages/AdminEvaluationV2Page.tsx` → renders config form, live dashboard, logs
 - Components: `EvaluationDashboard`, `EvaluationProgressMonitor`, `LiveEvaluationLogs`, `EvaluationResultsDisplay`
 - Cloud Functions: 
   - `startPipelineEvaluation` (callable): creates job + triggers processing
@@ -404,7 +404,7 @@ functions/src/util/enhancedCache.ts: two-tier cache
 functions/src/util/monitoring.ts: logs/metrics/health
 firestore.rules, storage.rules: access control
 web/src/components/evaluation/*: evaluation UI components
-web/src/pages/AdminEvaluationPage.tsx: evaluation admin page
+web/src/pages/AdminEvaluationV2Page.tsx: evaluation admin page
 Appendix B — Example Robust Gemini Call
 const client = getRobustGeminiClient({
 maxRetries: 3,

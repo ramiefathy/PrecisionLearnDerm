@@ -1,5 +1,5 @@
 /**
- * Admin Evaluation Page
+ * Admin Evaluation V2 Page
  * Main page for pipeline evaluation with integrated components
  */
 
@@ -54,7 +54,7 @@ interface EvaluationJob {
   };
 }
 
-const AdminEvaluationPage: React.FC = () => {
+const AdminEvaluationV2Page: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -383,4 +383,4 @@ const AdminEvaluationPage: React.FC = () => {
   );
 };
 
-export default AdminEvaluationPage;
+export default AdminEvaluationV2Page;

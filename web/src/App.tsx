@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Route, Routes, Navigate, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { ProtectedRoute, AdminRoute } from './app/routes'; // Assumed to exist and use <Outlet />
+import { ProtectedRoute, AdminRoute } from './app/routes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ToastContainer } from './components/Toast';
@@ -27,7 +27,9 @@ const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage')
 const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
 const AdminLogsPage = lazy(() => import('./pages/AdminLogsPage.tsx'));
-const AdminEvaluationPage = lazy(() => import('./pages/AdminEvaluationPage.tsx'));
+const AdminEvaluationV2Page = lazy(() => import('./pages/AdminEvaluationV2Page.tsx'));
+// Legacy evaluation dashboard
+const AdminPipelineEvaluation = lazy(() => import('./pages/AdminPipelineEvaluation.tsx'));
 
 // --- UI COMPONENTS (Loading, Error) ---
 
@@ -168,7 +170,10 @@ function AppRoutes() {
                   <Route path="/admin/question-bank" element={<AdminQuestionBankPage />} />
                   <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
                   <Route path="/admin/logs" element={<AdminLogsPage />} />
-                  <Route path="/admin/evaluation" element={<AdminEvaluationPage />} />
+                  {/* Legacy evaluation dashboard */}
+                  <Route path="/admin/evaluation" element={<AdminPipelineEvaluation />} />
+                  {/* New evaluation system */}
+                  <Route path="/admin/evaluation-v2" element={<AdminEvaluationV2Page />} />
                   <Route path="/admin" element={<Navigate to="/admin/setup" replace />} />
                 </Route>
               </Route>

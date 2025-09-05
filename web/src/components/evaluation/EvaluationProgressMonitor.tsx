@@ -32,7 +32,7 @@ import {
 import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { db, functions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-// LiveEvaluationLogs removed to avoid duplication - now rendered in parent AdminEvaluationPage
+// LiveEvaluationLogs removed to avoid duplication - now rendered in parent AdminEvaluationV2Page
 
 interface EvaluationJob {
   id: string;
@@ -412,7 +412,7 @@ export const EvaluationProgressMonitor: React.FC<EvaluationProgressMonitorProps>
       )}
       </Paper>
 
-      {/* Note: Live Streaming Logs moved to AdminEvaluationPage to avoid duplication */}
+      {/* Note: Live Streaming Logs moved to AdminEvaluationV2Page to avoid duplication */}
     </>
   );
 };

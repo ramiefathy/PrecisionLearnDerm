@@ -401,8 +401,21 @@ export default function AdminSetupPage() {
                 <span className="text-indigo-600">📈</span>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Pipeline Evaluation</h3>
-                <p className="text-sm text-gray-600">Test & compare</p>
+                <h3 className="font-semibold text-gray-900">Pipeline Evaluation (Legacy)</h3>
+                <p className="text-sm text-gray-600">Current system</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/evaluation-v2"
+              className="flex items-center gap-3 p-4 rounded-xl border-2 border-purple-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+            >
+              <div className="w-10 h-10 rounded-lg bg-purple-100 grid place-items-center">
+                <span className="text-purple-600">✨</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Pipeline Evaluation V2</h3>
+                <p className="text-sm text-gray-600">New beta system</p>
               </div>
             </Link>
 
