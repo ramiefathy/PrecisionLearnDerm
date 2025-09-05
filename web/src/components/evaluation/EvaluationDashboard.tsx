@@ -383,23 +383,17 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
 
     const datasets = pipelines.reduce((acc: any[], p, idx) => {
       const prs = testResults.filter(r => r.testCase.pipeline === p);
-      const isNumber = (val: unknown): val is number => typeof val === 'number' && !Number.isNaN(val);
-      const validPrs = prs.filter(r => {
+      const hasMissing = prs.some(r => {
         const s = r.aiScoresFlat;
-        return s &&
-          isNumber(s.clinicalRealism) &&
-          isNumber(s.medicalAccuracy) &&
-          isNumber(s.distractorQuality) &&
-          isNumber(s.cueingAbsence);
+        return !s || s.clinicalRealism == null || s.medicalAccuracy == null || s.distractorQuality == null || s.cueingAbsence == null;
       });
-
-      if (validPrs.length === 0) return acc; // Skip pipelines with no valid scores
+      if (hasMissing) return acc;
 
       const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-      const cr = avg(validPrs.map(r => r.aiScoresFlat!.clinicalRealism!));
-      const ma = avg(validPrs.map(r => r.aiScoresFlat!.medicalAccuracy!));
-      const dq = avg(validPrs.map(r => r.aiScoresFlat!.distractorQuality!));
-      const ca = avg(validPrs.map(r => r.aiScoresFlat!.cueingAbsence!));
+      const cr = avg(prs.map(r => r.aiScoresFlat!.clinicalRealism!));
+      const ma = avg(prs.map(r => r.aiScoresFlat!.medicalAccuracy!));
+      const dq = avg(prs.map(r => r.aiScoresFlat!.distractorQuality!));
+      const ca = avg(prs.map(r => r.aiScoresFlat!.cueingAbsence!));
       const colors = [
         'rgba(255,99,132,1)',
         'rgba(54,162,235,1)',
@@ -417,16 +411,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
       return acc;
     }, []);
 
-    if (datasets.length === 0) {
-      datasets.push({
-        label: 'No Data',
-        data: [0, 0, 0, 0],
-        borderColor: 'rgba(200,200,200,1)',
-        backgroundColor: 'rgba(0,0,0,0)'
-      } as any);
-    }
-
-    return { labels, datasets };
+    return datasets.length > 0 ? { labels, datasets } : null;
   };
 
   const prepareScoreComparisonData = () => {
@@ -813,22 +798,29 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               All dimensions scored 0-100. Generation Time: higher score = faster generation (100 = instant, 0 = 30s+)
             </Typography>
-            <Box sx={{ height: 400, display: 'flex', justifyContent: 'center' }}>
-              <Box sx={{ width: '60%' }}>
-                <Radar 
-                  data={prepareRadarData()} 
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      r: {
-                        beginAtZero: true,
-                        max: 100
-                      }
-                    }
-                  }}
-                />
-              </Box>
+            <Box sx={{ height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {(() => {
+                const data = prepareRadarData();
+                return data ? (
+                  <Box sx={{ width: '60%' }}>
+                    <Radar
+                      data={data}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          r: {
+                            beginAtZero: true,
+                            max: 100
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No data available</Typography>
+                );
+              })()}
             </Box>
           </Box>
         )}
