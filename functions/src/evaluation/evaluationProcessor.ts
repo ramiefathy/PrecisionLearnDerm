@@ -519,7 +519,22 @@ export async function processBatchTestsLogic(
               error: errorEntry.error.message,
               message: `❌ Test ${testIndex + 1} failed: ${errorEntry.error.message}`
             });
-            
+
+            // Persist failure result for UI visibility
+            await storeTestResult(jobId, testIndex, {
+              success: false,
+              error: errorEntry,
+              testCase,
+              latency
+            });
+
+            // Update progress even on failure
+            await db.collection('evaluationJobs').doc(jobId).set({
+              progress: {
+                completedTests: admin.firestore.FieldValue.increment(1)
+              }
+            }, { merge: true });
+
             logger.error('[EVAL_PROCESSOR] Test failed', {
               jobId,
               testIndex,
