@@ -52,7 +52,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-interface EvaluationResults {
+export interface EvaluationResults {
   byPipeline: Record<string, PipelineResult>;
   byCategory: Record<string, CategoryResult>;
   overall: OverallMetrics;
@@ -98,7 +98,7 @@ interface ErrorEntry {
   };
   context?: {
     attemptNumber?: number;
-    partialResult?: any;
+    partialResult?: unknown;
   };
 }
 
@@ -117,20 +117,26 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
   const [expandedError, setExpandedError] = useState<number | null>(null);
 
   // Prepare data for charts
-  const pipelineChartData = Object.values(results.byPipeline).map(p => ({
-    name: p.pipeline,
-    successRate: Math.round(p.successRate * 100),
-    avgLatency: Math.round(p.avgLatency),
-    avgQuality: parseFloat(p.avgQuality.toFixed(1)),
-    tests: p.totalTests
-  }));
+  const pipelineChartData = Object.values(results.byPipeline).map(p => {
+    const successRate = p.successRate > 1 ? p.successRate / 100 : p.successRate;
+    return {
+      name: p.pipeline,
+      successRate: Math.round(successRate * 100),
+      avgLatency: Math.round(p.avgLatency),
+      avgQuality: parseFloat(p.avgQuality.toFixed(1)),
+      tests: p.totalTests
+    };
+  });
 
-  const categoryChartData = Object.values(results.byCategory).map(c => ({
-    name: c.category,
-    successRate: Math.round(c.successRate * 100),
-    avgLatency: Math.round(c.avgLatency),
-    avgQuality: parseFloat(c.avgQuality.toFixed(1))
-  }));
+  const categoryChartData = Object.values(results.byCategory).map(c => {
+    const successRate = c.successRate > 1 ? c.successRate / 100 : c.successRate;
+    return {
+      name: c.category,
+      successRate: Math.round(successRate * 100),
+      avgLatency: Math.round(c.avgLatency),
+      avgQuality: parseFloat(c.avgQuality.toFixed(1))
+    };
+  });
 
   const successPieData = [
     { name: 'Successful', value: results.overall.totalSuccesses, color: '#4CAF50' },
@@ -172,17 +178,20 @@ export const EvaluationResultsDisplay: React.FC<EvaluationResultsDisplayProps> =
     let bestScore = -1;
     
     Object.values(results.byPipeline).forEach(p => {
+      // Normalize success rate in case backend returns percentages
+      const successRate = p.successRate > 1 ? p.successRate / 100 : p.successRate;
       // Weighted score: 40% success rate, 30% speed, 30% quality
-      const speedScore = 1 - (p.avgLatency / 30000); // Normalize to 0-1
-      const score = (p.successRate * 0.4) + (speedScore * 0.3) + ((p.avgQuality / 10) * 0.3);
-      
+      const speedScore = Math.max(0, Math.min(1, 1 - (p.avgLatency / 30000))); // Normalize to 0-1
+      const qualityScore = p.avgQuality / 100; // Normalize quality to 0-1
+      const score = (successRate * 0.4) + (speedScore * 0.3) + (qualityScore * 0.3);
+
       if (score > bestScore) {
         bestScore = score;
         bestPipeline = p.pipeline;
       }
     });
-    
-    return { pipeline: bestPipeline, score: bestScore };
+
+    return { pipeline: bestPipeline, score: Math.max(0, Math.min(1, bestScore)) };
   };
 
   const recommendation = getBestPipeline();
