@@ -269,6 +269,10 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
   };
   const { samples: aggSamples, aggregates, outliers, failures } = useEvaluationData(jobId, filters);
 
+  const timelineSamples = aggSamples.filter(
+    (s): s is ScoreSample & { ai: number } => typeof s.ai === 'number'
+  );
+
   const handleViewQuestion = (testResult: TestResult) => {
     setSelectedQuestion(testResult);
     setQuestionDialogOpen(true);
@@ -844,10 +848,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         {selectedTab === 6 && (
           <Box>
             <TimelinePanel
-              aiSeries={aggSamples
-                .filter(s=> typeof s.ai === 'number')
-                .map(s=> ({ x: s.createdAt, y: s.ai as number }))}
-              latencySeries={aggSamples.map(s=> ({ x: s.createdAt, y: s.latency }))}
+              aiSeries={timelineSamples.map(s => ({ x: s.createdAt, y: s.ai }))}
+              latencySeries={timelineSamples.map(s => ({ x: s.createdAt, y: s.latency }))}
             />
           </Box>
         )}
