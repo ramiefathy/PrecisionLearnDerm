@@ -149,36 +149,3 @@ class ErrorBoundary extends Component<Props, State> {
 
 export default ErrorBoundary;
 
-/**
- * Higher-order component to wrap any component with an error boundary
- */
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  fallback?: ReactNode,
-  onError?: (error: Error, errorInfo: ErrorInfo) => void
-) {
-  return (props: P) => (
-    <ErrorBoundary fallback={fallback} onError={onError}>
-      <Component {...props} />
-    </ErrorBoundary>
-  );
-}
-
-/**
- * Hook to throw errors that will be caught by the nearest error boundary
- * Useful for async errors that won't be caught automatically
- */
-export function useErrorHandler() {
-  const [error, setError] = React.useState<Error | null>(null);
-
-  React.useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-
-  return {
-    throwError: (error: Error) => setError(error),
-    clearError: () => setError(null),
-  };
-}
