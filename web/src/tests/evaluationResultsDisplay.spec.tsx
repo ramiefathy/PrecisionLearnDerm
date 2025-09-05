@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
 import { EvaluationResultsDisplay } from '../components/evaluation/EvaluationResultsDisplay';
 import type { EvaluationResults } from '../components/evaluation/EvaluationResultsDisplay';
@@ -52,5 +53,33 @@ describe('EvaluationResultsDisplay', () => {
       </div>
     );
     expect(screen.getByText(/highest score of 90.0\/100/i)).toBeInTheDocument();
+  });
+
+  it('displays partial result details when present', async () => {
+    const resultsWithError: EvaluationResults = {
+      ...mockResults,
+      errors: [
+        {
+          timestamp: new Date().toISOString(),
+          pipeline: 'Pipeline 1',
+          topic: 'Topic 1',
+          difficulty: 'Basic',
+          error: { message: 'Failed' },
+          context: { attemptNumber: 1, partialResult: { testIndex: 0 } }
+        }
+      ]
+    };
+
+    render(
+      <div style={{ width: 1000, height: 500 }}>
+        <EvaluationResultsDisplay results={resultsWithError} jobId="job" />
+      </div>
+    );
+
+    await userEvent.click(screen.getByRole('tab', { name: /Error Analysis/i }));
+    const summaryButton = screen.getByText('Topic 1').closest('button');
+    if (!summaryButton) throw new Error('Accordion summary not found');
+    await userEvent.click(summaryButton);
+    expect(screen.getByText(/"testIndex": 0/)).toBeInTheDocument();
   });
 });
