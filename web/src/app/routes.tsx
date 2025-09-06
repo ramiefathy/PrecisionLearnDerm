@@ -28,16 +28,22 @@ function AdminNavigation() {
       icon: '✨', 
       description: 'AI-powered question generation'
     },
-    { 
-      name: 'Review Queue', 
-      href: '/admin/review', 
-      icon: '📋', 
+    {
+      name: 'Review Queue',
+      href: '/admin/review',
+      icon: '📋',
       description: 'Review AI-generated questions'
     },
-    { 
-      name: 'Question Bank', 
-      href: '/admin/question-bank', 
-      icon: '📚', 
+    {
+      name: 'Iteration',
+      href: '/admin/iteration',
+      icon: '🔄',
+      description: 'Chat-based question refinement'
+    },
+    {
+      name: 'Question Bank',
+      href: '/admin/question-bank',
+      icon: '📚',
       description: 'Statistics & question library'
     },
     {
