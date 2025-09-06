@@ -54,7 +54,13 @@ interface EvaluationJob {
   };
 }
 
-const AdminEvaluationV2Page: React.FC = () => {
+interface AdminEvaluationV2PageProps {
+  loadExistingJobs?: () => Promise<void>;
+}
+
+const AdminEvaluationV2Page: React.FC<AdminEvaluationV2PageProps> = ({
+  loadExistingJobs
+}) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -66,14 +72,7 @@ const AdminEvaluationV2Page: React.FC = () => {
   const [previousJobs, setPreviousJobs] = useState<EvaluationJob[]>([]);
   const [runningJob, setRunningJob] = useState<EvaluationJob | null>(null);
 
-  // Load existing jobs when user is available (route already enforces admin)
-  useEffect(() => {
-    if (user) {
-      loadExistingJobs();
-    }
-  }, [user]);
-  
-  const loadExistingJobs = async () => {
+  const loadExistingJobsInternal = async () => {
     try {
       // Check for running jobs
       const runningQuery = query(
@@ -112,6 +111,13 @@ const AdminEvaluationV2Page: React.FC = () => {
       console.error('Failed to load existing jobs:', error);
     }
   };
+
+  // Load existing jobs when user is available (route already enforces admin)
+  useEffect(() => {
+    if (user) {
+      (loadExistingJobs ?? loadExistingJobsInternal)();
+    }
+  }, [user, loadExistingJobs]);
 
   const handleStartEvaluation = async (config: EvaluationConfig) => {
     try {

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import App from '../App';
+import AdminEvaluationV2Page from '../pages/AdminEvaluationV2Page';
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -46,9 +46,11 @@ vi.mock('firebase/firestore', () => ({
 
 describe('Admin evaluation v2 route', () => {
   it('renders evaluation dashboard for admin user', async () => {
+    const loadExistingJobs = vi.fn().mockResolvedValue(undefined);
+
     render(
-      <MemoryRouter initialEntries={['/admin/evaluation-v2']}>
-        <App />
+      <MemoryRouter>
+        <AdminEvaluationV2Page loadExistingJobs={loadExistingJobs} />
       </MemoryRouter>
     );
 
