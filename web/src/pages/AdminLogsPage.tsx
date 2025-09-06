@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../lib/api';
 import { toast } from '../components/Toast';
+import AdminPageHeader from '../components/AdminPageHeader';
+import { useAdminDataLoader } from '../hooks/useAdminDataLoader';
 
 interface LogEntry {
   id: string;
@@ -20,36 +22,34 @@ type TimeFilter = 'all' | '1h' | '6h' | '24h' | '7d';
 
 export default function AdminLogsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [levelFilter, setLevelFilter] = useState<LogFilter>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [searchQuery, setSearchQuery] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
   const loadLogs = async (reset = false) => {
     try {
-      if (reset) {
-        setLoading(true);
-      }
+      const response = await api.monitoring
+        .getLogs({
+          level: levelFilter === 'all' ? undefined : levelFilter,
+          limit: 25
+        })
+        .catch(() => {
+          // Fallback to mock data if endpoint doesn't exist
+          return generateMockLogs();
+        });
 
-      const response = await api.monitoring.getLogs({
-        level: levelFilter === 'all' ? undefined : levelFilter,
-        limit: 25
-      }).catch(() => {
-        // Fallback to mock data if endpoint doesn't exist
-        return generateMockLogs();
-      });
+      const newLogs = Array.isArray(response)
+        ? response
+        : ((response as any).logs || []);
 
-      const newLogs = Array.isArray(response) ? response : (response as any).logs || [];
-      
       if (reset) {
         setLogs(newLogs);
       } else {
         setLogs(prev => [...prev, ...newLogs]);
       }
-      
+
       setHasMore(newLogs.length === 25);
     } catch (error) {
       console.error('Error loading logs:', error);
@@ -57,10 +57,19 @@ export default function AdminLogsPage() {
         setLogs(generateMockLogs());
       }
       toast.error('Failed to load logs', 'Using sample data instead');
-    } finally {
-      setLoading(false);
     }
   };
+
+  const {
+    loading,
+    load,
+    autoRefresh,
+    setAutoRefresh
+  } = useAdminDataLoader(loadLogs, {
+    autoRefreshInterval: 30000,
+    autoRefreshArgs: [true],
+    initialLoading: true
+  });
 
   const generateMockLogs = (): LogEntry[] => {
     const levels: LogEntry['level'][] = ['info', 'warn', 'error', 'debug'];
@@ -95,18 +104,8 @@ export default function AdminLogsPage() {
   };
 
   useEffect(() => {
-    loadLogs(true);
-  }, [levelFilter, timeFilter, searchQuery]);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-    
-    const interval = setInterval(() => {
-      loadLogs(true);
-    }, 30000); // Refresh every 30 seconds
-    
-    return () => clearInterval(interval);
-  }, [autoRefresh, levelFilter, timeFilter, searchQuery]);
+    load(true);
+  }, [levelFilter, timeFilter, searchQuery, load]);
 
   const filteredLogs = logs.filter(log => {
     if (levelFilter !== 'all' && log.level !== levelFilter) return false;
@@ -152,41 +151,19 @@ export default function AdminLogsPage() {
 
   const loadMore = () => {
     if (!hasMore || loading) return;
-    loadLogs();
+    load();
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-50">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">System Logs</h1>
-              <p className="text-gray-600">Monitor system activity and troubleshoot issues</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                Auto-refresh
-              </label>
-              <button
-                onClick={() => loadLogs(true)}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Loading...' : 'Refresh'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="System Logs"
+        subtitle="Monitor system activity and troubleshoot issues"
+        loading={loading}
+        onRefresh={() => load(true)}
+        autoRefresh={autoRefresh}
+        onToggleAutoRefresh={setAutoRefresh}
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Filters */}

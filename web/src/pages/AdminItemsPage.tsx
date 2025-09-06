@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../lib/api';
 import { toast } from '../components/Toast';
 import { handleAdminError } from '../lib/errorHandler';
+import AdminPageHeader from '../components/AdminPageHeader';
+import { useAdminDataLoader } from '../hooks/useAdminDataLoader';
 
 interface Item {
   id: string;
@@ -39,7 +41,6 @@ type SortOrder = 'asc' | 'desc';
 export default function AdminItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('items');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('createdAt');
@@ -55,8 +56,6 @@ export default function AdminItemsPage() {
 
   const loadItems = async () => {
     try {
-      setLoading(true);
-      
       // Load real items from database
       const itemsResponse = await api.items.list({ limit: 50, status: 'active' });
       const realItems: Item[] = (itemsResponse as any).items?.map((item: any) => ({
@@ -107,18 +106,18 @@ export default function AdminItemsPage() {
     } catch (error) {
       console.error('Error loading items:', error);
       handleAdminError(error, 'load items');
-      
+
       // No fallbacks - set to empty arrays on error
       setItems([]);
       setDrafts([]);
-    } finally {
-      setLoading(false);
     }
   };
 
+  const { loading, load } = useAdminDataLoader(loadItems, { initialLoading: true });
+
   useEffect(() => {
-    loadItems();
-  }, []);
+    load();
+  }, [load]);
 
   const filteredItems = items.filter(item => {
     if (!searchQuery) return true;
@@ -180,7 +179,7 @@ export default function AdminItemsPage() {
       await api.items.propose({ topicIds });
       toast.success('Topics proposed', `Proposed ${topicIds.length} topics for question generation`);
       setProposeTopics('');
-      await loadItems();
+      await load();
     } catch (error) {
       handleAdminError(error, 'propose topics');
     } finally {
@@ -203,7 +202,7 @@ export default function AdminItemsPage() {
       toast.success('Item revision requested', 'The item has been queued for revision');
       setSelectedItemForRevision(null);
       setRevisionInstructions('');
-      await loadItems();
+      await load();
     } catch (error) {
       handleAdminError(error, 'revise item');
     } finally {
@@ -221,7 +220,7 @@ export default function AdminItemsPage() {
     try {
       await api.items.promote({ draftId: draft.id });
       toast.success('Draft promoted', 'Draft has been promoted to an active item');
-      await loadItems();
+      await load();
     } catch (error) {
       handleAdminError(error, 'promote draft');
     } finally {
@@ -253,25 +252,12 @@ export default function AdminItemsPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
-              <p className="text-gray-600">Manage quiz questions, drafts, and content lifecycle</p>
-            </div>
-            
-            <button
-              onClick={loadItems}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Content Management"
+        subtitle="Manage quiz questions, drafts, and content lifecycle"
+        loading={loading}
+        onRefresh={load}
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Tabs */}
