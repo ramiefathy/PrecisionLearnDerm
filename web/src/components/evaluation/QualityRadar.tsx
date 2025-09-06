@@ -38,16 +38,20 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
       return acc;
     }, {});
   }, [results]);
-  const pipelines = Object.keys(pipelineGroups);
+  const pipelines = useMemo(() => Object.keys(pipelineGroups), [pipelineGroups]);
   const [indices, setIndices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setIndices(prev => {
       const next = { ...prev };
+      let changed = false;
       pipelines.forEach(p => {
-        if (!(p in next)) next[p] = 0;
+        if (!(p in next)) {
+          next[p] = 0;
+          changed = true;
+        }
       });
-      return next;
+      return changed ? next : prev;
     });
   }, [pipelines]);
 
