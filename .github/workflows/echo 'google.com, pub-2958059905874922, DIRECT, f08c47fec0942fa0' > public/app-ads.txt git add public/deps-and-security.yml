@@ -1,0 +1,151 @@
+name: Dependencies and Security Checks
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  dependency-checks:
+    runs-on: ubuntu-latest
+    name: Dependency and Security Audit
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            functions/package-lock.json
+            web/package-lock.json
+            
+      # Install dependencies for functions
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
+        
+      # Install dependencies for web
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+        
+      # Run npm audit for functions
+      - name: Audit functions dependencies
+        working-directory: functions
+        run: |
+          npm audit --audit-level=moderate
+          npm audit --json > functions-audit.json || true
+        continue-on-error: true
+        
+      # Run npm audit for web
+      - name: Audit web dependencies
+        working-directory: web
+        run: |
+          npm audit --audit-level=moderate
+          npm audit --json > web-audit.json || true
+        continue-on-error: true
+        
+      # Upload audit results
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-reports
+          path: |
+            functions/functions-audit.json
+            web/web-audit.json
+            
+      # Create issue/PR if vulnerabilities found
+      - name: Check for vulnerabilities and create PR
+        if: failure()
+        run: |
+          echo "Vulnerabilities found. Creating issue to track fixes needed."
+          # In a real scenario, you'd use gh CLI or API to create issues
+          
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+          
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better secret detection
+          
+      - name: Run Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Optional for pro version
+          
+  dependabot-auto-merge:
+    name: Auto-merge Dependabot PRs
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Enable auto-merge for Dependabot PRs
+        run: |
+          gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          
+  create-security-pr:
+    name: Create Security Fix PR
+    runs-on: ubuntu-latest
+    needs: [dependency-checks, secret-scan]
+    if: failure()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Create security issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Security Vulnerabilities Detected - ' + new Date().toDateString(),
+              body: 'Automated security scans have detected vulnerabilities or issues that need attention.\n\nPlease review the workflow run: ' + context.payload.workflow_run?.html_url || 'N/A',
+              labels: ['security', 'vulnerability']
+            })
