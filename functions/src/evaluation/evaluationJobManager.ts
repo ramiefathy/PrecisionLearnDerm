@@ -169,6 +169,22 @@ export async function updateJobProgress(
   status?: EvaluationJob['status']
 ): Promise<void> {
   try {
+    const jobRef = db.collection('evaluationJobs').doc(jobId);
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists) {
+      logger.warn('[EVAL_MANAGER] Job not found for progress update', { jobId });
+      return;
+    }
+
+    const jobData = jobSnap.data() as EvaluationJob;
+    if (['cancelled', 'failed', 'completed'].includes(jobData.status)) {
+      logger.info('[EVAL_MANAGER] Skipping progress update for terminal job', {
+        jobId,
+        status: jobData.status
+      });
+      return;
+    }
+
     const updates: any = {
       updatedAt: admin.firestore.Timestamp.now()
     };
