@@ -6,5 +6,9 @@ export default defineConfig({
     setupFiles: ['./src/tests/setup.ts'],
     globals: true,
     env: { NODE_ENV: 'test' },
+    coverage: {
+      reporter: ['lcov', 'text'],
+      reportsDirectory: './coverage'
+    },
   },
 });
