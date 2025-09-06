@@ -1,5 +1,4 @@
 name: Deploy to Firebase
-
 on:
   push:
     branches:
@@ -11,19 +10,20 @@ jobs:
   deploy:
     name: Deploy Firebase Functions
     runs-on: ubuntu-latest
+    environment: production
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
           cache-dependency-path: functions/package-lock.json
-
-      # Install functions dependencies
+      
+      # Install and build functions dependencies
       - name: Install Functions Dependencies
         working-directory: ./functions
         run: |
@@ -32,21 +32,24 @@ jobs:
           # Prefer clean install with lockfile; fall back to install if needed
           npm ci || npm install
           npm run build
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools@latest
-
-      - name: Deploy to Firebase
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      
+      - name: Deploy Firebase Functions
         run: |
-          # Deploy functions with environment variables
-          # Note: GEMINI_API_KEY should be set using Firebase Functions secrets
-          # Run this command manually once: 
-          # firebase functions:secrets:set GEMINI_API_KEY
+          # Install Firebase CLI
+          npm install -g firebase-tools@latest
           
-          firebase deploy --only functions --project dermassist-ai-1zyic --non-interactive
-
+          # Create temporary service account file
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service-account-key.json
+          
+          # Set GOOGLE_APPLICATION_CREDENTIALS
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account-key.json
+          
+          # Deploy functions using service account authentication
+          firebase deploy --only functions --project '${{ secrets.FIREBASE_PROJECT_ID }}' --non-interactive
+          
+          # Clean up service account file
+          rm /tmp/service-account-key.json
+      
       - name: Deployment Status
         if: always()
         run: |
