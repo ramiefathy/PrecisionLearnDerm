@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from './utils';
 import { BatchQuizRunner } from '../components/BatchQuizRunner';
 
 vi.mock('../lib/api', () => {
@@ -16,7 +17,7 @@ vi.mock('../lib/api', () => {
 
 describe('BatchQuizRunner', () => {
   it('renders loading then content', async () => {
-    render(<BatchQuizRunner/>);
+    renderWithProviders(<BatchQuizRunner/>);
     const items = await screen.findAllByText('S');
     expect(items.length).toBeGreaterThan(0);
   });

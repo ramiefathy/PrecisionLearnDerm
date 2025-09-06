@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { renderWithProviders } from './utils';
 import { ScoreProgression } from '../components/evaluation/ScoreProgression';
 
 vi.mock('react-chartjs-2', () => ({
@@ -49,7 +50,7 @@ const resultsWithEmpty = [
 
 describe('ScoreProgression', () => {
   it('renders one chart per pipeline', () => {
-    render(<ScoreProgression results={results as any} />);
+    renderWithProviders(<ScoreProgression results={results as any} />);
     const charts = screen.getAllByTestId('line-chart');
     expect(charts).toHaveLength(2);
     expect(screen.getByText('Pipeline A')).toBeInTheDocument();
@@ -57,7 +58,7 @@ describe('ScoreProgression', () => {
   });
 
   it('omits pipelines without valid points', () => {
-    render(<ScoreProgression results={resultsWithEmpty as any} />);
+    renderWithProviders(<ScoreProgression results={resultsWithEmpty as any} />);
     const charts = screen.getAllByTestId('line-chart');
     expect(charts).toHaveLength(2);
     expect(screen.queryByText('Pipeline C')).not.toBeInTheDocument();

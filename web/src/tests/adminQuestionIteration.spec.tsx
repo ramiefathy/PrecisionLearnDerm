@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from './utils';
 
 vi.mock('../lib/api', () => ({
   api: {
@@ -39,7 +40,7 @@ const AdminQuestionIterationPage = (
 
 describe('AdminQuestionIterationPage', () => {
   it('updates question after regeneration', async () => {
-    render(<AdminQuestionIterationPage />);
+    renderWithProviders(<AdminQuestionIterationPage />);
     // initial question
     expect(await screen.findByText('Initial stem')).toBeInTheDocument();
     const input = screen.getByPlaceholderText(/enter feedback/i);

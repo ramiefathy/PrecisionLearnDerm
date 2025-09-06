@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderWithProviders } from "./utils";
 import MockExamPage from "../pages/MockExamPage";
 
 vi.mock("../lib/attempts", () => ({
@@ -18,7 +19,7 @@ describe("MockExamPage", () => {
     const hrefSetter = vi.spyOn(window, 'location', 'set');
     hrefSetter.mockImplementation(() => {});
 
-    render(<MockExamPage loadBatch={loadBatch} loadItem={loadItem} />);
+    renderWithProviders(<MockExamPage loadBatch={loadBatch} loadItem={loadItem} />);
 
     // Set number of questions to 1
     const spinner = screen.getByRole('spinbutton');

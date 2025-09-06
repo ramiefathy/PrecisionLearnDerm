@@ -1,7 +1,8 @@
 import './firebase-mocks';
 import { useEffect } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, waitFor, cleanup } from '@testing-library/react';
+import { waitFor, cleanup } from '@testing-library/react';
+import { renderWithProviders } from './utils';
 import { useEvaluationData } from '../hooks/useEvaluationData';
 import type { EvaluationFilters } from '../types';
 
@@ -57,7 +58,7 @@ describe('useEvaluationData', () => {
 
     let latest: any = null;
     const onResult = (res:any) => { latest = res; };
-    render(<TestHarness jobId="job1" onResult={onResult} />);
+    renderWithProviders(<TestHarness jobId="job1" onResult={onResult} />);
 
     await waitFor(() => {
       expect(latest).toBeTruthy();

@@ -1,16 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-
-vi.mock('../components/Toast', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-  },
-}));
+import { renderWithProviders } from './utils';
 
 vi.mock('../lib/api', () => {
   const listAdmins = vi.fn();
@@ -66,11 +57,7 @@ import { toast } from '../components/Toast';
 
 describe('AdminSetupPage admin user loading', () => {
   it('shows error toast and retains existing admins on load failure', async () => {
-    render(
-      <MemoryRouter>
-        <AdminSetupPage />
-      </MemoryRouter>
-    );
+    renderWithProviders(<AdminSetupPage />);
 
     await screen.findByText('admin@example.com', undefined, { timeout: 5000 });
 

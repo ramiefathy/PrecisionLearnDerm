@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderWithProviders } from "./utils";
 import AdminItemsPage from "../pages/AdminItemsPage";
 import React from "react";
 import { api } from "../lib/api";
@@ -30,7 +31,7 @@ vi.mock("../lib/firebase", () => ({ db: {} }));
 
 describe("AdminItemsPage", () => {
   it("propose and revise actions are clickable", async () => {
-    render(<AdminItemsPage/>);
+    renderWithProviders(<AdminItemsPage/>);
     await userEvent.click(await screen.findByRole("button", { name: /actions/i }));
     const topicInput = await screen.findByPlaceholderText(/psoriasis, acne, melanoma/i);
     await userEvent.type(topicInput, "psoriasis.plaque");
@@ -59,7 +60,7 @@ describe("AdminItemsPage", () => {
       ) // drafts
       .mockImplementation(realUseState);
 
-    render(<AdminItemsPage/>);
+    renderWithProviders(<AdminItemsPage/>);
     await waitFor(() => expect(api.items.list).toHaveBeenCalled());
 
     expect(draftsSetter).not.toHaveBeenCalled();

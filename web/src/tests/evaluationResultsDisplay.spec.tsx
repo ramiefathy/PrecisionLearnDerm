@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
+import { renderWithProviders } from './utils';
 import { EvaluationResultsDisplay } from '../components/evaluation/EvaluationResultsDisplay';
 import type { EvaluationResults } from '../components/evaluation/EvaluationResultsDisplay';
 
@@ -38,7 +39,7 @@ const mockResults: EvaluationResults = {
 
 describe('EvaluationResultsDisplay', () => {
   it('renders evaluation header', () => {
-    render(
+    renderWithProviders(
       <div style={{ width: 1000, height: 500 }}>
         <EvaluationResultsDisplay results={mockResults} jobId="job" />
       </div>
@@ -47,7 +48,7 @@ describe('EvaluationResultsDisplay', () => {
   });
 
   it('renders recommendation score normalized to 100', () => {
-    render(
+    renderWithProviders(
       <div style={{ width: 1000, height: 500 }}>
         <EvaluationResultsDisplay results={mockResults} jobId="job" />
       </div>
@@ -70,7 +71,7 @@ describe('EvaluationResultsDisplay', () => {
       ]
     };
 
-    render(
+    renderWithProviders(
       <div style={{ width: 1000, height: 500 }}>
         <EvaluationResultsDisplay results={resultsWithError} jobId="job" />
       </div>

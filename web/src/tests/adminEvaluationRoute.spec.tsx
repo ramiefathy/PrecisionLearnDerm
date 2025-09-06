@@ -1,28 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { ReactNode } from 'react';
+import { renderWithProviders } from './utils';
 import App from '../App';
-
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: { uid: '1', email: 'admin@example.com' },
-    profile: { role: 'admin', isAdmin: true },
-    loading: false,
-    profileLoading: false,
-  }),
-  AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('../components/Toast', () => ({
-  ToastContainer: () => null,
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-  },
-}));
 
 vi.mock('../lib/firebase', () => ({
   functions: {},
@@ -46,11 +25,13 @@ vi.mock('firebase/firestore', () => ({
 
 describe('Admin evaluation v2 route', () => {
   it('renders evaluation dashboard for admin user', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/evaluation-v2']}>
-        <App />
-      </MemoryRouter>
-    );
+    renderWithProviders(<App />, {
+      route: '/admin/evaluation-v2',
+      auth: {
+        user: { uid: '1', email: 'admin@example.com' } as any,
+        profile: { role: 'admin', isAdmin: true } as any,
+      },
+    });
 
     expect(
       await screen.findByText(/Pipeline Evaluation System/i, undefined, { timeout: 5000 })

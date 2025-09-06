@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from './utils';
 import { QuizRunner } from '../components/QuizRunner';
 
 vi.mock('../lib/api', () => ({
@@ -28,7 +28,6 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../components/TutorDrawer', () => ({ TutorDrawer: () => <div /> }));
 vi.mock('../components/QuestionFeedback', () => ({ default: () => null }));
-vi.mock('../components/Toast', () => ({ toast: { success: () => {}, error: () => {} } }));
 vi.mock('../lib/markdown', () => ({ renderSafeMarkdown: (s: string) => s }));
 vi.mock('../app/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
@@ -40,11 +39,7 @@ vi.mock('../lib/firebase', () => ({ auth: { currentUser: { getIdToken: vi.fn(), 
 
 describe('QuizRunner', () => {
   it('renders loading then question', async () => {
-    render(
-      <MemoryRouter>
-        <QuizRunner />
-      </MemoryRouter>
-    );
+    renderWithProviders(<QuizRunner />);
     expect(screen.getByText(/Loading your next question/i)).toBeInTheDocument();
     await screen.findByText('S');
   });

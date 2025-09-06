@@ -1,5 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { renderWithProviders } from './utils';
 import { QualityRadar } from '../components/evaluation/QualityRadar';
 
 vi.mock('react-chartjs-2', () => ({
@@ -38,7 +39,7 @@ const results = [
 
 describe('QualityRadar', () => {
   it('renders radars and sliders per pipeline', () => {
-    render(<QualityRadar results={results as any} />);
+    renderWithProviders(<QualityRadar results={results as any} />);
     const radars = screen.getAllByTestId('radar-chart');
     expect(radars.length).toBe(4);
     const sliders = screen.getAllByRole('slider');
@@ -49,7 +50,7 @@ describe('QualityRadar', () => {
 
   it('initializes indices for new pipelines while preserving existing values', () => {
     const initial = results.slice(0, 2);
-    const { rerender } = render(<QualityRadar results={initial as any} />);
+    const { rerender } = renderWithProviders(<QualityRadar results={initial as any} />);
 
     const sliderA = screen.getByRole('slider');
     fireEvent.change(sliderA, { target: { value: 1 } });
