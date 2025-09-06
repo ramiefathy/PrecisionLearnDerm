@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AdminItemsPage from "../pages/AdminItemsPage";
+import React from "react";
+import { api } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   api: {
@@ -39,5 +41,28 @@ describe("AdminItemsPage", () => {
     await userEvent.type(screen.getByPlaceholderText(/describe the specific changes/i), "shorten stem");
     await userEvent.click(screen.getByRole("button", { name: /request revision/i }));
     expect(true).toBe(true);
+  });
+
+  it("retains existing drafts on load error", async () => {
+    (api.items.list as any).mockRejectedValueOnce(new Error("boom"));
+
+    const realUseState = React.useState;
+    const draftsSetter = vi.fn() as React.Dispatch<unknown>;
+    const useStateSpy = vi.spyOn(React, "useState");
+    useStateSpy
+      .mockImplementationOnce(realUseState) // items
+      .mockImplementationOnce(
+        (<S,>(_initialState: S | (() => S)): [S, React.Dispatch<React.SetStateAction<S>>] => [
+          [{ id: "d1", status: "pending" }] as S,
+          draftsSetter as React.Dispatch<React.SetStateAction<S>>,
+        ]) as typeof React.useState,
+      ) // drafts
+      .mockImplementation(realUseState);
+
+    render(<AdminItemsPage/>);
+    await waitFor(() => expect(api.items.list).toHaveBeenCalled());
+
+    expect(draftsSetter).not.toHaveBeenCalled();
+    useStateSpy.mockRestore();
   });
 });

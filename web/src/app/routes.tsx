@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -140,7 +141,7 @@ function AdminNavigation() {
   );
 }
 
-export function AdminRoute() {
+export function AdminRoute({ children }: { children?: ReactNode }) {
   const { profile, user } = useAuth();
   
   if (!profile) {
@@ -188,7 +189,7 @@ export function AdminRoute() {
   return (
     <div>
       <AdminNavigation />
-      <Outlet />
+      {children ?? <Outlet />}
     </div>
   );
 }
