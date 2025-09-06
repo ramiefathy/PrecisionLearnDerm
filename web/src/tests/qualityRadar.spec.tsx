@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { QualityRadar } from '../components/evaluation/QualityRadar';
 
@@ -45,5 +45,19 @@ describe('QualityRadar', () => {
     expect(sliders.length).toBe(2);
     expect(screen.getByText('Pipeline A')).toBeInTheDocument();
     expect(screen.getByText('Pipeline B')).toBeInTheDocument();
+  });
+
+  it('initializes indices for new pipelines while preserving existing values', () => {
+    const initial = results.slice(0, 2);
+    const { rerender } = render(<QualityRadar results={initial as any} />);
+
+    const sliderA = screen.getByRole('slider');
+    fireEvent.change(sliderA, { target: { value: 1 } });
+    expect(sliderA).toHaveAttribute('aria-valuenow', '1');
+
+    rerender(<QualityRadar results={results as any} />);
+    const sliders = screen.getAllByRole('slider');
+    expect(sliders[0]).toHaveAttribute('aria-valuenow', '1');
+    expect(sliders[1]).toHaveAttribute('aria-valuenow', '0');
   });
 });

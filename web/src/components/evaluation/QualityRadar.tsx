@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Box, Grid, Slider, Typography } from '@mui/material';
 import {
   Chart as ChartJS,
@@ -31,15 +31,30 @@ export interface QualityRadarProps {
 }
 
 export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
-  const pipelines = Array.from(new Set(results.map(r => r.testCase.pipeline)));
-  const [indices, setIndices] = useState<Record<string, number>>(
-    Object.fromEntries(pipelines.map(p => [p, 0]))
-  );
+  const pipelineGroups = useMemo(() => {
+    return results.reduce<Record<string, TestResult[]>>((acc, r) => {
+      const key = r.testCase.pipeline;
+      (acc[key] ||= []).push(r);
+      return acc;
+    }, {});
+  }, [results]);
+  const pipelines = Object.keys(pipelineGroups);
+  const [indices, setIndices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    setIndices(prev => {
+      const next = { ...prev };
+      pipelines.forEach(p => {
+        if (!(p in next)) next[p] = 0;
+      });
+      return next;
+    });
+  }, [pipelines]);
 
   const renderAverageRadar = (pipeline: string) => {
-    const valid = results
-      .filter(r => r.testCase.pipeline === pipeline)
-      .filter(r => metrics.every(m => typeof r.aiScoresFlat?.[m] === 'number')) as TestResult[];
+    const valid = (pipelineGroups[pipeline] || []).filter(r =>
+      metrics.every(m => typeof r.aiScoresFlat?.[m] === 'number')
+    ) as TestResult[];
     if (valid.length === 0) return null;
 
     const avgValues = metrics.map(m =>
@@ -76,9 +91,9 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
   };
 
   const renderQuestionRadar = (pipeline: string) => {
-    const valid = results
-      .filter(r => r.testCase.pipeline === pipeline)
-      .filter(r => metrics.every(m => typeof r.aiScoresFlat?.[m] === 'number')) as TestResult[];
+    const valid = (pipelineGroups[pipeline] || []).filter(r =>
+      metrics.every(m => typeof r.aiScoresFlat?.[m] === 'number')
+    ) as TestResult[];
     if (valid.length === 0) return null;
 
     const idx = Math.min(indices[pipeline] ?? 0, valid.length - 1);
@@ -107,7 +122,9 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
           max={valid.length - 1}
           step={1}
           marks
-          onChange={(_, v) => setIndices({ ...indices, [pipeline]: v as number })}
+          onChange={(_, v) =>
+            setIndices(prev => ({ ...prev, [pipeline]: v as number }))
+          }
           sx={{ mb: 2 }}
         />
         <Box sx={{ height: 300 }}>
