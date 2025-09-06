@@ -967,17 +967,18 @@ export const cancelEvaluationJob = functions
 /**
  * Determine if a question should be added to the admin review queue
  */
-function shouldAddToReviewQueue(result: any): boolean {
+export function shouldAddToReviewQueue(result: any): boolean {
   // Only add questions that meet certain quality thresholds or need admin review
   if (!result.aiScores) return false;
-  
-  // Add questions that score below 70% overall or have specific issues
-  const needsReview = result.aiScores.overall < 70 ||
-                     result.aiScores.metadata.boardReadiness === 'major_revision' ||
-                     result.aiScores.metadata.boardReadiness === 'reject' ||
-                     result.aiScores.coreQuality.medicalAccuracy < 80;
-  
-  return needsReview;
+
+  const { aiScores } = result;
+  const meetsHighScore = aiScores.overall >= 70;
+  const legacyIssues =
+    aiScores.metadata?.boardReadiness === 'major_revision' ||
+    aiScores.metadata?.boardReadiness === 'reject' ||
+    aiScores.coreQuality?.medicalAccuracy < 80;
+
+  return meetsHighScore || legacyIssues;
 }
 
 /**
