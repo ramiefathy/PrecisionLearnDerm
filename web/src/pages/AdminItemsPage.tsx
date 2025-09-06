@@ -108,7 +108,7 @@ export default function AdminItemsPage() {
       console.error('Error loading items:', error);
       handleAdminError(error, 'load items');
       
-      // No fallbacks - set to empty arrays on error
+      // No fallbacks - clear items on error but keep existing drafts
       setItems([]);
     } finally {
       setLoading(false);
