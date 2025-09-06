@@ -48,11 +48,12 @@ export default function AdminQuestionIterationPage() {
   async function handleSend() {
     if (!prompt.trim() || !question) return;
     const feedback = prompt.trim();
+    const currentId = question.id;
     setConversation(prev => [...prev, { role: 'admin', content: feedback, timestamp: Date.now() }]);
     setSending(true);
     try {
       const res = (await api.admin.regenerateQuestion({
-        questionId: question.id,
+        questionId: currentId,
         questionData: question.draftItem,
         adminFeedback: feedback,
       })) as any;
@@ -72,11 +73,14 @@ export default function AdminQuestionIterationPage() {
             explanation: regen.explanation || regen.IMPROVED_EXPLANATION || question.draftItem.explanation,
           },
         };
-        setQuestion(updated);
-        setConversation(prev => [
-          ...prev,
-          { role: 'ai', content: 'Regenerated question', question: regen, timestamp: Date.now() }
-        ]);
+        setQuestion(prev => {
+          if (prev?.id !== currentId) return prev;
+          setConversation(conv => [
+            ...conv,
+            { role: 'ai', content: 'Regenerated question', question: regen, timestamp: Date.now() }
+          ]);
+          return updated;
+        });
       } else {
         toast.error('Regeneration failed', res.error || 'Unable to regenerate');
       }
@@ -150,7 +154,8 @@ export default function AdminQuestionIterationPage() {
           </button>
           <button
             onClick={handleApprove}
-            className="px-4 py-2 bg-green-600 text-white rounded"
+            disabled={sending}
+            className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
           >
             Approve
           </button>
