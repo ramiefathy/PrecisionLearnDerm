@@ -23,6 +23,7 @@ const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage.tsx'));
 const AdminItemsPage = lazy(() => import('./pages/AdminItemsPage.tsx'));
 const AdminQuestionReviewPage = lazy(() => import('./pages/AdminQuestionReviewPage'));
 const AdminQuestionGenerationPage = lazy(() => import('./pages/AdminQuestionGenerationPage'));
+const AdminQuestionIterationPage = lazy(() => import('./pages/AdminQuestionIterationPage.tsx'));
 const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage'));
 const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
@@ -165,6 +166,7 @@ function AppRoutes() {
                   <Route path="/admin/setup" element={<AdminSetupPage />} />
                   <Route path="/admin/items" element={<AdminItemsPage />} />
                   <Route path="/admin/review" element={<AdminQuestionReviewPage />} />
+                  <Route path="/admin/iteration" element={<AdminQuestionIterationPage />} />
                   <Route path="/admin/generate" element={<AdminQuestionGenerationPage />} />
                   <Route path="/admin/testing" element={<AdminTestingPage />} />
                   <Route path="/admin/question-bank" element={<AdminQuestionBankPage />} />
