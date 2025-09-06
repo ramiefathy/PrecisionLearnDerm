@@ -169,7 +169,27 @@ export async function updateJobProgress(
   status?: EvaluationJob['status']
 ): Promise<void> {
   try {
-    const updates: any = {
+    const jobRef = db.collection('evaluationJobs').doc(jobId);
+    const snapshot = await jobRef.get();
+    const current = snapshot.data() as EvaluationJob | undefined;
+
+    if (!current) {
+      logger.warn('[EVAL_MANAGER] Attempted to update progress for missing job', {
+        jobId
+      });
+      return;
+    }
+
+    // Ignore updates for jobs no longer active
+    if (current.status !== 'pending' && current.status !== 'running') {
+      logger.info('[EVAL_MANAGER] Skipping progress update for inactive job', {
+        jobId,
+        status: current.status
+      });
+      return;
+    }
+
+    const updates: Record<string, any> = {
       updatedAt: admin.firestore.Timestamp.now()
     };
 
@@ -189,7 +209,7 @@ export async function updateJobProgress(
       }
     }
 
-    await db.collection('evaluationJobs').doc(jobId).update(updates);
+    await jobRef.update(updates);
 
     logger.info('[EVAL_MANAGER] Updated job progress', {
       jobId,
