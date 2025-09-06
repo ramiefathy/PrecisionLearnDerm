@@ -47,11 +47,16 @@ describe("AdminItemsPage", () => {
     (api.items.list as any).mockRejectedValueOnce(new Error("boom"));
 
     const realUseState = React.useState;
-    const draftsSetter = vi.fn();
+    const draftsSetter = vi.fn() as React.Dispatch<unknown>;
     const useStateSpy = vi.spyOn(React, "useState");
     useStateSpy
       .mockImplementationOnce(realUseState) // items
-      .mockImplementationOnce((_initial) => [[{ id: "d1", status: "pending" }], draftsSetter]) // drafts
+      .mockImplementationOnce(
+        (_initial: unknown): [unknown, React.Dispatch<unknown>] => [
+          [{ id: "d1", status: "pending" }],
+          draftsSetter,
+        ],
+      ) // drafts
       .mockImplementation(realUseState);
 
     render(<AdminItemsPage/>);
