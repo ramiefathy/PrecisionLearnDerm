@@ -52,10 +52,10 @@ describe("AdminItemsPage", () => {
     useStateSpy
       .mockImplementationOnce(realUseState) // items
       .mockImplementationOnce(
-        (_initial: unknown): [unknown, React.Dispatch<unknown>] => [
-          [{ id: "d1", status: "pending" }],
-          draftsSetter,
-        ],
+        (<S,>(_initialState: S | (() => S)): [S, React.Dispatch<React.SetStateAction<S>>] => [
+          [{ id: "d1", status: "pending" }] as S,
+          draftsSetter as React.Dispatch<React.SetStateAction<S>>,
+        ]) as typeof React.useState,
       ) // drafts
       .mockImplementation(realUseState);
 
