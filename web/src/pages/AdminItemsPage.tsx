@@ -24,7 +24,7 @@ interface Item {
   updatedAt?: string;
 }
 
-interface Draft {
+interface ItemDraft {
   id: string;
   status: string;
   content?: any;
@@ -38,7 +38,7 @@ type SortOrder = 'asc' | 'desc';
 
 export default function AdminItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [drafts, setDrafts] = useState<ItemDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('items');
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +92,7 @@ export default function AdminItemsPage() {
       })) || [];
 
       // Load drafts from database (no mock data fallbacks)
-      let realDrafts: Draft[] = [];
+      let realDrafts: ItemDraft[] = [];
       try {
         // TODO: Implement real drafts API call when drafts endpoint is available
         // const draftsResponse = await api.admin.getDrafts({ limit: 50 });
@@ -210,7 +210,7 @@ export default function AdminItemsPage() {
     }
   };
 
-  const handlePromoteDraft = async (draft: Draft) => {
+  const handlePromoteDraft = async (draft: ItemDraft) => {
     if (draft.status !== 'approved') {
       toast.error('Draft not approved', 'Only approved drafts can be promoted to active items');
       return;
