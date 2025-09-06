@@ -49,14 +49,13 @@ import {
   LineElement,
   BarElement,
   BubbleController,
-  RadialLinearScale,
   ArcElement,
   Title,
   Tooltip as ChartTooltip,
   Legend,
   Filler
 } from 'chart.js';
-import { Line, Bar, Radar, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -70,6 +69,8 @@ import { ScoreDistributions } from './ScoreDistributions';
 import { TopicDifficultyHeatmap } from './TopicDifficultyHeatmap';
 import { TimelinePanel } from './TimelinePanel';
 import { useEvaluationData } from '../../hooks/useEvaluationData';
+import { ScoreProgression } from './ScoreProgression';
+import { QualityRadar } from './QualityRadar';
 import type { EvaluationFilters, PipelineAggregate, ScoreSample } from '../../types';
 
 // Register Chart.js components
@@ -80,7 +81,6 @@ ChartJS.register(
   LineElement,
   BarElement,
   BubbleController,
-  RadialLinearScale,
   ArcElement,
   Title,
   ChartTooltip,
@@ -375,43 +375,6 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         borderWidth: 1
       }]
     };
-  };
-
-  const prepareRadarData = () => {
-    const pipelines = Array.from(new Set(testResults.map(r => r.testCase.pipeline)));
-    const labels = ['Clinical Realism', 'Medical Accuracy', 'Distractor Quality', 'Cueing Absence'];
-
-    const datasets = pipelines.reduce((acc: any[], p, idx) => {
-      const prs = testResults.filter(r => r.testCase.pipeline === p);
-      const hasMissing = prs.some(r => {
-        const s = r.aiScoresFlat;
-        return !s || s.clinicalRealism == null || s.medicalAccuracy == null || s.distractorQuality == null || s.cueingAbsence == null;
-      });
-      if (hasMissing) return acc;
-
-      const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-      const cr = avg(prs.map(r => r.aiScoresFlat!.clinicalRealism!));
-      const ma = avg(prs.map(r => r.aiScoresFlat!.medicalAccuracy!));
-      const dq = avg(prs.map(r => r.aiScoresFlat!.distractorQuality!));
-      const ca = avg(prs.map(r => r.aiScoresFlat!.cueingAbsence!));
-      const colors = [
-        'rgba(255,99,132,1)',
-        'rgba(54,162,235,1)',
-        'rgba(255,206,86,1)',
-        'rgba(75,192,192,1)',
-        'rgba(153,102,255,1)'
-      ];
-      acc.push({
-        label: p,
-        data: [cr, ma, dq, ca],
-        borderColor: colors[idx % colors.length],
-        backgroundColor: 'rgba(0,0,0,0)',
-        pointBackgroundColor: colors[idx % colors.length]
-      } as any);
-      return acc;
-    }, []);
-
-    return datasets.length > 0 ? { labels, datasets } : null;
   };
 
   const prepareScoreComparisonData = () => {
@@ -719,24 +682,7 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
         {selectedTab === 0 && (
           <Box>
             <Typography variant="h6" gutterBottom>Score Progression</Typography>
-            <Box sx={{ height: 400 }}>
-              <Line 
-                data={prepareTimeSeriesData()} 
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    x: {
-                      title: { display: true, text: 'Test # (discrete)' }
-                    },
-                    y: {
-                      beginAtZero: true,
-                      max: 100
-                    }
-                  }
-                }}
-              />
-            </Box>
+            <ScoreProgression testResults={testResults} />
 
             <Box sx={{ mt: 4 }}>
               <Typography variant="h6" gutterBottom>Score Type Comparison</Typography>
@@ -744,8 +690,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
                 Comparison of AI scores, rule-based scores, and detailed quality scores
               </Typography>
               <Box sx={{ height: 400 }}>
-                <Line 
-                  data={prepareScoreComparisonData()} 
+                <Line
+                  data={prepareScoreComparisonData()}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
@@ -794,34 +740,8 @@ export const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({ jobId 
 
         {selectedTab === 2 && (
           <Box>
-            <Typography variant="h6" gutterBottom>Quality Dimensions</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              All dimensions scored 0-100. Generation Time: higher score = faster generation (100 = instant, 0 = 30s+)
-            </Typography>
-            <Box sx={{ height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              {(() => {
-                const data = prepareRadarData();
-                return data ? (
-                  <Box sx={{ width: '60%' }}>
-                    <Radar
-                      data={data}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                          r: {
-                            beginAtZero: true,
-                            max: 100
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No data available</Typography>
-                );
-              })()}
-            </Box>
+            <Typography variant="h6" gutterBottom>Quality Radar</Typography>
+            <QualityRadar testResults={testResults} />
           </Box>
         )}
 
