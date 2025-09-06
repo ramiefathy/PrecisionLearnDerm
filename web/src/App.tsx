@@ -161,23 +161,98 @@ function AppRoutes() {
 
             {/* Protected admin routes */}
             <Route element={<ProtectedRoute />}>
-              <Route element={<AdminRoute />}>
-                <Route element={<PageLayout />}>
-                  <Route path="/admin/setup" element={<AdminSetupPage />} />
-                  <Route path="/admin/items" element={<AdminItemsPage />} />
-                  <Route path="/admin/review" element={<AdminQuestionReviewPage />} />
-                  <Route path="/admin/iteration" element={<AdminQuestionIterationPage />} />
-                  <Route path="/admin/generate" element={<AdminQuestionGenerationPage />} />
-                  <Route path="/admin/testing" element={<AdminTestingPage />} />
-                  <Route path="/admin/question-bank" element={<AdminQuestionBankPage />} />
-                  <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
-                  <Route path="/admin/logs" element={<AdminLogsPage />} />
-                  {/* Legacy evaluation dashboard */}
-                  <Route path="/admin/evaluation" element={<AdminPipelineEvaluation />} />
-                  {/* New evaluation system */}
-                  <Route path="/admin/evaluation-v2" element={<AdminEvaluationV2Page />} />
-                  <Route path="/admin" element={<Navigate to="/admin/setup" replace />} />
-                </Route>
+              <Route element={<PageLayout />}>
+                <Route
+                  path="/admin/setup"
+                  element={
+                    <AdminRoute>
+                      <AdminSetupPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/items"
+                  element={
+                    <AdminRoute>
+                      <AdminItemsPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/review"
+                  element={
+                    <AdminRoute>
+                      <AdminQuestionReviewPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/iteration"
+                  element={
+                    <AdminRoute>
+                      <AdminQuestionIterationPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/generate"
+                  element={
+                    <AdminRoute>
+                      <AdminQuestionGenerationPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/testing"
+                  element={
+                    <AdminRoute>
+                      <AdminTestingPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/question-bank"
+                  element={
+                    <AdminRoute>
+                      <AdminQuestionBankPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/taxonomy"
+                  element={
+                    <AdminRoute>
+                      <AdminTaxonomyPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/logs"
+                  element={
+                    <AdminRoute>
+                      <AdminLogsPage />
+                    </AdminRoute>
+                  }
+                />
+                {/* Legacy evaluation dashboard */}
+                <Route
+                  path="/admin/evaluation"
+                  element={
+                    <AdminRoute>
+                      <AdminPipelineEvaluation />
+                    </AdminRoute>
+                  }
+                />
+                {/* New evaluation system */}
+                <Route
+                  path="/admin/evaluation-v2"
+                  element={
+                    <AdminRoute>
+                      <AdminEvaluationV2Page />
+                    </AdminRoute>
+                  }
+                />
+                <Route path="/admin" element={<Navigate to="/admin/setup" replace />} />
               </Route>
             </Route>
             
