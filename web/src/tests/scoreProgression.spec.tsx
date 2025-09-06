@@ -39,6 +39,14 @@ const results = [
   }
 ];
 
+const resultsWithEmpty = [
+  ...results,
+  {
+    testCase: { pipeline: 'Pipeline C' },
+    aiScoresFlat: { overall: null }
+  }
+];
+
 describe('ScoreProgression', () => {
   it('renders one chart per pipeline', () => {
     render(<ScoreProgression results={results as any} />);
@@ -46,5 +54,12 @@ describe('ScoreProgression', () => {
     expect(charts).toHaveLength(2);
     expect(screen.getByText('Pipeline A')).toBeInTheDocument();
     expect(screen.getByText('Pipeline B')).toBeInTheDocument();
+  });
+
+  it('omits pipelines without valid points', () => {
+    render(<ScoreProgression results={resultsWithEmpty as any} />);
+    const charts = screen.getAllByTestId('line-chart');
+    expect(charts).toHaveLength(2);
+    expect(screen.queryByText('Pipeline C')).not.toBeInTheDocument();
   });
 });

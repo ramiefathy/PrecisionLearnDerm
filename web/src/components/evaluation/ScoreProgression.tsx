@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Box, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
 import {
   Chart as ChartJS,
@@ -46,7 +46,12 @@ export interface ScoreProgressionProps {
 
 export const ScoreProgression: React.FC<ScoreProgressionProps> = ({ results }) => {
   const [metric, setMetric] = useState<Metric>('overall');
-  const pipelines = Array.from(new Set(results.map(r => r.testCase.pipeline)));
+  const pipelineGroups = useMemo(() => {
+    return results.reduce<Record<string, TestResult[]>>((acc, r) => {
+      (acc[r.testCase.pipeline] ||= []).push(r);
+      return acc;
+    }, {});
+  }, [results]);
 
   return (
     <Box>
@@ -66,8 +71,7 @@ export const ScoreProgression: React.FC<ScoreProgressionProps> = ({ results }) =
         </Select>
       </FormControl>
 
-      {pipelines.map(pipeline => {
-        const pipelineResults = results.filter(r => r.testCase.pipeline === pipeline);
+      {Object.entries(pipelineGroups).map(([pipeline, pipelineResults]) => {
         const points = pipelineResults
           .map((r, idx) => ({ x: idx + 1, y: r.aiScoresFlat?.[metric] ?? null }))
           .filter(pt => pt.y != null) as { x: number; y: number }[];
