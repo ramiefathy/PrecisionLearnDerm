@@ -110,7 +110,6 @@ export default function AdminItemsPage() {
       
       // No fallbacks - set to empty arrays on error
       setItems([]);
-      setDrafts([]);
     } finally {
       setLoading(false);
     }
