@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { toast } from '../components/Toast';
 import { handleAdminError } from '../lib/errorHandler';
 import { Link } from 'react-router-dom';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface SystemHealth {
   database: 'healthy' | 'warning' | 'error';
@@ -46,6 +47,7 @@ export default function AdminSetupPage() {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [grantingAdmin, setGrantingAdmin] = useState(false);
   const [revokingAdmin, setRevokingAdmin] = useState<string | null>(null);
+  const [dialogEmail, setDialogEmail] = useState<string | null>(null);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [setupKey, setSetupKey] = useState('');
 
@@ -186,17 +188,18 @@ export default function AdminSetupPage() {
     }
   };
 
-  const handleRevokeAdminRole = async (email: string) => {
-    if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) {
-      return;
-    }
+  const handleRevokeAdminRole = (email: string) => {
+    setDialogEmail(email);
+  };
 
-    setRevokingAdmin(email);
+  const confirmRevokeAdminRole = async () => {
+    if (!dialogEmail) return;
+    setRevokingAdmin(dialogEmail);
     try {
-      const result = await api.admin.revokeAdminRole({ email });
+      const result = await api.admin.revokeAdminRole({ email: dialogEmail });
 
       if (result.success) {
-        toast.success('Admin role revoked', `${email} no longer has admin access`);
+        toast.success('Admin role revoked', `${dialogEmail} no longer has admin access`);
         await loadAdminUsers();
       } else {
         toast.error('Failed to revoke admin role', result.message || 'Unknown error');
@@ -205,7 +208,12 @@ export default function AdminSetupPage() {
       handleAdminError(error, 'revoke admin role');
     } finally {
       setRevokingAdmin(null);
+      setDialogEmail(null);
     }
+  };
+
+  const cancelRevokeAdminRole = () => {
+    setDialogEmail(null);
   };
 
   const getHealthColor = (status: string) => {
@@ -228,6 +236,15 @@ export default function AdminSetupPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <ConfirmDialog
+        open={!!dialogEmail}
+        title="Revoke Admin Access"
+        description={`Are you sure you want to revoke admin access for ${dialogEmail}?`}
+        confirmText="Revoke"
+        cancelText="Cancel"
+        onConfirm={confirmRevokeAdminRole}
+        onCancel={cancelRevokeAdminRole}
+      />
       {/* Header */}
       <div className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-6">
