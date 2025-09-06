@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Grid, Slider, Typography } from '@mui/material';
 import {
   Chart as ChartJS,
@@ -7,7 +7,8 @@ import {
   LineElement,
   Filler,
   Tooltip,
-  Legend
+  Legend,
+  type ChartOptions
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
 
@@ -34,6 +35,15 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
   const pipelines = Array.from(new Set(results.map(r => r.testCase.pipeline)));
   const [indices, setIndices] = useState<Record<string, number>>(
     Object.fromEntries(pipelines.map(p => [p, 0]))
+  );
+
+  const radarOptions: ChartOptions<'radar'> = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { r: { beginAtZero: true, max: 100 } }
+    }),
+    []
   );
 
   const renderAverageRadar = (pipeline: string) => {
@@ -63,14 +73,7 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
         <Typography variant="subtitle1" gutterBottom>
           {pipeline}
         </Typography>
-        <Radar
-          data={data}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { r: { beginAtZero: true, max: 100 } }
-          }}
-        />
+        <Radar data={data} options={radarOptions} />
       </Box>
     );
   };
@@ -111,14 +114,7 @@ export const QualityRadar: React.FC<QualityRadarProps> = ({ results }) => {
           sx={{ mb: 2 }}
         />
         <Box sx={{ height: 300 }}>
-          <Radar
-            data={data}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              scales: { r: { beginAtZero: true, max: 100 } }
-            }}
-          />
+          <Radar data={data} options={radarOptions} />
         </Box>
       </Box>
     );
