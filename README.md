@@ -24,7 +24,9 @@ PrecisionLearnDerm is a sophisticated AI-powered platform designed to help medic
 
 Test and compare AI pipelines with live dashboards, logs, and canonicalized results.
 
-- Route: `/admin/evaluation`
+- Routes:
+  - `/admin/evaluation` (legacy)
+  - `/admin/evaluation-v2` (beta)
 - UI Components:
   - `web/src/components/evaluation/EvaluationDashboard.tsx` — live charts, table, question dialog
   - `web/src/components/evaluation/EvaluationProgressMonitor.tsx` — progress + cancel
