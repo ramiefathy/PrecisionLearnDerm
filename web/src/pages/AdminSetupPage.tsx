@@ -138,16 +138,20 @@ export default function AdminSetupPage() {
   };
 
   const loadAdminUsers = async () => {
+    const previousAdmins = adminUsers;
     try {
       setLoadingAdmins(true);
       const result = await api.admin.listAdmins();
-      
+
       if (result.success && result.data?.admins) {
         setAdminUsers(result.data.admins);
+      } else {
+        setAdminUsers(previousAdmins);
+        handleAdminError(new Error(result.message || 'Unknown error'), 'load admin users');
       }
     } catch (error: any) {
-      console.error('Error loading admin users:', error);
-      // Don't show error toast for this since it might fail on first admin setup
+      setAdminUsers(previousAdmins);
+      handleAdminError(error, 'load admin users');
     } finally {
       setLoadingAdmins(false);
     }
