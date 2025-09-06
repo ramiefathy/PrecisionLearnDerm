@@ -25,14 +25,15 @@ jobs:
       - name: Build Web
         working-directory: web
         run: npm run build
-      - name: Test Web (optional)
+      - name: Lint Web
         working-directory: web
-        run: npm run test || echo "Tests not configured, skipping"
-        continue-on-error: true
+        run: npm run lint
+      - name: Test Web
+        working-directory: web
+        run: npm run test
       - name: Install Functions deps
         working-directory: functions
         run: npm ci && npm run build
-      - name: Lint Functions (optional)
+      - name: Lint Functions
         working-directory: functions
-        run: npm run lint || echo "Linting not configured, skipping"
-        continue-on-error: true
+        run: npm run lint
