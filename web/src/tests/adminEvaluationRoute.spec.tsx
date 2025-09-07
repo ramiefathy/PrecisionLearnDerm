@@ -45,9 +45,7 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
 }));
 
-// Extend default test timeout for slow, lazy-loaded route rendering
-vi.setTimeout(20000);
-describe('Admin evaluation v2 route', () => {
+	describe('Admin evaluation v2 route', () => {
   it('renders evaluation dashboard for admin user', async () => {
     render(
       <MemoryRouter>
@@ -62,5 +60,5 @@ describe('Admin evaluation v2 route', () => {
       { timeout: 10000 }
     );
     expect(header).toBeInTheDocument();
-  });
+  }).timeout(20000);
 });
