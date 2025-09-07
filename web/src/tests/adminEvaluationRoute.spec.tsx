@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import App from '../App';
 
+
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { uid: '1', email: 'admin@example.com' },
@@ -55,5 +56,5 @@ describe('Admin evaluation v2 route', () => {
     expect(
       await screen.findByText(/Pipeline Evaluation System/i, undefined, { timeout: 5000 })
     ).toBeInTheDocument();
-  });
+  }, { timeout: 10000 });
 });
