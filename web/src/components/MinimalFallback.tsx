@@ -29,6 +29,7 @@ const MinimalLoadingFallback = () => (
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: '12px'
     }}>
       <div style={{
@@ -65,10 +66,11 @@ const MinimalErrorFallback = ({ resetError }: { error?: Error; resetError?: () =
     borderRadius: '8px',
     margin: '16px'
   }}>
-    <div style={{
+      <div style={{
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: '12px',
       textAlign: 'center',
       maxWidth: '400px'
@@ -97,6 +99,7 @@ const MinimalErrorFallback = ({ resetError }: { error?: Error; resetError?: () =
       {resetError && (
         <button
           onClick={resetError}
+          type="button"
           style={{
             padding: '8px 16px',
             backgroundColor: '#dc2626',

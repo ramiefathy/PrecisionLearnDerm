@@ -83,9 +83,16 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback UI provided
+      // Custom fallback UI provided (inject resetError handler if fallback is an element)
       if (this.props.fallback) {
-        return <>{this.props.fallback}</>;
+        const { fallback } = this.props;
+        if (React.isValidElement(fallback)) {
+          // Inject the error reset handler into the fallback element
+          return React.cloneElement(fallback as React.ReactElement<any>, {
+            resetError: this.handleReset,
+          });
+        }
+        return <>{fallback}</>;
       }
 
       // Default error UI

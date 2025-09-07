@@ -68,7 +68,8 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
 // Example: Defensive API component
 const AdminMetricsWidget = () => {
-  const [metrics, setMetrics] = React.useState(null);
+  type Metrics = { users: number; questions: number; activeTests: number };
+  const [metrics, setMetrics] = React.useState<Metrics | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
