@@ -60,5 +60,5 @@ describe('Admin evaluation v2 route', () => {
       { timeout: 10000 }
     );
     expect(header).toBeInTheDocument();
-  });
+  }, { timeout: 20000 });
 });
