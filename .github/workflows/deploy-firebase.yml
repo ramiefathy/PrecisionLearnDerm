@@ -12,9 +12,11 @@ jobs:
     name: Deploy Firebase Functions and Hosting
     runs-on: ubuntu-latest
     environment: production
-    env:
-      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-    
+
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -24,35 +26,34 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          cache: 'npm'
-          cache-dependency-path: functions/package-lock.json
+          node-version: 20
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Install Functions Dependencies
-        working-directory: ./functions
+        working-directory: functions
         run: |
           echo "Node version: $(node --version)"
-          echo "npm version: $(npm --version)"
+          echo "npm version:  $(npm --version)"
           npm ci || npm install
           npm run build
 
       - name: Install Web App Dependencies
-        working-directory: ./web
+        working-directory: web
         run: |
           echo "Building web app..."
           echo "Node version: $(node --version)"
-          echo "npm version: $(npm --version)"
-          npm ci || npm install
+          echo "npm version:  $(npm --version)"
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Deploy Firebase Hosting and Functions
         run: |
           npm install -g firebase-tools@latest
-          # Write service account JSON robustly (preserves newlines)
-          printf '%s' "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > /tmp/service-account-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account-key.json
-          firebase deploy --only hosting,functions --project "${FIREBASE_PROJECT_ID}" --non-interactive
-          rm /tmp/service-account-key.json
+          firebase deploy --only hosting,functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
 
       - name: Deployment succeeded
         if: success()
