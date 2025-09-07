@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
@@ -45,20 +45,24 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
 }));
 
-	describe('Admin evaluation v2 route', () => {
-  it('renders evaluation dashboard for admin user', async () => {
+describe('Admin evaluation v2 route', () => {
+  it('renders evaluation dashboard for admin user', { timeout: 20000 }, async () => {
     render(
       <MemoryRouter>
         <AdminEvaluationV2Page />
       </MemoryRouter>
     );
 
-    // Should display the main header on the pipeline evaluation page
-    const header = await screen.findByRole(
-      'heading',
-      { level: 1, name: /Pipeline Evaluation System/i },
+    // Poll for the <h1> to appear; retry up to 10s
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole('heading', {
+            level: 1,
+            name: /Pipeline Evaluation System/i,
+          })
+        ).toBeInTheDocument(),
       { timeout: 10000 }
     );
-    expect(header).toBeInTheDocument();
-  }, 20000);
+  });
 });
