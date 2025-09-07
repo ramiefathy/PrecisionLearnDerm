@@ -1,0 +1,82 @@
+name: Generate web/package-lock.json
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-web-lockfile
+  cancel-in-progress: false
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify web directory
+        run: |
+            if [ ! -f web/package.json ]; then
+              echo "ERROR: web/package.json not found."
+              exit 1
+            fi
+
+      - name: Generate (or update) lockfile
+        working-directory: ./web
+        run: |
+          set -e
+          echo "Node: $(node --version)"
+          echo "npm:  $(npm --version)"
+          npm install
+          ls -l package-lock.json || (echo "No package-lock.json produced!" && exit 1)
+
+      - name: Show lockfile diff (if any)
+        run: |
+          if git diff --quiet -- web/package-lock.json 2>/dev/null; then
+            echo "No changes to web/package-lock.json"
+          else
+            echo "Changes detected in web/package-lock.json:"
+            git --no-pager diff --name-status -- web/package-lock.json
+            # (Optional) Uncomment next line to see a short diffstat:
+            # git --no-pager diff --stat -- web/package-lock.json
+          fi
+
+      - name: Commit updated lockfile (if changed)
+        run: |
+          set -e
+          if git diff --quiet -- web/package-lock.json; then
+            echo "No commit needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/package-lock.json
+          git commit -m "chore(web): generate/update package-lock.json via CI"
+          git push
+          echo "Lockfile committed."
+
+      - name: Job summary
+        run: |
+          {
+            echo "### Generate web/package-lock.json"
+            if git diff --quiet -- web/package-lock.json; then
+              echo "- No changes were necessary."
+            else
+              echo "- Updated and pushed web/package-lock.json."
+            fi
+            echo "- Node version: $(node --version)"
+            echo "- npm version:  $(npm --version)"
+          } >> "$GITHUB_STEP_SUMMARY"
