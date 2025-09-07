@@ -53,7 +53,7 @@ describe('Admin evaluation v2 route', () => {
       </MemoryRouter>
     );
 
-    // Poll for the <h1> to appear; retry up to 10 s
+    // Poll for the <h1> to appear; retry up to 10s
     await waitFor(
       () =>
         expect(
