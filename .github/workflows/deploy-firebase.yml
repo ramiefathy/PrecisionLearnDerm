@@ -12,13 +12,15 @@ jobs:
     name: Deploy Firebase Functions and Hosting
     runs-on: ubuntu-latest
     environment: production
+    env:
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history to ensure all recent changes are included
-      
+          fetch-depth: 0
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,47 +29,37 @@ jobs:
           cache-dependency-path: |
             functions/package-lock.json
             web/package-lock.json
-      
-      # Install and build functions dependencies
+
       - name: Install Functions Dependencies
         working-directory: ./functions
         run: |
           echo "Node version: $(node --version)"
           echo "npm version: $(npm --version)"
-          # Prefer clean install with lockfile; fall back to install if needed
           npm ci || npm install
           npm run build
-      
-      # Install and build web app dependencies
+
       - name: Install Web App Dependencies
         working-directory: ./web
         run: |
           echo "Building web app..."
-          npm ci
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          npm ci || npm install
           npm run build
-      
+
       - name: Deploy Firebase Hosting and Functions
         run: |
-          # Install Firebase CLI
           npm install -g firebase-tools@latest
-          
-          # Create temporary service account file
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service-account-key.json
-          
-          # Set GOOGLE_APPLICATION_CREDENTIALS
+          # Write service account JSON robustly (preserves newlines)
+          printf '%s' "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > /tmp/service-account-key.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account-key.json
-          
-          # Deploy both hosting and functions using service account authentication
-          firebase deploy --only hosting,functions --project '${{ secrets.FIREBASE_PROJECT_ID }}' --non-interactive
-          
-          # Clean up service account file
+          firebase deploy --only hosting,functions --project "${FIREBASE_PROJECT_ID}" --non-interactive
           rm /tmp/service-account-key.json
-      
-      - name: Deployment Status
-        if: always()
-        run: |
-          if [ $? -eq 0 ]; then
-            echo "✅ Deployment successful!"
-          else
-            echo "❌ Deployment failed. Check logs above."
-          fi
+
+      - name: Deployment succeeded
+        if: success()
+        run: echo "✅ Deployment successful!"
+
+      - name: Deployment failed
+        if: failure()
+        run: echo "❌ Deployment failed. Check logs above."
