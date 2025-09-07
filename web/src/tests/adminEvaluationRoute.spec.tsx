@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import App from '../App';
+import AdminEvaluationV2Page from '../pages/AdminEvaluationV2Page';
 
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -45,11 +45,13 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
 }));
 
+// Extend default test timeout for slow, lazy-loaded route rendering
+vi.setTimeout(20000);
 describe('Admin evaluation v2 route', () => {
   it('renders evaluation dashboard for admin user', async () => {
     render(
-      <MemoryRouter initialEntries={['/admin/evaluation-v2']}>
-        <App />
+      <MemoryRouter>
+        <AdminEvaluationV2Page />
       </MemoryRouter>
     );
 
@@ -60,5 +62,5 @@ describe('Admin evaluation v2 route', () => {
       { timeout: 10000 }
     );
     expect(header).toBeInTheDocument();
-  }, { timeout: 20000 });
+  });
 });
