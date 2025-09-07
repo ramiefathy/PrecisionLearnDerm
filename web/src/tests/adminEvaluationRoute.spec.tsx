@@ -60,5 +60,5 @@ vi.mock('firebase/firestore', () => ({
       { timeout: 10000 }
     );
     expect(header).toBeInTheDocument();
-  }).timeout(20000);
+  }, 20000);
 });
