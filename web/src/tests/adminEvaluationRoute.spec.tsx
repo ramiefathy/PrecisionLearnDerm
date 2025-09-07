@@ -53,8 +53,12 @@ describe('Admin evaluation v2 route', () => {
       </MemoryRouter>
     );
 
-    expect(
-      await screen.findByText(/Pipeline Evaluation System/i, undefined, { timeout: 5000 })
-    ).toBeInTheDocument();
-  }, { timeout: 10000 });
+    // Should display the main header on the pipeline evaluation page
+    const header = await screen.findByRole(
+      'heading',
+      { level: 1, name: /Pipeline Evaluation System/i },
+      { timeout: 10000 }
+    );
+    expect(header).toBeInTheDocument();
+  });
 });
