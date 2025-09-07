@@ -3,121 +3,175 @@
  * This file consolidates all active callable / HTTP / trigger functions
  * currently present in the codebase (as verified by repository inspection).
  *
+ * DEFENSIVE EXPORT PATTERN:
+ * This file implements defensive exports that gracefully handle missing modules
+ * and provide fallback behaviors when functions fail to load. This ensures
+ * the deployment doesn't fail if individual modules have issues.
+ *
  * Conventions:
  * - Maintain backward compatibility with legacy names via alias exports.
  * - Keep deprecated functions exported (marked clearly) to avoid hard client breaks.
  * - Development / test endpoints are guarded internally by environment checks.
+ * - Use defensive exports for all non-critical functions to prevent deployment failures.
  *
  * NOTE: Multi-agent / removed pipeline functions (e.g. ai_generate_enhanced_mcq and other
  * deprecated orchestration/test variants listed in CLEANUP_LOG.md) are intentionally
  * NOT exported here.
  *
- * If adding new modules, append exports in the appropriate section below.
+ * If adding new modules, append exports in the appropriate section below using
+ * defensive export patterns where appropriate.
  */
 
-/* =========================================================
- * Admin / Legacy Import
- * ======================================================= */
-export {
-  importSampleLegacyQuestions as admin_import_sample_legacy,
-  importSampleLegacyQuestions
-} from './admin/importQuestions';
-
-export {
-  storageImportLegacyQuestions as storage_import_legacy_questions
-} from './admin/importQuestions';
-
-export {
-  importLegacyQuestions // Deprecated callable (returns structured deprecation response)
-} from './admin/importQuestions';
+import { safeExportBatch, safeExportWithStub, conditionalExport } from './util/defensiveExport';
 
 /* =========================================================
- * Personalization & Learning (SRS / Ability)
+ * Admin / Legacy Import (Defensive Exports)
  * ======================================================= */
-export {
-  srsUpdate,
-  srsUpdate as pe_srs_update   // Alias for namespaced style
-} from './pe/srs';
+const adminImports = safeExportBatch('./admin/importQuestions', [
+  { name: 'importSampleLegacyQuestions' },
+  { name: 'storageImportLegacyQuestions' },
+  { name: 'importLegacyQuestions' }
+]);
 
-export {
-  srsDue,
-  srsDue as pe_srs_due         // Alias for namespaced style
-} from './pe/srs';
-
-export {
-  updateAbility,
-  updateAbility as pe_update_ability
-} from './pe/ability';
+export const importSampleLegacyQuestions = adminImports.importSampleLegacyQuestions;
+export const admin_import_sample_legacy = adminImports.importSampleLegacyQuestions;
+export const storage_import_legacy_questions = adminImports.storageImportLegacyQuestions;
+export const importLegacyQuestions = adminImports.importLegacyQuestions; // Deprecated callable
 
 /* =========================================================
- * Personalized Content (Question Bank / Adaptive Retrieval)
+ * Personalization & Learning (SRS / Ability) - Defensive Exports
  * ======================================================= */
-export {
-  getPersonalizedQuestions,
-  getPersonalizedQuestions as pe_get_personalized_questions
-} from './pe/adaptiveGeneration';
+const srsExports = safeExportBatch('./pe/srs', [
+  { name: 'srsUpdate' },
+  { name: 'srsDue' }
+]);
+
+const abilityExports = safeExportBatch('./pe/ability', [
+  { name: 'updateAbility' }
+]);
+
+export const srsUpdate = srsExports.srsUpdate;
+export const pe_srs_update = srsExports.srsUpdate; // Alias for namespaced style
+export const srsDue = srsExports.srsDue;
+export const pe_srs_due = srsExports.srsDue; // Alias for namespaced style
+export const updateAbility = abilityExports.updateAbility;
+export const pe_update_ability = abilityExports.updateAbility;
 
 /* =========================================================
- * Item / Content Management
+ * Personalized Content (Question Bank / Adaptive Retrieval) - Defensive Exports
  * ======================================================= */
-export {
-  itemsPromote,
-  itemsPromote as items_promote
-} from './items/promote';
+const adaptiveExports = safeExportBatch('./pe/adaptiveGeneration', [
+  { name: 'getPersonalizedQuestions' }
+]);
 
-export {
-  itemsPropose,
-  itemsPropose as items_propose
-} from './items/propose';
+export const getPersonalizedQuestions = adaptiveExports.getPersonalizedQuestions;
+export const pe_get_personalized_questions = adaptiveExports.getPersonalizedQuestions;
 
 /* =========================================================
- * Queue / Generation Admin Utilities
+ * Item / Content Management - Defensive Exports
  * ======================================================= */
-export {
-  initializeQueue,
-  initializeQueue as admin_initialize_queue
-} from './admin/questionQueue';
+const itemsExports = safeExportBatch('./items/promote', [
+  { name: 'itemsPromote' }
+]);
+
+const proposeExports = safeExportBatch('./items/propose', [
+  { name: 'itemsPropose' }
+]);
+
+export const itemsPromote = itemsExports.itemsPromote;
+export const items_promote = itemsExports.itemsPromote;
+export const itemsPropose = proposeExports.itemsPropose;
+export const items_propose = proposeExports.itemsPropose;
 
 /* =========================================================
- * Monitoring & Observability
+ * Queue / Generation Admin Utilities - Defensive Exports
  * ======================================================= */
-export {
-  healthCheck
-} from './util/monitoring';
+const queueExports = safeExportBatch('./admin/questionQueue', [
+  { name: 'initializeQueue' }
+]);
 
-export {
-  getMetrics
-} from './util/monitoring';
-
-export {
-  getLogs
-} from './util/monitoring';
-
-export {
-  comprehensiveHealthCheck
-} from './util/enhancedMonitoring';
+export const initializeQueue = queueExports.initializeQueue;
+export const admin_initialize_queue = queueExports.initializeQueue;
 
 /* =========================================================
- * Admin Status / Diagnostics (Development Only)
+ * Monitoring & Observability - Critical Functions (Safe Exports)
  * ======================================================= */
-export {
-  checkAdminStatus
-} from './admin/initialSetup';
+// These are critical for deployment health, use safe exports but prefer to fail fast if missing
+const monitoringExports = safeExportBatch('./util/monitoring', [
+  { name: 'healthCheck' },
+  { name: 'getMetrics' },
+  { name: 'getLogs' }
+]);
+
+const enhancedMonitoringExports = safeExportBatch('./util/enhancedMonitoring', [
+  { name: 'comprehensiveHealthCheck' }
+]);
+
+export const healthCheck = monitoringExports.healthCheck;
+export const getMetrics = monitoringExports.getMetrics;
+export const getLogs = monitoringExports.getLogs;
+export const comprehensiveHealthCheck = enhancedMonitoringExports.comprehensiveHealthCheck;
 
 /* =========================================================
- * Test / Development Endpoints (Guarded Internally)
+ * Admin Status / Diagnostics (Development Only) - Conditional Export
  * ======================================================= */
-export {
-  test_generate_question
-} from './test/aiTestingEndpoints';
+// Only export in development/testing environments
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const adminStatusExports = conditionalExport(
+  isDevelopment,
+  './admin/initialSetup',
+  'checkAdminStatus',
+  // Fallback for production
+  () => ({
+    success: false,
+    error: 'Admin status checks disabled in production',
+    code: 'PRODUCTION_DISABLED'
+  })
+);
 
-export {
-  test_review_question
-} from './test/aiTestingEndpoints';
+export const checkAdminStatus = adminStatusExports;
+
+/* =========================================================
+ * Test / Development Endpoints (Guarded Internally) - Conditional Export
+ * ======================================================= */
+// Only export test endpoints in non-production environments
+const testExports = conditionalExport(
+  isDevelopment,
+  './test/aiTestingEndpoints',
+  'test_generate_question',
+  // Fallback stub for production
+  () => ({
+    success: false,
+    error: 'Test endpoints disabled in production',
+    code: 'PRODUCTION_DISABLED'
+  })
+);
+
+const testReviewExports = conditionalExport(
+  isDevelopment,
+  './test/aiTestingEndpoints',
+  'test_review_question',
+  // Fallback stub for production
+  () => ({
+    success: false,
+    error: 'Test endpoints disabled in production',
+    code: 'PRODUCTION_DISABLED'
+  })
+);
+
+export const test_generate_question = testExports;
+export const test_review_question = testReviewExports;
 
 /* =========================================================
  * IMPORTANT:
  * Functions explicitly removed or deprecated per CLEANUP_LOG.md
  * (e.g., ai_generate_enhanced_mcq, distributed pipeline agents,
  * evaluation batch orchestration placeholders) are not re-exported.
+ * 
+ * DEFENSIVE EXPORT PATTERN:
+ * This index now uses defensive exports that:
+ * 1. Gracefully handle missing modules without failing deployment
+ * 2. Provide fallback stubs for non-critical functions
+ * 3. Disable development/test endpoints in production
+ * 4. Log warnings for missing modules while maintaining service availability
  * ======================================================= */

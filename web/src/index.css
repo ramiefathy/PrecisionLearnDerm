@@ -139,6 +139,12 @@
     50% { transform: translateY(-10px); }
   }
 
+  /* Basic spin animation for minimal fallback (no external dependencies) */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
   /* Backdrop blur utilities for better browser support */
   .backdrop-blur-fallback {
     background-color: rgba(255, 255, 255, 0.8);

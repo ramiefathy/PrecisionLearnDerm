@@ -71,14 +71,28 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   handleGoHome = () => {
-    window.location.href = '/';
+    // Use history API if available, fallback to location.href
+    if (window.history && window.history.pushState) {
+      window.history.pushState(null, '', '/');
+      // Dispatch a popstate event to trigger React Router navigation
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } else {
+      window.location.href = '/';
+    }
   };
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback UI provided
+      // Custom fallback UI provided (inject resetError handler if fallback is an element)
       if (this.props.fallback) {
-        return <>{this.props.fallback}</>;
+        const { fallback } = this.props;
+        if (React.isValidElement(fallback)) {
+          // Inject the error reset handler into the fallback element
+          return React.cloneElement(fallback as React.ReactElement<any>, {
+            resetError: this.handleReset,
+          });
+        }
+        return <>{fallback}</>;
       }
 
       // Default error UI

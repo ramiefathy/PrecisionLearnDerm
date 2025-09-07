@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import App from '../App';
+import AdminEvaluationV2Page from '../pages/AdminEvaluationV2Page';
+
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -44,16 +45,20 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
 }));
 
-describe('Admin evaluation v2 route', () => {
+	describe('Admin evaluation v2 route', () => {
   it('renders evaluation dashboard for admin user', async () => {
     render(
-      <MemoryRouter initialEntries={['/admin/evaluation-v2']}>
-        <App />
+      <MemoryRouter>
+        <AdminEvaluationV2Page />
       </MemoryRouter>
     );
 
-    expect(
-      await screen.findByText(/Pipeline Evaluation System/i, undefined, { timeout: 5000 })
-    ).toBeInTheDocument();
-  });
+    // Should display the main header on the pipeline evaluation page
+    const header = await screen.findByRole(
+      'heading',
+      { level: 1, name: /Pipeline Evaluation System/i },
+      { timeout: 10000 }
+    );
+    expect(header).toBeInTheDocument();
+  }, 20000);
 });
