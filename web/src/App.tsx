@@ -28,6 +28,7 @@ const AdminQuestionBankPage = lazy(() => import('./pages/AdminQuestionBankPage')
 const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
 const AdminLogsPage = lazy(() => import('./pages/AdminLogsPage.tsx'));
+const AdminGenerationRedirect = lazy(() => import('./pages/AdminGenerationRedirect.tsx'));
 const AdminEvaluationV2Page = lazy(() => import('./pages/AdminEvaluationV2Page.tsx'));
 // Legacy evaluation dashboard
 const AdminPipelineEvaluation = lazy(() => import('./pages/AdminPipelineEvaluation.tsx'));
@@ -199,6 +200,15 @@ function AppRoutes() {
                   element={
                     <AdminRoute>
                       <AdminQuestionGenerationPage />
+                    </AdminRoute>
+                  }
+                />
+                {/* Legacy route redirect for backward compatibility */}
+                <Route
+                  path="/admin/generation"
+                  element={
+                    <AdminRoute>
+                      <AdminGenerationRedirect />
                     </AdminRoute>
                   }
                 />
