@@ -6,7 +6,7 @@ import { MockAI } from './mocks';
 
 // Import admin functions
 import { admin_generateQuestionQueue, admin_getQuestionQueue, admin_reviewQuestion } from '../admin/questionQueue';
-import { importLegacyQuestions, getQuestionBankStats } from '../admin/importQuestions';
+import { importLegacyQuestions, importSampleLegacyQuestions, getQuestionBankStats } from '../admin/importQuestions';
 
 setupTestEnvironment();
 
@@ -514,6 +514,155 @@ describe('Admin Question Management Tests', () => {
       results.forEach(result => {
         expect(result).to.have.property('success', true);
       });
+    });
+  });
+
+  describe('New Sample Import and Normalized Approval Schema', () => {
+    it('should handle deprecated importLegacyQuestions with graceful message', async function() {
+      this.timeout(5000);
+      
+      const legacyQuestions = [
+        {
+          question: 'What is the most common type of skin cancer?',
+          answer_a: 'Basal cell carcinoma',
+          correct_answer: 'a'
+        }
+      ];
+
+      const requestData = {
+        questions: legacyQuestions,
+        source: 'legacy_import_test'
+      };
+
+      const result = await importLegacyQuestions(requestData, testAdminContext);
+
+      expect(result).to.have.property('success', false);
+      expect(result).to.have.property('deprecated', true);
+      expect(result).to.have.property('message');
+      expect(result.message).to.include('deprecated');
+      expect(result.message).to.include('admin_import_sample_legacy');
+    });
+
+    it('should import sample legacy questions with normalized schema', async function() {
+      this.timeout(8000);
+      
+      const requestData = {
+        limit: 2
+      };
+
+      const result = await importSampleLegacyQuestions(requestData, testAdminContext);
+
+      expect(result).to.have.property('success', true);
+      expect(result).to.have.property('importedCount', 2);
+
+      // Verify items were written to database with normalized schema
+      const db = admin.firestore();
+      const itemsSnapshot = await db.collection('items')
+        .where('source', '==', 'legacy_question_bank')
+        .limit(1)
+        .get();
+
+      expect(itemsSnapshot.docs).to.have.length.at.least(1);
+      
+      const item = itemsSnapshot.docs[0].data();
+      // Check normalized fields
+      expect(item).to.have.property('stem'); // normalized field
+      expect(item).to.have.property('question'); // normalized field  
+      expect(item).to.have.property('options'); // array format
+      expect(item.options).to.be.an('array');
+      expect(item).to.have.property('correctIndex'); // numeric index
+      expect(item.correctIndex).to.be.a('number');
+      expect(item.correctIndex).to.be.at.least(0);
+      expect(item.correctIndex).to.be.lessThan(item.options.length);
+      expect(item).to.have.property('explanation'); 
+      expect(item).to.have.property('topicIds');
+      expect(item.topicIds).to.be.an('array');
+      expect(item).to.have.property('tags');
+      expect(item.tags).to.be.an('array');
+      expect(item).to.have.property('createdAt');
+      expect(item).to.have.property('status', 'active');
+      expect(item).to.have.property('source', 'legacy_question_bank');
+    });
+
+    it('should approve questions with normalized item shape', async function() {
+      this.timeout(10000);
+      
+      const mockReviewResponse = {
+        overallScore: 85,
+        recommendation: 'approve',
+        strengths: ['Clear clinical scenario'],
+        improvements: [],
+        changes: []
+      };
+
+      MockAI.mockGemini(JSON.stringify(mockReviewResponse));
+
+      const db = admin.firestore();
+      const testQuestion = {
+        id: 'normalize-test-1',
+        question: 'A 45-year-old patient presents with scaling lesions on elbows. Most likely diagnosis?',
+        stem: 'A 45-year-old patient presents with scaling lesions on elbows.',
+        leadIn: 'What is the most likely diagnosis?',
+        options: [
+          'Psoriasis',
+          'Eczema', 
+          'Contact dermatitis',
+          'Seborrheic dermatitis',
+          'Lichen planus'
+        ],
+        correctIndex: 0,
+        explanation: 'Psoriasis commonly affects elbows with characteristic scaling.',
+        difficulty: 2,
+        topicIds: ['psoriasis'],
+        tags: ['pattern-recognition'],
+        status: 'pending_review',
+        qualityScore: 85
+      };
+
+      await db.collection('admin_queue').doc(testQuestion.id).set(testQuestion);
+
+      const requestData = {
+        questionId: testQuestion.id,
+        action: 'approve',
+        comments: 'High quality question with clear clinical presentation'
+      };
+
+      const result = await admin_reviewQuestion(requestData, testAdminContext);
+
+      expect(result).to.have.property('success', true);
+      expect(result).to.have.property('status', 'approved');
+
+      // Verify approved item has normalized schema in items collection
+      const approvedItemSnapshot = await db.collection('items')
+        .where('source', '==', 'admin_review')
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+
+      if (!approvedItemSnapshot.empty) {
+        const approvedItem = approvedItemSnapshot.docs[0].data();
+        
+        // Verify canonical normalized fields
+        expect(approvedItem).to.have.property('stem');
+        expect(approvedItem.stem).to.be.a('string');
+        expect(approvedItem).to.have.property('question');
+        expect(approvedItem.question).to.be.a('string');
+        expect(approvedItem).to.have.property('options');
+        expect(approvedItem.options).to.be.an('array');
+        expect(approvedItem.options).to.have.length(5);
+        expect(approvedItem).to.have.property('correctIndex');
+        expect(approvedItem.correctIndex).to.be.a('number');
+        expect(approvedItem.correctIndex).to.be.at.least(0);
+        expect(approvedItem.correctIndex).to.be.lessThan(5);
+        expect(approvedItem).to.have.property('explanation');
+        expect(approvedItem.explanation).to.be.a('string');
+        expect(approvedItem).to.have.property('topicIds');
+        expect(approvedItem.topicIds).to.be.an('array');
+        expect(approvedItem).to.have.property('tags');
+        expect(approvedItem.tags).to.be.an('array');
+        expect(approvedItem).to.have.property('createdAt');
+        expect(approvedItem).to.have.property('status', 'active');
+      }
     });
   });
 });
