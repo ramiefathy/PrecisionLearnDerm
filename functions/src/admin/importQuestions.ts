@@ -216,6 +216,43 @@ const HIGH_QUALITY_QUESTIONS = [
   }
 ];
 
+export const importSampleLegacyQuestions = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+  const { limit } = data || {};
+
+  const itemsRef = db.collection('items');
+  const batch = db.batch();
+  const count = limit ? Math.min(limit, HIGH_QUALITY_QUESTIONS.length) : HIGH_QUALITY_QUESTIONS.length;
+
+  HIGH_QUALITY_QUESTIONS.slice(0, count).forEach(q => {
+    const docRef = itemsRef.doc();
+    batch.set(docRef, {
+      question: q.stem,
+      stem: q.stem,
+      leadIn: q.leadIn,
+      options: q.options,
+      correctIndex: q.keyIndex,
+      explanation: q.explanation,
+      difficulty: q.difficulty ?? 0,
+      topicIds: q.topicIds || [],
+      tags: q.tags || [],
+      source: 'legacy_question_bank',
+      status: 'active',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      qualityScore: q.qualityScore
+    });
+  });
+
+  await batch.commit();
+
+  await db.collection('admin').doc('questionBankMetadata').set({
+    lastImportedAt: admin.firestore.FieldValue.serverTimestamp(),
+    importedCount: admin.firestore.FieldValue.increment(count)
+  }, { merge: true });
+
+  return { success: true, importedCount: count };
+});
+
 export const importLegacyQuestions = functions.storage.object().onFinalize(async (object) => {
   const fileBucket = object.bucket; // The Storage bucket that contains the file.
   const filePath = object.name; // File path in the bucket.

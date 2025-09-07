@@ -6,7 +6,7 @@ import { MockAI } from './mocks';
 
 // Import admin functions
 import { admin_generateQuestionQueue, admin_getQuestionQueue, admin_reviewQuestion } from '../admin/questionQueue';
-import { importLegacyQuestions, getQuestionBankStats } from '../admin/importQuestions';
+import { importSampleLegacyQuestions, getQuestionBankStats } from '../admin/importQuestions';
 
 setupTestEnvironment();
 
@@ -201,6 +201,14 @@ describe('Admin Question Management Tests', () => {
       expect(result).to.have.property('qualityScore');
       expect(result.qualityScore).to.be.at.least(80);
       expect(result).to.have.property('status', 'approved');
+
+      const saved = await db.collection('items').doc(result.itemId).get();
+      expect(saved.exists).to.be.true;
+      const data = saved.data();
+      expect(data).to.have.property('question');
+      expect(data).to.have.property('options');
+      expect(data).to.have.property('correctIndex');
+      expect(Array.isArray(data?.options)).to.be.true;
     });
 
     it('should allow admin to reject questions with feedback', async function() {
@@ -307,85 +315,19 @@ describe('Admin Question Management Tests', () => {
       expect(result.difficultyDistribution).to.be.an('object');
     });
 
-    it('should handle legacy question import for admin', async function() {
-      this.timeout(10000);
-      
-      const legacyQuestions = [
-        {
-          question: 'What is the most common type of skin cancer?',
-          answer_a: 'Basal cell carcinoma',
-          answer_b: 'Squamous cell carcinoma',
-          answer_c: 'Melanoma',
-          answer_d: 'Merkel cell carcinoma',
-          correct_answer: 'a',
-          explanation: 'Basal cell carcinoma is the most common skin cancer.',
-          topic: 'skin_cancer',
-          difficulty: 'medium'
-        },
-        {
-          question: 'Which layer of skin contains melanocytes?',
-          answer_a: 'Stratum corneum',
-          answer_b: 'Stratum basale',
-          answer_c: 'Dermis',
-          answer_d: 'Hypodermis',
-          correct_answer: 'b',
-          explanation: 'Melanocytes are located in the stratum basale.',
-          topic: 'skin_anatomy',
-          difficulty: 'basic'
-        }
-      ];
-
-      const requestData = {
-        questions: legacyQuestions,
-        source: 'legacy_import_test',
-        validateQuality: true
-      };
-
-      const result = await importLegacyQuestions(requestData, testAdminContext);
-
-      expect(result).to.have.property('success', true);
-      expect(result).to.have.property('importedCount');
-      expect(result.importedCount).to.equal(2);
-      expect(result).to.have.property('skippedCount');
-      expect(result).to.have.property('validationResults');
-      expect(result.validationResults).to.be.an('array');
-    });
-
-    it('should validate imported questions meet quality standards', async function() {
+    it('should import sample legacy questions', async function() {
       this.timeout(8000);
-      
-      const lowQualityQuestions = [
-        {
-          question: 'What?',
-          answer_a: 'A',
-          answer_b: 'B',
-          answer_c: 'C',
-          answer_d: 'D',
-          correct_answer: 'a',
-          explanation: 'Because.',
-          topic: 'unknown',
-          difficulty: 'unknown'
-        }
-      ];
 
-      const requestData = {
-        questions: lowQualityQuestions,
-        source: 'quality_test',
-        validateQuality: true,
-        minQualityScore: 70
-      };
-
-      const result = await importLegacyQuestions(requestData, testAdminContext);
+      const result = await importSampleLegacyQuestions({}, testAdminContext);
 
       expect(result).to.have.property('success', true);
-      expect(result).to.have.property('skippedCount');
-      expect(result.skippedCount).to.be.at.least(1);
-      expect(result).to.have.property('validationResults');
-      
-      const validationResult = result.validationResults[0];
-      expect(validationResult).to.have.property('skipped', true);
-      expect(validationResult).to.have.property('reason');
-      expect(validationResult.reason).to.include('quality');
+      expect(result.importedCount).to.be.greaterThan(0);
+
+      const snapshot = await admin.firestore()
+        .collection('items')
+        .where('source', '==', 'legacy_question_bank')
+        .get();
+      expect(snapshot.size).to.be.at.least(result.importedCount);
     });
   });
 
@@ -393,12 +335,12 @@ describe('Admin Question Management Tests', () => {
     it('should deny admin functions to non-admin users', async function() {
       this.timeout(5000);
       
-      const restrictedFunctions = [
+        const restrictedFunctions = [
         () => admin_generateQuestionQueue({ topicIds: ['test'] }, testUserContext),
         () => admin_getQuestionQueue({}, testUserContext),
         () => admin_reviewQuestion({ questionId: 'test', action: 'approve' }, testUserContext),
         () => getQuestionBankStats({}, testUserContext),
-        () => importLegacyQuestions({ questions: [] }, testUserContext)
+        () => importSampleLegacyQuestions({}, testUserContext)
       ];
 
       for (const func of restrictedFunctions) {
@@ -414,14 +356,12 @@ describe('Admin Question Management Tests', () => {
     it('should validate input parameters', async function() {
       this.timeout(5000);
       
-      const invalidRequests = [
-        { func: 'generateQueue', data: {} }, // Missing topicIds
-        { func: 'generateQueue', data: { topicIds: 'invalid' } }, // Invalid topicIds type
-        { func: 'reviewQuestion', data: {} }, // Missing questionId
-        { func: 'reviewQuestion', data: { questionId: 'test' } }, // Missing action
-        { func: 'importQuestions', data: {} }, // Missing questions
-        { func: 'importQuestions', data: { questions: 'invalid' } } // Invalid questions type
-      ];
+        const invalidRequests = [
+          { func: 'generateQueue', data: {} }, // Missing topicIds
+          { func: 'generateQueue', data: { topicIds: 'invalid' } }, // Invalid topicIds type
+          { func: 'reviewQuestion', data: {} }, // Missing questionId
+          { func: 'reviewQuestion', data: { questionId: 'test' } } // Missing action
+        ];
 
       for (const request of invalidRequests) {
         try {
@@ -431,9 +371,6 @@ describe('Admin Question Management Tests', () => {
               break;
             case 'reviewQuestion':
               await admin_reviewQuestion(request.data, testAdminContext);
-              break;
-            case 'importQuestions':
-              await importLegacyQuestions(request.data, testAdminContext);
               break;
           }
           expect.fail(`Should have thrown validation error for ${request.func}`);

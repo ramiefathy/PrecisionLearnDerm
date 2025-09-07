@@ -5,7 +5,8 @@ import { toast } from '../components/Toast';
 
 interface LogEntry {
   id: string;
-  timestamp: string;
+  timestamp?: string;
+  createdAt?: any;
   level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
   category: string;
@@ -135,8 +136,8 @@ export default function AdminLogsPage() {
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+  const formatTimestamp = (value?: any) => {
+    const date = value?.toDate ? value.toDate() : new Date(value);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -270,7 +271,7 @@ export default function AdminLogsPage() {
                             {log.level.toUpperCase()}
                           </span>
                           <span className="text-sm font-medium text-gray-900">{log.category}</span>
-                          <span className="text-xs text-gray-500">{formatTimestamp(log.timestamp)}</span>
+                          <span className="text-xs text-gray-500">{formatTimestamp(log.createdAt || log.timestamp)}</span>
                         </div>
                         <p className="text-gray-900 font-medium">{log.message}</p>
                         <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">

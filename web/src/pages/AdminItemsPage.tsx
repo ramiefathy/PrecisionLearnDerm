@@ -61,20 +61,20 @@ export default function AdminItemsPage() {
       const itemsResponse = await api.items.list({ limit: 50, status: 'active' });
       const realItems: Item[] = (itemsResponse as any).items?.map((item: any) => ({
         id: item.id,
-        stem: item.stem || 'Question stem not available',
-        leadIn: item.leadIn,
+        stem: item.stem || item.question || 'Question stem not available',
+        leadIn: item.leadIn || item.question,
         options: item.options ? (
-          Array.isArray(item.options) 
+          Array.isArray(item.options)
             ? item.options.reduce((acc: any, opt: any, idx: number) => {
-                const letter = String.fromCharCode(65 + idx); // A, B, C, D, E
-                acc[letter] = opt.text;
+                const letter = String.fromCharCode(65 + idx);
+                acc[letter] = typeof opt === 'string' ? opt : opt.text;
                 return acc;
               }, {})
             : item.options
         ) : {},
         correctAnswer: item.options ? (
-          Array.isArray(item.options) 
-            ? String.fromCharCode(65 + item.options.findIndex((opt: any) => opt.isCorrect))
+          Array.isArray(item.options)
+            ? String.fromCharCode(65 + (item.correctIndex ?? item.options.findIndex((opt: any) => opt.isCorrect)))
             : item.correctAnswer
         ) : 'A',
         explanation: item.explanation || 'Explanation not available',

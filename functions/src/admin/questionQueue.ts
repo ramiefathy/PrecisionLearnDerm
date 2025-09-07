@@ -816,30 +816,50 @@ export const admin_reviewQuestion = functions.https.onCall(async (data, context)
     const questionData = questionDoc.data();
     
     if (action === 'approve') {
-      // Move to main question bank
+      const draft = questionData.draftItem || questionData;
+
+      const optionsArray = Array.isArray(draft.options)
+        ? draft.options
+        : Object.values(draft.options || {});
+      const mappedOptions = optionsArray.map((opt: any) =>
+        typeof opt === 'string' ? opt : opt.text
+      );
+      const correctIndex = typeof draft.keyIndex === 'number'
+        ? draft.keyIndex
+        : optionsArray.findIndex((opt: any) => opt.isCorrect);
+
       const itemData: any = {
-        ...questionData,
+        question: draft.stem || draft.question || '',
+        stem: draft.stem || '',
+        leadIn: draft.leadIn || '',
+        options: mappedOptions,
+        correctIndex: correctIndex >= 0 ? correctIndex : 0,
+        explanation: draft.explanation || '',
+        difficulty: draft.difficulty ?? draft.estimatedDifficulty ?? 0,
+        topicIds: draft.topicIds || questionData.topicIds || [],
+        tags: draft.tags || [],
         status: 'active',
+        source: questionData.source || 'ai_generated',
+        qualityScore: questionData.qualityScore,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
         reviewedBy: context?.auth?.uid || 'admin',
         reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
         adminNotes: notes || '',
-        queueId: questionId
+        queueId: questionId,
+        topicHierarchy: questionData.topicHierarchy || null,
+        kbSource: questionData.kbSource || null,
+        pipelineOutputs: questionData.pipelineOutputs || null
       };
-      
-      // Remove queue-specific fields if they exist
-      if ('queueStatus' in itemData) delete itemData.queueStatus;
-      if ('queueCreatedAt' in itemData) delete itemData.queueCreatedAt;
-      
+
       const newItemRef = await itemsRef.add(itemData);
-      
-      // Update queue status
+
       await queueRef.update({
         status: 'approved',
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         adminNotes: notes || '',
         movedToItemId: newItemRef.id
       });
-      
+
       return {
         success: true,
         message: 'Question approved and moved to question bank',

@@ -127,7 +127,8 @@ export const api = {
     generateQuestionQueue: (payload: { count?: number; topics?: string[] } = {}) => httpsCallable(functions, 'admin_generate_question_queue')(payload).then(r => r.data as APIResponse),
     generatePerTopic: (payload: { topics?: string[]; questionsPerTopic?: number; perTopic?: number } = {}) => httpsCallable(functions, 'admin_generate_per_topic')(payload).then(r => r.data as APIResponse),
     // Fixed function names to match backend exports
-    importLegacyQuestions: (payload: { filePath?: string } = {}) => httpsCallable(functions, 'storage_import_legacy_questions')(payload).then(r => r.data as APIResponse),
+    importLegacyQuestions: (payload: { limit?: number } = {}) =>
+      httpsCallable(functions, 'admin_import_sample_legacy')(payload).then(r => r.data as APIResponse),
     getQuestionBankStats: (payload: { includeDetails?: boolean } = {}) => httpsCallable(functions, 'admin_get_question_bank_stats')(payload).then(r => r.data as QuestionBankStats),
     listUncategorized: (payload: { limit?: number }) => httpsCallable(functions, 'admin_list_uncategorized')(payload).then(r => r.data as APIResponse),
     setItemTaxonomy: (payload: { itemId: string; taxonomy?: any; categoryId?: string; topicId?: string; subtopicId?: string }) => httpsCallable(functions, 'admin_set_item_taxonomy')(payload).then(r => r.data as APIResponse),

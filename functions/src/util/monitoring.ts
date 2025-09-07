@@ -440,9 +440,9 @@ export const getLogs = functions.https.onCall(async (data, context) => {
   }
 
   const { level, operation, userId, startTime, endTime, limit = 100 } = data || {};
-  
+
   let query: any = db.collection('logs');
-  
+
   if (level) {
     query = query.where('level', '==', level);
   }
@@ -453,13 +453,13 @@ export const getLogs = functions.https.onCall(async (data, context) => {
     query = query.where('userId', '==', userId);
   }
   if (startTime) {
-    query = query.where('timestamp', '>=', startTime);
+    query = query.where('createdAt', '>=', startTime);
   }
   if (endTime) {
-    query = query.where('timestamp', '<=', endTime);
+    query = query.where('createdAt', '<=', endTime);
   }
-  
-  query = query.orderBy('timestamp', 'desc').limit(limit);
+
+  query = query.orderBy('createdAt', 'desc').limit(limit);
   
   const snapshot = await query.get();
   const logs = snapshot.docs.map((doc: any) => ({

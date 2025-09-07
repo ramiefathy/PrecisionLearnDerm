@@ -426,7 +426,7 @@ export default function AdminQuestionBankPage() {
                         Review Queue
                       </a>
                       <a
-                        href="/admin/generation"
+                        href="/admin/generate"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
                       >
                         <span>✨</span>

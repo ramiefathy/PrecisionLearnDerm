@@ -81,6 +81,7 @@ export { admin_getTaxonomyEntities } from './admin/questionQueue';
 // } from './admin/migration';
 export { importLegacyQuestions as storage_import_legacy_questions } from './admin/importQuestions';
 export { getQuestionBankStats as admin_get_question_bank_stats } from './admin/importQuestions';
+export { importSampleLegacyQuestions as admin_import_sample_legacy } from './admin/importQuestions';
 
 // User Management - Admin Functions
 export { grantAdminRole as admin_grant_role, revokeAdminRole as admin_revoke_role, listAdminUsers as admin_list_admins } from './admin/grantAdminRole';
