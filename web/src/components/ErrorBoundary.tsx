@@ -71,7 +71,14 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   handleGoHome = () => {
-    window.location.href = '/';
+    // Use history API if available, fallback to location.href
+    if (window.history && window.history.pushState) {
+      window.history.pushState(null, '', '/');
+      // Dispatch a popstate event to trigger React Router navigation
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } else {
+      window.location.href = '/';
+    }
   };
 
   render() {

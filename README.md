@@ -19,6 +19,8 @@ PrecisionLearnDerm is a sophisticated AI-powered platform designed to help medic
 - **🏥 Board-Style Questions**: Clinically accurate questions following ABD guidelines
 - **🎯 Real-time Performance Tracking**: SRS-based spaced repetition system
 - **👨‍⚕️ Admin Dashboard**: Comprehensive management tools for educators and administrators
+- **🛡️ Defensive Architecture**: Robust error handling and graceful degradation for high availability
+- **🔄 Minimal Fallbacks**: Self-contained UI components that work without external dependencies
 
 ### 📊 Admin Pipeline Evaluation (New)
 
@@ -43,6 +45,39 @@ Canonical fields saved per test for robust UI/analytics:
 - `aiScoresFlat.overall`, `.boardReadiness`, `.clinicalRealism`, `.medicalAccuracy`, `.distractorQuality`, `.cueingAbsence`
 
 Cancel support: callable `cancelEvaluationJob` sets `cancelRequested` and the processor stops at batch boundaries.
+
+### 🛡️ Defensive Architecture
+
+The platform implements comprehensive defensive patterns for high availability:
+
+#### Backend Defensive Exports
+- **Safe Module Loading**: Functions gracefully handle missing modules without deployment failures
+- **Automatic Stub Generation**: Creates consistent error responses for unavailable services
+- **Environment-Aware Exports**: Development/test functions automatically disabled in production
+- **Backward Compatibility**: Maintains existing function signatures during failures
+
+```typescript
+// Example: Safe export with automatic fallback
+const exports = safeExportBatch('./module/path', [
+  { name: 'criticalFunction' },
+  { name: 'optionalFunction' }
+]);
+```
+
+#### Frontend Minimal Fallbacks
+- **Self-Contained Components**: Work without external CSS frameworks or dependencies
+- **Dual Error Boundaries**: Handle both React errors and Suspense loading states
+- **Progressive Enhancement**: Start with minimal UI, enhance with features
+- **Accessibility First**: Built-in keyboard navigation and screen reader support
+
+```tsx
+// Example: Defensive component wrapper
+<MinimalFallback>
+  <ComplexAdminComponent />
+</MinimalFallback>
+```
+
+See [`DEFENSIVE_PATTERNS.md`](./DEFENSIVE_PATTERNS.md) for implementation details.
 
 ### ⚠️ Frontend UI Note: MUI Grid usage
 - Import with `import { Grid } from '@mui/material'`.
