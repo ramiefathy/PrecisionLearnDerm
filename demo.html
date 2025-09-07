@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MinimalFallback Demo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9fafb;
+        }
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #1f2937;
+            margin-top: 0;
+        }
+        .example {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Recreate the MinimalFallback loading state */
+        .minimal-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            padding: 20px;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin: 16px;
+        }
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            fontSize: 14px;
+            color: #6b7280;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        /* Recreate the MinimalFallback error state */
+        .minimal-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            padding: 20px;
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            margin: 16px;
+        }
+        .error-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            text-align: center;
+            max-width: 400px;
+        }
+        .error-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .error-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+            color: #991b1b;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .error-message {
+            margin: 0;
+            font-size: 14px;
+            color: #7f1d1d;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .error-button {
+            padding: 8px 16px;
+            background-color: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .error-button:hover {
+            background-color: #b91c1c;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ PrecisionLearnDerm Defensive Patterns Demo</h1>
+    
+    <div class="demo-section">
+        <h2>MinimalFallback - Loading State</h2>
+        <p>This loading state works without any external CSS frameworks or dependencies:</p>
+        <div class="example">
+            <div class="minimal-loading">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <span class="loading-text">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>MinimalFallback - Error State</h2>
+        <p>This error fallback provides clear messaging and recovery options:</p>
+        <div class="example">
+            <div class="minimal-error">
+                <div class="error-content">
+                    <div class="error-icon">⚠️</div>
+                    <h3 class="error-title">Something went wrong</h3>
+                    <p class="error-message">
+                        This section couldn't load properly. You can try refreshing the page or continue using other parts of the application.
+                    </p>
+                    <button class="error-button" onclick="alert('Try Again clicked!')">
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>Key Features of Defensive Patterns</h2>
+        <ul>
+            <li><strong>No External Dependencies:</strong> All styling is inline or self-contained</li>
+            <li><strong>Accessible:</strong> Proper keyboard navigation and screen reader support</li>
+            <li><strong>Responsive:</strong> Works on all screen sizes</li>
+            <li><strong>Graceful Degradation:</strong> Provides meaningful fallbacks when things fail</li>
+            <li><strong>Consistent UX:</strong> Maintains design language even during errors</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>Implementation Benefits</h2>
+        <ul>
+            <li>🚀 <strong>Higher Availability:</strong> System continues working when non-critical parts fail</li>
+            <li>🛡️ <strong>Deployment Safety:</strong> Reduced risk of complete deployment failures</li>
+            <li>👥 <strong>Better UX:</strong> Clear error states with recovery options</li>
+            <li>🔧 <strong>Maintainability:</strong> Consistent patterns for handling failures</li>
+        </ul>
+    </div>
+
+    <script>
+        // Demonstrate interactive behavior
+        console.log('✅ MinimalFallback demo loaded successfully');
+        console.log('🛡️ Defensive patterns ensure this works even if other scripts fail');
+    </script>
+</body>
+</html>
