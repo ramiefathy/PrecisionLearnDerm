@@ -4,10 +4,11 @@
  *  - storageImportLegacyQuestions: (placeholder) storage trigger for legacy imports (kept if original existed).
  *  - importLegacyQuestions: deprecated callable wrapper returning guidance (backward compatibility).
  *  - importSampleLegacyQuestions: new simplified seeding callable using HIGH_QUALITY_QUESTIONS.
+ *  - getQuestionBankStats: basic stats for admin dashboard.
  */
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { requireAdmin } from './auth';
+import { requireAdmin } from '../util/auth';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -64,11 +65,6 @@ export const storageImportLegacyQuestions = functions.storage.object().onFinaliz
   const bucketName = object.bucket;
   console.log('[storageImportLegacyQuestions] Triggered for', { bucketName, filePath });
 
-  // Placeholder: In a real implementation you would:
-  //  1. Download the file from Storage.
-  //  2. Parse JSON containing an array of question objects.
-  //  3. Validate & write to Firestore.
-  // For now we simply log the event.
   await db.collection('admin_logs').add({
     type: 'storage_legacy_import_trigger',
     filePath,
@@ -81,7 +77,7 @@ export const storageImportLegacyQuestions = functions.storage.object().onFinaliz
  * Deprecated callable wrapper: retains the old function name to avoid hard breaks.
  * Always returns a structured deprecation response.
  */
-export const importLegacyQuestions = functions.https.onCall(async (data, context) => {
+export const importLegacyQuestions = functions.https.onCall(async (_data: any, context: any) => {
   requireAdmin(context);
   return {
     success: false,
@@ -95,7 +91,7 @@ export const importLegacyQuestions = functions.https.onCall(async (data, context
  * Accepts: { limit?: number }
  * Writes up to `limit` (or all) HIGH_QUALITY_QUESTIONS into items collection with normalized schema.
  */
-export const importSampleLegacyQuestions = functions.https.onCall(async (data, context) => {
+export const importSampleLegacyQuestions = functions.https.onCall(async (data: any, context: any) => {
   requireAdmin(context);
   const { limit } = data || {};
 
@@ -121,6 +117,7 @@ export const importSampleLegacyQuestions = functions.https.onCall(async (data, c
       source: 'legacy_question_bank',
       status: 'active',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       qualityScore: seed.qualityScore ?? null
     });
   });
@@ -133,4 +130,46 @@ export const importSampleLegacyQuestions = functions.https.onCall(async (data, c
   }, { merge: true });
 
   return { success: true, importedCount: total };
+});
+
+/**
+ * Minimal stats for admin dashboard.
+ * Returns counts and average quality if present.
+ */
+export const getQuestionBankStats = functions.https.onCall(async (_data: any, context: any) => {
+  requireAdmin(context);
+
+  try {
+    const itemsSnapshot = await db.collection('items').get();
+    const totalQuestions = itemsSnapshot.size;
+
+    const categories: Record<string, number> = {};
+    const qualityScores: number[] = [];
+
+    itemsSnapshot.docs.forEach(doc => {
+      const data = doc.data() as any;
+      const category = data.category || (data.topicIds?.[0] ?? 'uncategorized');
+      categories[category] = (categories[category] || 0) + 1;
+
+      if (typeof data.qualityScore === 'number') {
+        qualityScores.push(data.qualityScore);
+      }
+    });
+
+    const avgQuality = qualityScores.length
+      ? Math.round((qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length) * 100) / 100
+      : 0;
+
+    return {
+      totalQuestions,
+      categories,
+      averageQuality: avgQuality
+    };
+  } catch (error: any) {
+    console.error('Error getting question bank stats:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 });
