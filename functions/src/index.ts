@@ -131,36 +131,6 @@ const adminStatusExports = conditionalExport(
 
 export const checkAdminStatus = adminStatusExports;
 
-/* =========================================================
- * Test / Development Endpoints (Guarded Internally) - Conditional Export
- * ======================================================= */
-// Only export test endpoints in non-production environments
-const testExports = conditionalExport(
-  isDevelopment,
-  './testEndpoints/aiTestingEndpoints',
-  'test_generate_question',
-  // Fallback stub for production
-  () => ({
-    success: false,
-    error: 'Test endpoints disabled in production',
-    code: 'PRODUCTION_DISABLED'
-  })
-);
-
-const testReviewExports = conditionalExport(
-  isDevelopment,
-  './testEndpoints/aiTestingEndpoints',
-  'test_review_question',
-  // Fallback stub for production
-  () => ({
-    success: false,
-    error: 'Test endpoints disabled in production',
-    code: 'PRODUCTION_DISABLED'
-  })
-);
-
-export const test_generate_question = testExports;
-export const test_review_question = testReviewExports;
 
 /* =========================================================
  * IMPORTANT:
