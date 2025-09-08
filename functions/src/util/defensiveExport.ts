@@ -1,12 +1,25 @@
 /**
  * Defensive Export Utilities
- * Provides safe export patterns that handle missing modules gracefully
- * and provide fallback behaviors when modules fail to load.
+ * Resolves module paths relative to lib root so production deploys can load compiled modules.
  */
+
+import * as path from 'path';
+
+/**
+ * Resolve a module path relative to the compiled lib root.
+ * __dirname here is .../lib/util at runtime; we need .../lib/<modulePath>.
+ */
+function resolveFromLibRoot(modulePath: string): string {
+  if (modulePath.startsWith('.')) {
+    // lib/util -> lib
+    return path.join(__dirname, '..', modulePath);
+  }
+  return modulePath;
+}
 
 /**
  * Safe export wrapper that catches module import failures
- * and provides a fallback stub function
+ * and provides a fallback stub function (dev only).
  */
 export function safeExport<T>(
   modulePath: string,
@@ -14,30 +27,37 @@ export function safeExport<T>(
   fallbackFn?: T
 ): T | undefined {
   try {
-    const module = require(modulePath);
-    const exportedFunction = module[exportName];
-    
-    if (typeof exportedFunction === 'function') {
-      return exportedFunction;
+    const resolved = resolveFromLibRoot(modulePath);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require(resolved);
+    const exported = mod[exportName];
+
+    if (typeof exported === 'function') {
+      return exported;
     }
-    
-    console.warn(`Export '${exportName}' not found in module '${modulePath}', using fallback`);
+
+    console.warn(`Export '${exportName}' not found in '${resolved}', using fallback`);
     return fallbackFn;
   } catch (error) {
-    console.warn(`Failed to load module '${modulePath}': ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.warn(
+      `Failed to load module '${modulePath}': ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
     return fallbackFn;
   }
 }
 
 /**
- * Creates a stub function that logs attempts to call missing functions
+ * Creates a stub function; in production we throw to avoid silent fallbacks.
  */
 export function createStubFunction(moduleName: string, functionName: string) {
   return (...args: any[]) => {
-    const message = `Function '${functionName}' from module '${moduleName}' is not available. This is a stub implementation.`;
-    console.warn(message, { args });
-    
-    // Return a consistent error response for Cloud Functions
+    const message = `Function '${functionName}' from module '${moduleName}' is not available.`;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(message);
+    }
+    console.warn(`${message} Returning dev stub.`, { args });
     return {
       success: false,
       error: `Service temporarily unavailable: ${functionName}`,
@@ -53,13 +73,8 @@ export function safeExportWithStub<T extends (...args: any[]) => any>(
   modulePath: string,
   exportName: string
 ): T {
-  const safeFunction = safeExport(modulePath, exportName);
-  
-  if (safeFunction) {
-    return safeFunction as T;
-  }
-  
-  // Return a stub function if the export failed
+  const fn = safeExport(modulePath, exportName);
+  if (fn) return fn as T;
   return createStubFunction(modulePath, exportName) as T;
 }
 
@@ -71,32 +86,31 @@ export function safeExportBatch(
   exports: Array<{ name: string; alias?: string }>
 ): Record<string, any> {
   const result: Record<string, any> = {};
-  
   try {
-    const module = require(modulePath);
-    
-    for (const exportConfig of exports) {
-      const { name, alias } = exportConfig;
+    const resolved = resolveFromLibRoot(modulePath);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require(resolved);
+
+    for (const { name, alias } of exports) {
       const key = alias || name;
-      
-      if (module[name] && typeof module[name] === 'function') {
-        result[key] = module[name];
+      if (mod[name] && typeof mod[name] === 'function') {
+        result[key] = mod[name];
       } else {
-        console.warn(`Export '${name}' not found in module '${modulePath}', creating stub`);
+        console.warn(`Export '${name}' not found in '${resolved}', creating stub`);
         result[key] = createStubFunction(modulePath, name);
       }
     }
   } catch (error) {
-    console.warn(`Failed to load module '${modulePath}': ${error instanceof Error ? error.message : 'Unknown error'}`);
-    
-    // Create stubs for all requested exports
-    for (const exportConfig of exports) {
-      const { name, alias } = exportConfig;
+    console.warn(
+      `Failed to load module '${modulePath}': ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
+    for (const { name, alias } of exports) {
       const key = alias || name;
       result[key] = createStubFunction(modulePath, name);
     }
   }
-  
   return result;
 }
 
@@ -109,9 +123,6 @@ export function conditionalExport<T>(
   exportName: string,
   fallbackFn?: T
 ): T | undefined {
-  if (!condition) {
-    return fallbackFn;
-  }
-  
+  if (!condition) return fallbackFn;
   return safeExport(modulePath, exportName, fallbackFn);
 }
