@@ -1,6 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import type { HttpsCallableOptions } from 'firebase/functions';
-import { functions, auth } from './firebase';
+import { functions } from './firebase';
 import type { 
   APIResponse, 
   QuestionGenerationResponse,
@@ -90,17 +90,9 @@ export const api = {
     srsDue: (payload: { userId: string }) => httpsCallable(functions, 'pe_srs_due')(payload).then(r => r.data as APIResponse),
     // Adaptive Personalized Generation
     triggerAdaptiveGeneration: (payload: any) => httpsCallable(functions, 'pe_trigger_adaptive_generation')(payload).then(r => r.data as APIResponse),
-    getPersonalizedQuestions: async (payload: { userId?: string; limit?: number }) => {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-      return fetch(`https://us-central1-dermassist-ai-1zyic.cloudfunctions.net/pe_get_personal_questions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      }).then(r => r.json());
-    },
+    getPersonalizedQuestions: (payload: { userId?: string; limit?: number }) =>
+      httpsCallable(functions, 'pe_get_personal_questions', STANDARD_TIMEOUT_OPTIONS)(payload)
+        .then(r => r.data as { success: boolean; questions?: any[]; count?: number; totalAvailable?: number }),
     updateAbility: (payload: AbilityUpdateRequest) => httpsCallable(functions, 'pe_update_ability')(payload).then(r => r.data as APIResponse),
   },
   quality: {
