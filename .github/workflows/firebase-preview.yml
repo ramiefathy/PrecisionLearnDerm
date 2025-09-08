@@ -34,4 +34,3 @@ jobs:
           projectId: '${{ secrets.FIREBASE_PROJECT_ID }}'
           channelId: 'preview-${{ github.event.number }}'
           expires: '7d'
-          entrypoint: './web'
