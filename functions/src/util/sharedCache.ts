@@ -78,9 +78,16 @@ export class SharedCache {
       this.metrics.kbLoadTime = Date.now() - startTime;
       
       const entryCount = Object.keys(this.knowledgeBase || {}).length;
+      let highQualityEntryCount = 0;
+      try {
+        highQualityEntryCount = Object.values(this.knowledgeBase || {}).filter((e: any) => (e?.completeness_score || 0) > 65).length;
+      } catch (_e) {
+        highQualityEntryCount = 0;
+      }
       
       logInfo('shared_cache.kb_loaded', {
         entryCount,
+        highQualityEntryCount,
         loadTimeMs: this.metrics.kbLoadTime,
         source: kb.metadata?.source || 'service',
         timestamp: new Date().toISOString()

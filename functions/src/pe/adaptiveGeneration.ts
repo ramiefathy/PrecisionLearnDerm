@@ -562,3 +562,38 @@ export const getPersonalizedQuestions = functions.https.onRequest(
     }
   })
 ); 
+
+// Callable variant used by web client (avoids CORS and matches httpsCallable usage)
+export const getPersonalizedQuestionsCallable = functions.https.onCall(async (data: any, context: any) => {
+  try {
+    const uid = requireAuth(context);
+    const limit = Math.max(0, Math.min(50, (data && typeof data.limit === 'number') ? data.limit : 2));
+
+    const db = admin.firestore();
+    const personalBankRef = db.collection('userPersonalQuestions').doc(uid);
+    const personalBankDoc = await personalBankRef.get();
+
+    if (!personalBankDoc.exists) {
+      return {
+        success: true,
+        questions: [],
+        count: 0,
+        totalAvailable: 0
+      };
+    }
+
+    const personalBank = personalBankDoc.data() || {};
+    const questions = Array.isArray((personalBank as any).questions) ? (personalBank as any).questions : [];
+    const limitedQuestions = questions.slice(0, limit);
+
+    return {
+      success: true,
+      questions: limitedQuestions,
+      count: limitedQuestions.length,
+      totalAvailable: questions.length
+    };
+  } catch (error: any) {
+    console.error('Error in getPersonalizedQuestionsCallable:', error);
+    throw new functions.https.HttpsError('internal', error?.message || 'Failed to get personalized questions');
+  }
+});
