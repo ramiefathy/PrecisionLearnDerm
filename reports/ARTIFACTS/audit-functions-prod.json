@@ -1,0 +1,468 @@
+npm warn config production Use `--omit=dev` instead.
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@google-cloud/firestore": {
+      "name": "@google-cloud/firestore",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "google-gax"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": ">=0.21.0",
+      "nodes": [
+        "node_modules/@google-cloud/firestore"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@google-cloud/storage": {
+      "name": "@google-cloud/storage",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios",
+        "google-auth-library",
+        "retry-request",
+        "teeny-request"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": "2.2.0 - 5.8.5 || >=5.17.0",
+      "nodes": [
+        "node_modules/@google-cloud/storage"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@google/genai": {
+      "name": "@google/genai",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "google-auth-library"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/@google/genai"
+      ],
+      "fixAvailable": false
+    },
+    "agent-base": {
+      "name": "agent-base",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "http-proxy-agent",
+        "https-proxy-agent"
+      ],
+      "range": "6.0.0 - 7.1.2",
+      "nodes": [
+        "node_modules/teeny-request/node_modules/agent-base"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "body-parser": {
+      "name": "body-parser",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "express"
+      ],
+      "range": ">=1.12.0",
+      "nodes": [
+        "node_modules/body-parser"
+      ],
+      "fixAvailable": false
+    },
+    "debug": {
+      "name": "debug",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1107274,
+          "name": "debug",
+          "dependency": "debug",
+          "title": "Malware in debug",
+          "url": "https://github.com/advisories/GHSA-8mgj-vmr8-frr6",
+          "severity": "critical",
+          "cwe": [
+            "CWE-506"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=0"
+        }
+      ],
+      "effects": [
+        "agent-base",
+        "body-parser",
+        "express",
+        "finalhandler",
+        "http-proxy-agent",
+        "https-proxy-agent",
+        "jwks-rsa",
+        "send"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/debug",
+        "node_modules/https-proxy-agent/node_modules/debug",
+        "node_modules/jwks-rsa/node_modules/debug",
+        "node_modules/teeny-request/node_modules/debug"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "express": {
+      "name": "express",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "body-parser",
+        "debug",
+        "finalhandler",
+        "send",
+        "serve-static"
+      ],
+      "effects": [
+        "firebase-functions"
+      ],
+      "range": ">=3.0.0-alpha1",
+      "nodes": [
+        "node_modules/express"
+      ],
+      "fixAvailable": false
+    },
+    "finalhandler": {
+      "name": "finalhandler",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "express"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/finalhandler"
+      ],
+      "fixAvailable": false
+    },
+    "firebase-admin": {
+      "name": "firebase-admin",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "@google-cloud/firestore",
+        "@google-cloud/storage",
+        "jwks-rsa"
+      ],
+      "effects": [],
+      "range": ">=7.0.0",
+      "nodes": [
+        "node_modules/firebase-admin"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "firebase-functions": {
+      "name": "firebase-functions",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "express"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/firebase-functions"
+      ],
+      "fixAvailable": false
+    },
+    "gaxios": {
+      "name": "gaxios",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "https-proxy-agent"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "gcp-metadata",
+        "google-auth-library",
+        "gtoken"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/gaxios"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "gcp-metadata": {
+      "name": "gcp-metadata",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios"
+      ],
+      "effects": [],
+      "range": ">=0.9.3",
+      "nodes": [
+        "node_modules/gcp-metadata"
+      ],
+      "fixAvailable": true
+    },
+    "google-auth-library": {
+      "name": "google-auth-library",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios",
+        "gcp-metadata",
+        "gtoken"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "@google/genai",
+        "google-gax"
+      ],
+      "range": ">=3.0.0-pre1",
+      "nodes": [
+        "node_modules/google-auth-library"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "google-gax": {
+      "name": "google-gax",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "google-auth-library",
+        "retry-request"
+      ],
+      "effects": [
+        "@google-cloud/firestore"
+      ],
+      "range": ">=0.24.0",
+      "nodes": [
+        "node_modules/google-gax"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "gtoken": {
+      "name": "gtoken",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios"
+      ],
+      "effects": [],
+      "range": ">=2.3.1",
+      "nodes": [
+        "node_modules/gtoken"
+      ],
+      "fixAvailable": true
+    },
+    "http-proxy-agent": {
+      "name": "http-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "agent-base",
+        "debug"
+      ],
+      "effects": [
+        "teeny-request"
+      ],
+      "range": ">=0.2.4",
+      "nodes": [
+        "node_modules/teeny-request/node_modules/http-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "https-proxy-agent": {
+      "name": "https-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "agent-base",
+        "debug"
+      ],
+      "effects": [
+        "gaxios",
+        "teeny-request"
+      ],
+      "range": ">=0.3.0",
+      "nodes": [
+        "node_modules/https-proxy-agent",
+        "node_modules/teeny-request/node_modules/https-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "jwks-rsa": {
+      "name": "jwks-rsa",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/jwks-rsa"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "retry-request": {
+      "name": "retry-request",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "teeny-request"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "google-gax"
+      ],
+      "range": ">=7.0.0",
+      "nodes": [
+        "node_modules/retry-request"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "send": {
+      "name": "send",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "serve-static"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/send"
+      ],
+      "fixAvailable": false
+    },
+    "serve-static": {
+      "name": "serve-static",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "send"
+      ],
+      "effects": [
+        "express"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/serve-static"
+      ],
+      "fixAvailable": false
+    },
+    "teeny-request": {
+      "name": "teeny-request",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "http-proxy-agent",
+        "https-proxy-agent"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "retry-request"
+      ],
+      "range": ">=3.2.0",
+      "nodes": [
+        "node_modules/teeny-request"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 22,
+      "total": 22
+    },
+    "dependencies": {
+      "prod": 235,
+      "dev": 677,
+      "optional": 64,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 920
+    }
+  }
+}

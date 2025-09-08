@@ -71,33 +71,25 @@ export const testSimple = functions.https.onCall(async (data: any, context) => {
 });
 
 // CORS-enabled HTTP version for production compatibility
-export const testSimpleHttp = functions.https.onRequest(async (req, res) => {
-  // Set CORS headers
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.set('Access-Control-Max-Age', '3600');
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    res.status(204).send('');
-    return;
-  }
-  
-  try {
-    res.json({
-      success: true,
-      message: 'Simple test HTTP function working',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error: any) {
-    console.error('Error in testSimpleHttp:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
+import { withCORS } from '../util/corsConfig';
+
+export const testSimpleHttp = functions.https.onRequest(
+  withCORS('STRICT', async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: 'Simple test HTTP function working',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Error in testSimpleHttp:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  })
+);
 
 // New function to test the iterative scoring pipeline 3 times
 export const testIterativeScoringPipeline = functions.https.onCall(async (data: any, context) => {

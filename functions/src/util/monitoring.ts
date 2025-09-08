@@ -394,10 +394,14 @@ export async function performHealthCheck(): Promise<{
 // Exported Functions
 // ============================================
 
-export const healthCheck = functions.https.onRequest(async (req, res) => {
-  const result = await performHealthCheck();
-  res.status(result.status === 'healthy' ? 200 : 503).json(result);
-});
+import { withCORS } from './corsConfig';
+
+export const healthCheck = functions.https.onRequest(
+  withCORS('STRICT', async (req, res) => {
+    const result = await performHealthCheck();
+    res.status(result.status === 'healthy' ? 200 : 503).json(result);
+  })
+);
 
 export const getMetrics = functions.https.onCall(async (data, context) => {
   // Require admin

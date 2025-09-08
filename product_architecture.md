@@ -701,6 +701,12 @@ jobs:
           projectId: dermassist-ai-1zyic
 ```
 
+### CI/Build Environment Guardrails (2025-09-08)
+- **Node Version**: Enforce Node 20 for both `web/` and `functions/` builds.
+- **esbuild Version**: Pin `esbuild@0.25.9` (required by Vite 6). Add CI assertion to fail on mismatch between host and binary versions.
+- **Platform-Specific Packages**: Disallow `@esbuild/*` packages (macOS/Linux specific) in any `package.json` or lockfiles; CI should fail if detected.
+- **Emulator Integration Tests**: Add a CI job that runs Firebase emulators and executes smoke tests for callable functions and a minimal web build to prevent regressions.
+
 ### **Environment Management**
 
 #### **Configuration Layers**

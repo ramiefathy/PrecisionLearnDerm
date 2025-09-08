@@ -156,6 +156,13 @@ Create a comprehensive, AI-powered dermatology board exam preparation platform t
   - [ ] Create deployment rollback procedures
   - [ ] Establish performance benchmarks
 
+- [ ] **CI/Build Environment Stability**
+  - [ ] Enforce Node 20 in workflows and `engines` fields
+  - [ ] Pin `esbuild@0.25.9` (Vite 6 compatibility)
+  - [ ] Block `@esbuild/*` platform-specific packages in CI (fail if present)
+  - [ ] Add CI check for esbuild host vs binary version mismatch
+  - [ ] Add emulator-based integration tests (functions + web) in CI
+
 - [ ] **Content Development**
   - [ ] Import legacy question bank (1,754 questions)
   - [ ] Process through AI review pipeline

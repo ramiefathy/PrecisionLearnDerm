@@ -1,0 +1,1183 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@babel/core": {
+      "name": "@babel/core",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@babel/helper-module-transforms",
+        "@babel/traverse",
+        "debug"
+      ],
+      "effects": [
+        "istanbul-lib-instrument"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@babel/core"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@babel/helper-module-imports": {
+      "name": "@babel/helper-module-imports",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@babel/traverse"
+      ],
+      "effects": [
+        "@babel/helper-module-transforms"
+      ],
+      "range": ">=7.24.7",
+      "nodes": [
+        "node_modules/@babel/helper-module-imports"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@babel/helper-module-transforms": {
+      "name": "@babel/helper-module-transforms",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@babel/helper-module-imports",
+        "@babel/traverse"
+      ],
+      "effects": [
+        "@babel/core"
+      ],
+      "range": "7.12.0 - 7.22.5 || >=7.24.7",
+      "nodes": [
+        "node_modules/@babel/helper-module-transforms"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@babel/traverse": {
+      "name": "@babel/traverse",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "@babel/helper-module-imports",
+        "@babel/helper-module-transforms"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@babel/traverse"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@google-cloud/cloud-sql-connector": {
+      "name": "@google-cloud/cloud-sql-connector",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@googleapis/sqladmin",
+        "gaxios",
+        "google-auth-library"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/@google-cloud/cloud-sql-connector"
+      ],
+      "fixAvailable": true
+    },
+    "@google-cloud/firestore": {
+      "name": "@google-cloud/firestore",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "google-gax"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": ">=0.21.0",
+      "nodes": [
+        "node_modules/@google-cloud/firestore"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@google-cloud/pubsub": {
+      "name": "@google-cloud/pubsub",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "google-auth-library",
+        "google-gax"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": ">=0.24.0",
+      "nodes": [
+        "node_modules/@google-cloud/pubsub"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "@google-cloud/storage": {
+      "name": "@google-cloud/storage",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios",
+        "google-auth-library",
+        "retry-request",
+        "teeny-request"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": "2.2.0 - 5.8.5 || >=5.17.0",
+      "nodes": [
+        "node_modules/@google-cloud/storage"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@google/genai": {
+      "name": "@google/genai",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "google-auth-library"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/@google/genai"
+      ],
+      "fixAvailable": false
+    },
+    "@googleapis/sqladmin": {
+      "name": "@googleapis/sqladmin",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "googleapis-common"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/@googleapis/sqladmin"
+      ],
+      "fixAvailable": true
+    },
+    "@npmcli/agent": {
+      "name": "@npmcli/agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "http-proxy-agent",
+        "https-proxy-agent",
+        "socks-proxy-agent"
+      ],
+      "effects": [
+        "make-fetch-happen"
+      ],
+      "range": ">=2.1.0",
+      "nodes": [
+        "node_modules/@npmcli/agent"
+      ],
+      "fixAvailable": true
+    },
+    "agent-base": {
+      "name": "agent-base",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "http-proxy-agent",
+        "https-proxy-agent"
+      ],
+      "range": "6.0.0 - 7.1.2",
+      "nodes": [
+        "node_modules/teeny-request/node_modules/agent-base"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "body-parser": {
+      "name": "body-parser",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "exegesis",
+        "express",
+        "firebase-tools"
+      ],
+      "range": ">=1.12.0",
+      "nodes": [
+        "node_modules/body-parser"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "compression": {
+      "name": "compression",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "superstatic"
+      ],
+      "range": ">=1.0.9",
+      "nodes": [
+        "node_modules/compression"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "connect": {
+      "name": "connect",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug",
+        "finalhandler"
+      ],
+      "effects": [
+        "superstatic"
+      ],
+      "range": ">=2.0.0",
+      "nodes": [
+        "node_modules/connect"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "debug": {
+      "name": "debug",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1107274,
+          "name": "debug",
+          "dependency": "debug",
+          "title": "Malware in debug",
+          "url": "https://github.com/advisories/GHSA-8mgj-vmr8-frr6",
+          "severity": "critical",
+          "cwe": [
+            "CWE-506"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=0"
+        }
+      ],
+      "effects": [
+        "@babel/core",
+        "@babel/traverse",
+        "agent-base",
+        "body-parser",
+        "compression",
+        "connect",
+        "express",
+        "finalhandler",
+        "get-uri",
+        "http-proxy-agent",
+        "https-proxy-agent",
+        "istanbul-lib-source-maps",
+        "jwks-rsa",
+        "mocha",
+        "morgan",
+        "pac-proxy-agent",
+        "portfinder",
+        "proxy-agent",
+        "router",
+        "send",
+        "socks-proxy-agent",
+        "superagent",
+        "tcp-port-used",
+        "universal-analytics"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@babel/core/node_modules/debug",
+        "node_modules/@babel/traverse/node_modules/debug",
+        "node_modules/debug",
+        "node_modules/get-uri/node_modules/debug",
+        "node_modules/http-proxy-agent/node_modules/debug",
+        "node_modules/https-proxy-agent/node_modules/debug",
+        "node_modules/istanbul-lib-source-maps/node_modules/debug",
+        "node_modules/jwks-rsa/node_modules/debug",
+        "node_modules/mocha/node_modules/debug",
+        "node_modules/pac-proxy-agent/node_modules/debug",
+        "node_modules/portfinder/node_modules/debug",
+        "node_modules/proxy-agent/node_modules/debug",
+        "node_modules/router/node_modules/debug",
+        "node_modules/socks-proxy-agent/node_modules/debug",
+        "node_modules/superagent/node_modules/debug",
+        "node_modules/tcp-port-used/node_modules/debug",
+        "node_modules/teeny-request/node_modules/debug",
+        "node_modules/universal-analytics/node_modules/debug"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "exegesis": {
+      "name": "exegesis",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "body-parser"
+      ],
+      "effects": [
+        "exegesis-express",
+        "firebase-tools"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/exegesis"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "exegesis-express": {
+      "name": "exegesis-express",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "exegesis"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/exegesis-express"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "express": {
+      "name": "express",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "body-parser",
+        "debug",
+        "finalhandler",
+        "send",
+        "serve-static"
+      ],
+      "effects": [
+        "firebase-functions",
+        "firebase-tools"
+      ],
+      "range": ">=3.0.0-alpha1",
+      "nodes": [
+        "node_modules/express"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "finalhandler": {
+      "name": "finalhandler",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "connect",
+        "express"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/connect/node_modules/finalhandler",
+        "node_modules/finalhandler"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "firebase-admin": {
+      "name": "firebase-admin",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "@google-cloud/firestore",
+        "@google-cloud/storage",
+        "jwks-rsa"
+      ],
+      "effects": [],
+      "range": ">=7.0.0",
+      "nodes": [
+        "node_modules/firebase-admin"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "firebase-functions": {
+      "name": "firebase-functions",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "express"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/firebase-functions"
+      ],
+      "fixAvailable": false
+    },
+    "firebase-tools": {
+      "name": "firebase-tools",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "@google-cloud/cloud-sql-connector",
+        "@google-cloud/pubsub",
+        "body-parser",
+        "exegesis",
+        "exegesis-express",
+        "express",
+        "gaxios",
+        "google-auth-library",
+        "morgan",
+        "portfinder",
+        "proxy-agent",
+        "superstatic",
+        "tcp-port-used",
+        "universal-analytics"
+      ],
+      "effects": [],
+      "range": ">=2.0.0",
+      "nodes": [
+        "node_modules/firebase-tools"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "gaxios": {
+      "name": "gaxios",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "https-proxy-agent"
+      ],
+      "effects": [
+        "@google-cloud/cloud-sql-connector",
+        "@google-cloud/storage",
+        "firebase-tools",
+        "gcp-metadata",
+        "google-auth-library",
+        "googleapis-common",
+        "gtoken"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@google-cloud/cloud-sql-connector/node_modules/gaxios",
+        "node_modules/gaxios",
+        "node_modules/googleapis-common/node_modules/gaxios"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "gcp-metadata": {
+      "name": "gcp-metadata",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios"
+      ],
+      "effects": [],
+      "range": ">=0.9.3",
+      "nodes": [
+        "node_modules/@google-cloud/cloud-sql-connector/node_modules/gcp-metadata",
+        "node_modules/gcp-metadata",
+        "node_modules/googleapis-common/node_modules/gcp-metadata"
+      ],
+      "fixAvailable": true
+    },
+    "get-uri": {
+      "name": "get-uri",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/get-uri"
+      ],
+      "fixAvailable": true
+    },
+    "google-auth-library": {
+      "name": "google-auth-library",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios",
+        "gcp-metadata",
+        "gtoken"
+      ],
+      "effects": [
+        "@google-cloud/cloud-sql-connector",
+        "@google-cloud/pubsub",
+        "@google-cloud/storage",
+        "@google/genai",
+        "firebase-tools",
+        "google-gax"
+      ],
+      "range": ">=3.0.0-pre1",
+      "nodes": [
+        "node_modules/@google-cloud/cloud-sql-connector/node_modules/google-auth-library",
+        "node_modules/google-auth-library",
+        "node_modules/googleapis-common/node_modules/google-auth-library"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "google-gax": {
+      "name": "google-gax",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "google-auth-library",
+        "retry-request"
+      ],
+      "effects": [
+        "@google-cloud/firestore"
+      ],
+      "range": ">=0.24.0",
+      "nodes": [
+        "node_modules/google-gax"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "googleapis-common": {
+      "name": "googleapis-common",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios",
+        "google-auth-library"
+      ],
+      "effects": [
+        "@googleapis/sqladmin"
+      ],
+      "range": ">=0.6.0-webpack",
+      "nodes": [
+        "node_modules/googleapis-common"
+      ],
+      "fixAvailable": true
+    },
+    "gtoken": {
+      "name": "gtoken",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "gaxios"
+      ],
+      "effects": [],
+      "range": ">=2.3.1",
+      "nodes": [
+        "node_modules/@google-cloud/cloud-sql-connector/node_modules/gtoken",
+        "node_modules/googleapis-common/node_modules/gtoken",
+        "node_modules/gtoken"
+      ],
+      "fixAvailable": true
+    },
+    "http-proxy-agent": {
+      "name": "http-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "agent-base",
+        "debug"
+      ],
+      "effects": [
+        "teeny-request"
+      ],
+      "range": ">=0.2.4",
+      "nodes": [
+        "node_modules/http-proxy-agent",
+        "node_modules/teeny-request/node_modules/http-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "https-proxy-agent": {
+      "name": "https-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "agent-base",
+        "debug"
+      ],
+      "effects": [
+        "@npmcli/agent",
+        "gaxios",
+        "pac-proxy-agent",
+        "teeny-request"
+      ],
+      "range": ">=0.3.0",
+      "nodes": [
+        "node_modules/https-proxy-agent",
+        "node_modules/teeny-request/node_modules/https-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "istanbul-lib-instrument": {
+      "name": "istanbul-lib-instrument",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@babel/core"
+      ],
+      "effects": [
+        "nyc"
+      ],
+      "range": ">=4.0.0-alpha.0",
+      "nodes": [
+        "node_modules/istanbul-lib-instrument"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "istanbul-lib-source-maps": {
+      "name": "istanbul-lib-source-maps",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "nyc"
+      ],
+      "range": ">=1.2.0",
+      "nodes": [
+        "node_modules/istanbul-lib-source-maps"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "jwks-rsa": {
+      "name": "jwks-rsa",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-admin"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/jwks-rsa"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "make-fetch-happen": {
+      "name": "make-fetch-happen",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "@npmcli/agent"
+      ],
+      "effects": [
+        "node-gyp"
+      ],
+      "range": ">=14.0.0",
+      "nodes": [
+        "node_modules/make-fetch-happen"
+      ],
+      "fixAvailable": true
+    },
+    "mocha": {
+      "name": "mocha",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "debug"
+      ],
+      "effects": [],
+      "range": ">=0.3.3",
+      "nodes": [
+        "node_modules/mocha"
+      ],
+      "fixAvailable": {
+        "name": "mocha",
+        "version": "0.3.2",
+        "isSemVerMajor": true
+      }
+    },
+    "morgan": {
+      "name": "morgan",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-tools",
+        "superstatic"
+      ],
+      "range": ">=1.4.0",
+      "nodes": [
+        "node_modules/morgan"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "node-gyp": {
+      "name": "node-gyp",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "make-fetch-happen"
+      ],
+      "effects": [
+        "re2"
+      ],
+      "range": ">=11.0.0",
+      "nodes": [
+        "node_modules/node-gyp"
+      ],
+      "fixAvailable": true
+    },
+    "nyc": {
+      "name": "nyc",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "istanbul-lib-instrument",
+        "istanbul-lib-source-maps"
+      ],
+      "effects": [],
+      "range": ">=7.0.0-alpha.1",
+      "nodes": [
+        "node_modules/nyc"
+      ],
+      "fixAvailable": {
+        "name": "nyc",
+        "version": "6.6.1",
+        "isSemVerMajor": true
+      }
+    },
+    "pac-proxy-agent": {
+      "name": "pac-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug",
+        "get-uri",
+        "http-proxy-agent",
+        "https-proxy-agent",
+        "socks-proxy-agent"
+      ],
+      "effects": [
+        "proxy-agent"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/pac-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "portfinder": {
+      "name": "portfinder",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": ">=1.0.7-beta.0",
+      "nodes": [
+        "node_modules/portfinder"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "proxy-agent": {
+      "name": "proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug",
+        "http-proxy-agent",
+        "https-proxy-agent",
+        "pac-proxy-agent",
+        "socks-proxy-agent"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": ">=1.1.0",
+      "nodes": [
+        "node_modules/proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "re2": {
+      "name": "re2",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "node-gyp"
+      ],
+      "effects": [],
+      "range": ">=1.21.5",
+      "nodes": [
+        "node_modules/re2"
+      ],
+      "fixAvailable": true
+    },
+    "retry-request": {
+      "name": "retry-request",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "teeny-request"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "google-gax"
+      ],
+      "range": ">=7.0.0",
+      "nodes": [
+        "node_modules/retry-request"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "router": {
+      "name": "router",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [],
+      "range": "1.0.0-beta.1 - 2.0.0-beta.2 || >=2.2.0",
+      "nodes": [
+        "node_modules/router"
+      ],
+      "fixAvailable": true
+    },
+    "send": {
+      "name": "send",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "serve-static"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/send"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "serve-static": {
+      "name": "serve-static",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "send"
+      ],
+      "effects": [
+        "express"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/serve-static"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "socks-proxy-agent": {
+      "name": "socks-proxy-agent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "pac-proxy-agent",
+        "proxy-agent"
+      ],
+      "range": ">=5.0.0",
+      "nodes": [
+        "node_modules/socks-proxy-agent"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "superagent": {
+      "name": "superagent",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "supertest"
+      ],
+      "range": ">=0.14.9",
+      "nodes": [
+        "node_modules/superagent"
+      ],
+      "fixAvailable": {
+        "name": "supertest",
+        "version": "0.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "superstatic": {
+      "name": "superstatic",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "compression",
+        "connect",
+        "morgan"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/superstatic"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "supertest": {
+      "name": "supertest",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "superagent"
+      ],
+      "effects": [],
+      "range": ">=0.7.1",
+      "nodes": [
+        "node_modules/supertest"
+      ],
+      "fixAvailable": {
+        "name": "supertest",
+        "version": "0.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "tcp-port-used": {
+      "name": "tcp-port-used",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": ">=0.0.3",
+      "nodes": [
+        "node_modules/tcp-port-used"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    },
+    "teeny-request": {
+      "name": "teeny-request",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "http-proxy-agent",
+        "https-proxy-agent"
+      ],
+      "effects": [
+        "@google-cloud/storage",
+        "retry-request"
+      ],
+      "range": ">=3.2.0",
+      "nodes": [
+        "node_modules/teeny-request"
+      ],
+      "fixAvailable": {
+        "name": "firebase-admin",
+        "version": "9.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "universal-analytics": {
+      "name": "universal-analytics",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        "debug"
+      ],
+      "effects": [
+        "firebase-tools"
+      ],
+      "range": ">=0.4.17",
+      "nodes": [
+        "node_modules/universal-analytics"
+      ],
+      "fixAvailable": {
+        "name": "firebase-tools",
+        "version": "3.18.2",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 55,
+      "total": 55
+    },
+    "dependencies": {
+      "prod": 235,
+      "dev": 677,
+      "optional": 64,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 920
+    }
+  }
+}

@@ -767,9 +767,13 @@ export class PayloadLogger {
 // Exported Functions
 // ============================================
 
-export const comprehensiveHealthCheck = functions.https.onRequest(async (req, res) => {
-  const result = await EnhancedHealthCheck.performComprehensiveHealthCheck();
-  res.status(result.status === 'healthy' ? 200 : 503).json(result);
-});
+import { withCORS } from './corsConfig';
+
+export const comprehensiveHealthCheck = functions.https.onRequest(
+  withCORS('STRICT', async (req, res) => {
+    const result = await EnhancedHealthCheck.performComprehensiveHealthCheck();
+    res.status(result.status === 'healthy' ? 200 : 503).json(result);
+  })
+);
 
 // Classes are already exported individually above

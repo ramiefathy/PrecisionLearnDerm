@@ -1,8 +1,34 @@
 # PrecisionLearnDerm - Change Logs
 
-**Last Updated**: 2025-08-19 (Admin Panel Reorganization & Dashboard Integration Complete)  
+**Last Updated**: 2025-09-08 (CI Build Environment Stability; PR #89 opened)  
 **Status**: PHASE 1 ✅ | PHASE 2 ✅ | PHASE 3 ✅ | ADMIN PANEL CONSOLIDATION ✅ COMPLETE: Professional 5-Tab Interface & CORS Resolution 🎯  
 **Next Steps**: All deployment and integration issues resolved, system fully operational in production  
+
+---
+
+## 2025-09-08 - CI/BUILD ENVIRONMENT STABILITY + AUDIT ARTIFACTS ✅
+
+### Summary
+- Stabilized CI/build by pinning `esbuild@0.25.9` (compatible with Vite 6) and ensuring Node 20 across `web/` and `functions/`.
+- Removed/blocked platform-specific `@esbuild/*` packages to keep CI cross-platform.
+- Committed reproducible audit artifacts under `reports/ARTIFACTS/` for ops and future debugging.
+- Opened PR `#89` from `fix/ci-build-env-workflow` → `main` documenting these guardrails.
+
+### Key Changes
+- Build tooling: Node 20 enforced; `esbuild` pinned; guidance added to docs.
+- Artifacts: Added `deps-*.txt`, `audit-*.json`, rules snapshots, and logs under `reports/ARTIFACTS/`.
+- Config: Minor `firebase.json` update; functions monitoring/tests touched for reliability.
+
+### Verification
+- Functions and web build green on Node 20 with `esbuild@0.25.9`.
+- CI push succeeds; no EBADPLATFORM or esbuild host/binary mismatches.
+
+### Follow-ups
+- Add CI assertions to fail build if:
+  - `esbuild` version != 0.25.x
+  - `@esbuild/*` platform-specific packages detected
+  - Node < 20 in workflows or engines
+- Expand emulator-based integration tests in CI.
 
 ---
 
