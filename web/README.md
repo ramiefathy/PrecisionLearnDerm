@@ -39,6 +39,22 @@ export default tseslint.config([
 ])
 ```
 
+## Firebase configuration
+
+This project requires Firebase environment variables to be set before building or running.
+
+1. Copy the sample file and fill in your Firebase project credentials:
+   ```bash
+   cp .env.sample .env.local
+   # Then edit .env.local to add your own Firebase API key, domain, etc.
+   ```
+
+2. In development (`npm run dev`), Vite will load `.env.local`.
+
+3. In production (`npm run build`), Vite will load `.env.production` or the environment variables provided by your CI/CD or hosting platform.
+
+See `.env.sample` for the list of required `VITE_FIREBASE_*` variables.
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js

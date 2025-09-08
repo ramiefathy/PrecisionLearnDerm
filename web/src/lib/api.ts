@@ -1,6 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import type { HttpsCallableOptions } from 'firebase/functions';
-import { functions, auth } from './firebase';
+import { functions } from './firebase';
 import type { 
   APIResponse, 
   QuestionGenerationResponse,
