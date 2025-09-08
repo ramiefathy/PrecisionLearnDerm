@@ -3,8 +3,7 @@
     "source": "functions"
   },
   "hosting": {
-  "site": "dermassist-ai-1zyic",
-  "public": "web/dist",
+    "public": "web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },

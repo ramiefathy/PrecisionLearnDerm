@@ -1,0 +1,9 @@
+Root directory listing (hidden files):
+.
+..
+.DS_Store
+.firebase
+.firebaserc
+.git
+.github
+.gitignore

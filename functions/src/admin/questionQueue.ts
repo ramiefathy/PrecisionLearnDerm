@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import cors from 'cors';
+import { CallableContext } from 'firebase-functions/lib/common/providers/https';
+import { withCORS } from '../util/corsConfig';
 import { requireAdmin } from '../util/auth';
 import { logInfo, logError } from '../util/logging';
 import { config } from '../util/config';
@@ -490,7 +491,6 @@ async function mapEntityToTopicHierarchy(entityName: string): Promise<any> {
   }
 }
 
-const corsHandler = cors({ origin: true });
 
 export const admin_generateQuestionQueue = functions
   .runWith({
@@ -1027,12 +1027,12 @@ export const admin_update_question = functions.https.onCall(async (data, context
 });
 
 // Initialize queue with default questions
-export const initializeQueue = functions.https.onRequest(async (req, res) => {
-  corsHandler(req, res, async () => {
+export const initializeQueue = functions.https.onRequest(
+  withCORS('STRICT', async (req, res) => {
     try {
-      const context = { 
+      const context: CallableContext = {
         auth: req.body.context?.auth,
-        rawRequest: req,
+        rawRequest: req as any,
         instanceIdToken: undefined,
         app: undefined
       };
@@ -1043,7 +1043,8 @@ export const initializeQueue = functions.https.onRequest(async (req, res) => {
       const existingQueue = await db.collection('questionQueue').limit(1).get();
       
       if (!existingQueue.empty) {
-        return res.status(200).send({ data: { message: 'Queue already initialized', count: existingQueue.size } });
+        res.status(200).send({ data: { message: 'Queue already initialized', count: existingQueue.size } });
+        return;
       }
       
       // Generate initial 25 questions directly using the internal logic
@@ -1056,7 +1057,8 @@ export const initializeQueue = functions.https.onRequest(async (req, res) => {
       const needed = Math.max(0, targetCount - currentCount);
       
       if (needed === 0) {
-        return res.status(200).send({ data: { message: 'Queue already full', count: currentCount } });
+        res.status(200).send({ data: { message: 'Queue already full', count: currentCount } });
+        return;
       }
       
       const selectedTopics = await selectWeightedTopics(needed);
@@ -1109,6 +1111,7 @@ export const initializeQueue = functions.https.onRequest(async (req, res) => {
           count: generatedQuestions.length
         }
       });
+      return;
       
     } catch (error: any) {
       logError('queue.init_failed', {
@@ -1116,6 +1119,7 @@ export const initializeQueue = functions.https.onRequest(async (req, res) => {
         error: error?.message || 'Unknown error'
       });
       res.status(500).send({ error: { message: 'Failed to initialize queue' } });
+      return;
     }
-  });
-}); 
+  })
+);

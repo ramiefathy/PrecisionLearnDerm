@@ -16,7 +16,7 @@ import { withCORS } from '../util/corsConfig';
  * DISABLED IN PRODUCTION for security
  */
 export const test_enhanced_pipeline = functions.https.onRequest(
-  withCORS('TEST', async (req, res) => {
+  withCORS('STRICT', async (req, res) => {
     // SECURITY: Disable in production
     if (process.env.NODE_ENV === 'production') {
       res.status(404).json({
@@ -81,7 +81,7 @@ export const test_enhanced_pipeline = functions.https.onRequest(
  * DISABLED IN PRODUCTION for security
  */
 export const test_generate_with_details = functions.https.onRequest(
-  withCORS('TEST', async (req, res) => {
+  withCORS('STRICT', async (req, res) => {
     // SECURITY: Disable in production
     if (process.env.NODE_ENV === 'production') {
       res.status(404).json({
