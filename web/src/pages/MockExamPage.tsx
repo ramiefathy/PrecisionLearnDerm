@@ -109,8 +109,8 @@ export default function MockExamPage({ loadBatch, loadItem }: { loadBatch?: Load
           </div>
           <SectionCard title="Questions">
             <div className="grid gap-3">
-              {queue.map((q, i)=>(
-                <div key={q.itemId} className="border rounded-xl p-3 bg-white/70">
+              {queue.map((q, i) => (
+                <div key={`${q.itemId}-${i}`} className="border rounded-xl p-3 bg-white/70">
                   <div className="font-medium">Q{i+1}. {q.fullItem?.stem}</div>
                   <div className="mt-2 grid gap-2">
                     {(q.fullItem?.options||[]).map((opt:any,j:number)=>(
