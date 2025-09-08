@@ -137,7 +137,7 @@ export const checkAdminStatus = adminStatusExports;
 // Only export test endpoints in non-production environments
 const testExports = conditionalExport(
   isDevelopment,
-  './test/aiTestingEndpoints',
+  './testEndpoints/aiTestingEndpoints',
   'test_generate_question',
   // Fallback stub for production
   () => ({
@@ -149,7 +149,7 @@ const testExports = conditionalExport(
 
 const testReviewExports = conditionalExport(
   isDevelopment,
-  './test/aiTestingEndpoints',
+  './testEndpoints/aiTestingEndpoints',
   'test_review_question',
   // Fallback stub for production
   () => ({
