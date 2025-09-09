@@ -153,8 +153,8 @@ export default function AdminPipelineEvaluation() {
     setError(null);
     
     try {
-      const runPipelineEvaluation = httpsCallable(functions, 'runPipelineEvaluation');
-      const result = await runPipelineEvaluation();
+      const startEval = httpsCallable(functions, 'startPipelineEvaluation');
+      const result = await startEval({});
       
       if (result.data) {
         // Refresh data

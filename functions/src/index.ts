@@ -157,6 +157,9 @@ export { adminGenerateQuestions as admin_generate_questions, adminBatchGenerateQ
 export { grantAdminRole as setup_grant_admin } from './admin/grantAdminRole';
 export { setup_check_admin } from './admin/setup';
 
+// Evaluation callables
+export { startPipelineEvaluation } from './evaluation/startPipelineEvaluation';
+
 /* =========================================================
  * Admin Status / Diagnostics (Development Only) - Conditional Export
  * ======================================================= */
