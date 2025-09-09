@@ -1,3 +1,23 @@
+## 2025-09-09
+
+### Web
+- RunPanel: replaced single difficulty/count with per-difficulty `Basic/Intermediate/Advanced` inputs (0–50), added total cap display, and integrated taxonomy selection via `MultiSelectTaxonomy`. Built payload with `counts`, `taxonomySelection`, and merged freeform topics.
+- Added `web/src/features/eval/payload.ts` with helpers (`validateCounts`, `buildTopicsFromTaxonomy`, `buildTaxonomySelection`, `buildEvaluationRequestPayload`).
+- Extended `useRunEvaluation.EvaluationRequest` with optional `counts` and `taxonomySelection`.
+- Reviewer gating: `AuthContext` now exposes token claims (`isAdmin`, `isReviewer`) via `getIdTokenResult`. Introduced `ReviewerRoute` and applied to `/admin/review`. Navigation shows Review tab for reviewers or admins.
+- Review UI a11y: `AdminQuestionReviewPage` warns when image alt text is missing/too short and disables Approve until valid.
+- Added analytics dashboard page at `/admin/analytics` showing recent `evaluationSummaries` aggregates.
+
+### Functions
+- Extended `functions/src/types/evaluation.ts` with `counts` and `taxonomySelection`.
+- Updated `startPipelineEvaluation` to map `counts` to internal counts, validate each [0,50], total ≤ 50, at least one > 0, and resolve topics from `taxonomySelection` if empty.
+- Added scheduled psychometrics aggregation `scheduledAggregateItemPerformance` and shared helper `computeAndStoreItemPerformance`.
+- Tests: added unit and integration tests for counts/taxonomy mapping.
+
+### Rules/Docs
+- Firestore rules already support `isReviewer` and `isReviewerOrAdmin` for review collections.
+- Updated documentation pending in `project_plan.md` and `product_architecture.md`.
+
 # PrecisionLearnDerm - Change Logs
 
 **Last Updated**: 2025-09-08 (CI Build Environment Stability; PR #89 opened)  
@@ -1369,3 +1389,10 @@ The deployment failures were misleading - functions were actually deploying succ
 **Last Review**: 2025-08-14 (DEPLOYMENT SUCCESS)  
 **Next Review**: 2025-08-15 (Post-validation)  
 **Document Maintained By**: Development Team 
+
+## 2025-09-09 - Evaluation V2 wiring + Hosting deploy
+
+- Legacy `admin/evaluation` now redirects to V2 with `jobId` after `startPipelineEvaluation` returns.
+- `AdminEvaluationV2Page` reads `jobId` from URL and initializes running state.
+- Live components (`EvaluationDashboard`, `LiveEvaluationLogs`) confirmed binding to `evaluationJobs/{jobId}`.
+- Web built and deployed to Hosting (`dermassist-ai-1zyic`). 

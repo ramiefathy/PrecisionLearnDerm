@@ -159,6 +159,12 @@ export { setup_check_admin } from './admin/setup';
 
 // Evaluation callables
 export { startPipelineEvaluation } from './evaluation/startPipelineEvaluation';
+export { processEvaluationBatch } from './evaluation/evaluationProcessor';
+export { diag_cors } from './util/diagnostics';
+
+// Review queue endpoints (admin-only)
+export { review_enqueue_draft, review_list_queue, review_approve, review_reject, review_save_draft } from './review/endpoints';
+export { aggregateItemPerformance, scheduledAggregateItemPerformance } from './telemetry/psychometrics';
 
 /* =========================================================
  * Admin Status / Diagnostics (Development Only) - Conditional Export

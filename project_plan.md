@@ -314,3 +314,16 @@ Create a comprehensive, AI-powered dermatology board exam preparation platform t
 **Last Updated**: 2025-08-14
 **Next Review**: 2025-08-21
 **Status**: Critical Phase - Deployment Recovery 
+
+### Recently Completed (2025-09-09)
+- RunPanel: per-difficulty counts + taxonomy selection integrated; web payload helpers added
+- Functions: `EvaluationRequest.counts/taxonomySelection` accepted; mapping/validation implemented
+- Reviewer gating: token-claim based gating (ReviewerRoute); review tab visible to reviewers
+- Review UI: image alt-text enforcement; approve disabled until valid
+- Psychometrics: daily scheduled aggregation job added
+- Dashboard: initial admin analytics dashboard for recent evaluation summaries
+
+### Evaluation System (V2) - 2025-09-09
+- Redirect legacy evaluation to V2 UI with `jobId` after callable returns.
+- V2 page reads `jobId` from URL and shows live logs and dashboards.
+- Next: add deep links to specific pipeline runs, enrich filters, and export presets. 

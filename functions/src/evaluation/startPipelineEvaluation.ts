@@ -10,6 +10,7 @@ import * as admin from 'firebase-admin';
 import * as crypto from 'node:crypto';
 import { requireAdmin } from '../util/auth';
 import { createEvaluationJob, failJob } from './evaluationJobManager';
+import type { EvaluationRequest } from '../types/evaluation';
 
 /**
  * Firebase Function to start pipeline evaluation
@@ -27,33 +28,82 @@ export const startPipelineEvaluation = functions
       requireAdmin(context);
       const userId = context.auth!.uid;
       
-      // Validate input
-      const {
-        basicCount = 1,
-        advancedCount = 1,
-        veryDifficultCount = 1,
-        pipelines = ['boardStyle', 'optimizedOrchestrator', 'hybridRouter'],
-        topics = []
-      } = data;
+      // Validate input (support both legacy fields and new EvaluationRequest)
+      const req: EvaluationRequest = {
+        pipelines: Array.isArray(data?.pipelines) && data.pipelines.length > 0
+          ? data.pipelines
+          : ['boardStyle', 'optimizedOrchestrator', 'hybridRouter'],
+        difficulty: data?.difficulty,
+        count: typeof data?.count === 'number' ? data.count : undefined,
+        topics: Array.isArray(data?.topics) ? data.topics : undefined,
+        tags: Array.isArray(data?.tags) ? data.tags : undefined,
+        seed: typeof data?.seed === 'number' ? data.seed : undefined,
+        diversity: data?.diversity,
+        counts: (data?.counts && typeof data.counts === 'object') ? {
+          Basic: Number(data.counts.Basic ?? 0),
+          Intermediate: Number(data.counts.Intermediate ?? 0),
+          Advanced: Number(data.counts.Advanced ?? 0)
+        } : undefined,
+        taxonomySelection: (data?.taxonomySelection && typeof data.taxonomySelection === 'object') ? {
+          categories: Array.isArray(data.taxonomySelection.categories) ? data.taxonomySelection.categories : [],
+          subcategories: Array.isArray(data.taxonomySelection.subcategories) ? data.taxonomySelection.subcategories : [],
+          topics: Array.isArray(data.taxonomySelection.topics) ? data.taxonomySelection.topics : []
+        } : undefined
+      };
+
+      const mappedCounts = (() => {
+        // Preferred: new counts object
+        if (req.counts) {
+          return {
+            basic: req.counts.Basic,
+            adv: req.counts.Intermediate,
+            very: req.counts.Advanced
+          };
+        }
+        // Legacy numeric fields (basicCount/advancedCount/veryDifficultCount)
+        if (typeof data?.basicCount === 'number' || typeof data?.advancedCount === 'number' || typeof data?.veryDifficultCount === 'number') {
+          return {
+            basic: typeof data?.basicCount === 'number' ? data.basicCount : 0,
+            adv: typeof data?.advancedCount === 'number' ? data.advancedCount : 0,
+            very: typeof data?.veryDifficultCount === 'number' ? data.veryDifficultCount : 0
+          };
+        }
+        // Map legacy single difficulty + count
+        const c = typeof req.count === 'number' ? req.count : undefined;
+        const d = req.difficulty;
+        if (!c || !d) {
+          return { basic: 1, adv: 1, very: 1 };
+        }
+        if (d === 'Basic') return { basic: c, adv: 0, very: 0 };
+        if (d === 'Intermediate') return { basic: 0, adv: c, very: 0 };
+        return { basic: 0, adv: 0, very: c };
+      })();
+
+      const basicCount = mappedCounts.basic;
+      const advancedCount = mappedCounts.adv;
+      const veryDifficultCount = mappedCounts.very;
+      const pipelines = req.pipelines;
+      // Topics resolution: prefer explicit topics, then taxonomySelection.topics, else defaults
+      const resolvedTopics: string[] = Array.isArray(req.topics) && req.topics.length > 0
+        ? req.topics
+        : (Array.isArray(req.taxonomySelection?.topics) && req.taxonomySelection!.topics.length > 0
+            ? req.taxonomySelection!.topics
+            : []);
       
       // Validate counts
-      if (basicCount < 0 || basicCount > 10) {
+      const eachInRange = (n: number) => n >= 0 && n <= 50;
+      if (!eachInRange(basicCount) || !eachInRange(advancedCount) || !eachInRange(veryDifficultCount)) {
         throw new functions.https.HttpsError(
           'invalid-argument',
-          'Basic count must be between 0 and 10'
+          'Each count must be between 0 and 50'
         );
       }
-      if (advancedCount < 0 || advancedCount > 10) {
-        throw new functions.https.HttpsError(
-          'invalid-argument',
-          'Advanced count must be between 0 and 10'
-        );
+      const total = basicCount + advancedCount + veryDifficultCount;
+      if (total > 50) {
+        throw new functions.https.HttpsError('invalid-argument', 'Total of counts must be ≤ 50');
       }
-      if (veryDifficultCount < 0 || veryDifficultCount > 10) {
-        throw new functions.https.HttpsError(
-          'invalid-argument',
-          'Very Difficult count must be between 0 and 10'
-        );
+      if (total === 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'At least one difficulty count must be > 0');
       }
       
       // Validate pipelines
@@ -67,7 +117,7 @@ export const startPipelineEvaluation = functions
       }
       
       // Use default topics if none provided
-      const evaluationTopics = topics.length > 0 ? topics : [
+      const evaluationTopics = resolvedTopics.length > 0 ? resolvedTopics : [
         'Psoriasis',
         'Melanoma diagnosis',
         'Atopic dermatitis',
@@ -93,10 +143,11 @@ export const startPipelineEvaluation = functions
           veryDifficultCount,
           pipelines,
           topics: evaluationTopics
-        }
+        },
+        request: req
       });
       
-      // Queue the first batch using Cloud Tasks for reliable processing
+      // Queue the first batch using Cloud Tasks
       try {
         const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
         const taskId = crypto.randomUUID();
@@ -104,36 +155,23 @@ export const startPipelineEvaluation = functions
           jobId,
           taskId,
           startIndex: 0,
-          batchSize: 3 // Start with a conservative batch size
+          batchSize: 3
         }, {
           id: taskId,
-          scheduleDelaySeconds: 1, // Start processing after 1 second
-          dispatchDeadlineSeconds: 1800 // 30 minute deadline
+          scheduleDelaySeconds: 1,
+          dispatchDeadlineSeconds: 1800
         });
 
-        await admin.firestore().collection('evaluationJobs').doc(jobId).update({
-          taskIds: admin.firestore.FieldValue.arrayUnion(taskId)
-        });
-
-        logger.info('[START_EVAL] Queued first batch for processing', {
-          jobId,
-          totalTests: basicCount + advancedCount + veryDifficultCount,
-          pipelines: pipelines.length
-        });
+        await admin.firestore().collection('evaluationJobs').doc(jobId).set({
+          status: 'queued',
+          taskIds: admin.firestore.FieldValue.arrayUnion(taskId),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          request: req
+        }, { merge: true });
       } catch (queueError) {
         const errorMessage = queueError instanceof Error ? queueError.message : String(queueError);
-        logger.error('[START_EVAL] Failed to queue batch processing', {
-          jobId,
-          error: errorMessage
-        });
-
         await failJob(jobId, errorMessage);
-
-        // Surface failure to caller so admin UI can notify immediately
-        throw new functions.https.HttpsError(
-          'internal',
-          `Failed to queue batch processing: ${errorMessage}`
-        );
+        throw new functions.https.HttpsError('internal', `Failed to queue batch processing: ${errorMessage}`);
       }
       
       // Return immediately with job ID

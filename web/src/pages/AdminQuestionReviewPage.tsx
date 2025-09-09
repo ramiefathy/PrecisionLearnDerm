@@ -99,6 +99,7 @@ export default function AdminQuestionReviewPage() {
   const [editedQuestion, setEditedQuestion] = useState<any>(null);
   const [savingEdits, setSavingEdits] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [imageAltIssue, setImageAltIssue] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuestionQueue();
@@ -404,6 +405,24 @@ export default function AdminQuestionReviewPage() {
     setAiReviewResult(null);
     setShowAiReview(false);
     setAdminFeedback('');
+
+    // A11y: if image present, check alt text
+    try {
+      const media: any = (question as any)?.draftItem?.media || (question as any)?.draftItem?.image || null;
+      const imageUrl = media?.url || (question as any)?.draftItem?.imageUrl;
+      const altText = media?.alt || (question as any)?.draftItem?.imageAlt;
+      if (imageUrl) {
+        if (!altText || String(altText).trim().length < 5) {
+          setImageAltIssue('Image detected: Alt text is required and should be at least 5 characters.');
+        } else {
+          setImageAltIssue(null);
+        }
+      } else {
+        setImageAltIssue(null);
+      }
+    } catch {
+      setImageAltIssue(null);
+    }
   };
 
 
@@ -685,6 +704,11 @@ export default function AdminQuestionReviewPage() {
                     {/* Explanation */}
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Explanation</h3>
+                      {imageAltIssue && (
+                        <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                          {imageAltIssue}
+                        </div>
+                      )}
                       {isEditMode ? (
                         <textarea
                           value={editedQuestion?.explanation || ''}
@@ -1064,8 +1088,9 @@ export default function AdminQuestionReviewPage() {
                       <div className="flex gap-4">
                         <button
                           onClick={() => handleReview(selectedQuestion.id, 'approve')}
-                          disabled={reviewing !== null}
+                          disabled={reviewing !== null || !!imageAltIssue}
                           className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+                          title={imageAltIssue ? 'Alt text required for images' : undefined}
                         >
                           {reviewing === selectedQuestion.id ? 'Approving...' : '✓ Approve & Add to Bank'}
                         </button>
