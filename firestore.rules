@@ -67,5 +67,11 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
     }
+
+    // Pipeline evaluations (summary/history) - admin only
+    match /pipelineEvaluations/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
   }
 }

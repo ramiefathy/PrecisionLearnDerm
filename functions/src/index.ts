@@ -65,7 +65,6 @@ const adaptiveExports = safeExportBatch('./pe/adaptiveGeneration', [
 ]);
 
 export const getPersonalizedQuestions = adaptiveExports.getPersonalizedQuestions;
-export const pe_get_personalized_questions = adaptiveExports.getPersonalizedQuestions;
 
 /* =========================================================
  * Item / Content Management - Defensive Exports
@@ -143,6 +142,7 @@ export { seedUserActivities as activities_seed, clearUserActivities as activitie
 // Admin - Question queue and taxonomy
 export { admin_generateQuestionQueue as admin_generate_question_queue, admin_generate_per_topic, admin_getQuestionQueue as admin_get_question_queue, admin_reviewQuestion as admin_review_question, admin_update_question } from './admin/questionQueue';
 export { admin_listUncategorized as admin_list_uncategorized, admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
+export { admin_getTaxonomy, admin_getTaxonomyEntities } from './admin/questionQueue';
 
 // Admin - Question bank stats and legacy import
 export { getQuestionBankStats as admin_get_question_bank_stats } from './admin/importQuestions';
@@ -152,6 +152,10 @@ export { grantAdminRole as admin_grant_role, revokeAdminRole as admin_revoke_rol
 
 // Admin - Generation endpoints
 export { adminGenerateQuestions as admin_generate_questions, adminBatchGenerateQuestions as admin_batch_generate_questions } from './admin/adminQuestionGeneration';
+
+// Setup callables
+export { grantAdminRole as setup_grant_admin } from './admin/grantAdminRole';
+export { setup_check_admin } from './admin/setup';
 
 /* =========================================================
  * Admin Status / Diagnostics (Development Only) - Conditional Export

@@ -128,7 +128,13 @@ export const api = {
     revokeAdminRole: (payload: AdminUserRequest) => 
       httpsCallable(functions, 'admin_revoke_role')(payload).then(r => r.data as APIResponse),
     listAdmins: () => 
-      httpsCallable(functions, 'admin_list_admins')({}).then(r => r.data as APIResponse),
+      httpsCallable(functions, 'admin_list_admins')({}).then(r => {
+        const d: any = r.data;
+        if (d && Array.isArray(d.admins)) {
+          return { success: true, data: { admins: d.admins } } as APIResponse;
+        }
+        return d as APIResponse;
+      }),
     // Dedicated admin question generation with ABD guidelines (uses extended timeout)
     generateQuestions: (payload: { 
       topic: string; 

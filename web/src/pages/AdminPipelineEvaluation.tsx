@@ -89,8 +89,19 @@ export default function AdminPipelineEvaluation() {
 
   // Load latest evaluation on mount
   useEffect(() => {
-    loadLatestEvaluation();
-    loadHistoricalData();
+    (async () => {
+      try {
+        const token = await (await import('../lib/firebase')).auth.currentUser?.getIdTokenResult(true);
+        if (!token?.claims?.admin) {
+          // Skip subscribing if not admin
+          return;
+        }
+        await loadLatestEvaluation();
+        await loadHistoricalData();
+      } catch (_) {
+        // Silent; page already admin-gated at route level
+      }
+    })();
   }, []);
 
   const loadLatestEvaluation = async () => {
