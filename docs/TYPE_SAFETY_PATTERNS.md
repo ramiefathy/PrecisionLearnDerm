@@ -225,3 +225,11 @@ const normalizedAnswer = normalizeRecordAnswerRequest({
 4. **Phase 4**: Apply transformation functions to ensure data consistency
 
 This approach provides the best of both worlds: backward compatibility for existing code and type safety for new implementations.
+
+### Recharts Label Typing (Sep 2025)
+- Avoid importing label prop types (e.g., `PieLabelRenderProps`); they vary across versions and can break CI.
+- Prefer untyped label callbacks with null‑safe guards:
+  ```tsx
+  label={(p: any) => `${p?.name ?? p?.payload?.name ?? ''}: ${p?.value ?? 0} (${((p?.percent ?? 0)*100).toFixed(0)}%)`}
+  ```
+- Keep this pattern in a shared helper to prevent drift between environments.
