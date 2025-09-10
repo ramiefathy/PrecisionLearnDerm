@@ -1418,3 +1418,10 @@ The deployment failures were misleading - functions were actually deploying succ
 - Admin Nav: `web/src/app/routes.tsx` restricts Review tab to admins only.
 - Analytics: `web/src/features/analytics/AdminEvalDashboard.tsx` counts last-30d feedback-triggered entries using `where('createdAt','>=', since)` and links to `/admin/review?source=user_feedback&sinceDays=30`.
 - Tests: Added emulator-backed `functions/src/test/integration.review-list-filters.test.ts` to verify filter behavior; included it in `functions/tsconfig.tests.json`. 
+
+----
+
+## 2025-09-10 - CI Workflow Alignment for PR Green ✅
+- Aligned `.github/workflows/ci.yml` to current GitHub config: PR-triggered, Node 20, separate web and functions steps.
+- Added Vite Firebase env variables to Web build/test steps to prevent env-related Vitest failures.
+- Next: run local CI-equivalent steps and push to trigger GitHub Actions. 
