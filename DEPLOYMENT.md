@@ -288,3 +288,14 @@ firebase deploy --only functions
 
 **Last Updated:** August 17, 2025  
 **Maintained By:** PrecisionLearnDerm Team
+
+### Firestore Deployment Notes
+
+- Ensure `firestore.indexes.json` includes retained `items` indexes for legacy `topicIds` queries to avoid delete prompts:
+  - `(status ASC, topicIds CONTAINS)`
+  - `(topicIds CONTAINS, createdAt DESC)`
+  - `(status ASC, topicIds CONTAINS, createdAt DESC)`
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```

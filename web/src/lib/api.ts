@@ -19,7 +19,6 @@ import type {
   ItemGetResponse,
   AdminUserRequest,
   GrantAdminRoleRequest,
-  QuestionQueueResponse,
   QuestionBankStats,
   ActivityLogRequest,
   ActivitySummaryResponse,
@@ -114,8 +113,18 @@ export const api = {
       httpsCallable(functions, 'items_list')(payload).then(r => r.data as APIResponse),
   },
   admin: {
-    getQuestionQueue: (payload: { status?: string; limit?: number } = {}) => httpsCallable(functions, 'admin_get_question_queue')(payload).then(r => r.data as QuestionQueueResponse),
-    reviewQuestion: (payload: { questionId: string; action: 'approve' | 'reject'; notes?: string }) => httpsCallable(functions, 'admin_review_question')(payload).then(r => r.data as APIResponse),
+    // Deprecated questionQueue endpoints removed in favor of review_*
+    // New review endpoints
+    reviewListQueue: (payload: { status?: string; topicIds?: string[]; source?: string; sinceDays?: number; limit?: number; cursor?: string } = {}) => 
+      httpsCallable(functions, 'review_list_queue')(payload).then(r => r.data as APIResponse),
+    reviewApprove: (payload: { draftId: string }) => 
+      httpsCallable(functions, 'review_approve')(payload).then(r => r.data as APIResponse),
+    reviewReject: (payload: { draftId: string; notes?: string }) => 
+      httpsCallable(functions, 'review_reject')(payload).then(r => r.data as APIResponse),
+    reviewSaveDraft: (payload: { draftId: string; edits: any }) => 
+      httpsCallable(functions, 'review_save_draft')(payload).then(r => r.data as APIResponse),
+    reviewEnqueueDraft: (payload: { draftItem: any; topicIds?: string[]; metadata?: any }) =>
+      httpsCallable(functions, 'review_enqueue_draft')(payload).then(r => r.data as APIResponse),
     generateQuestionQueue: (payload: { count?: number; topics?: string[] } = {}) => httpsCallable(functions, 'admin_generate_question_queue')(payload).then(r => r.data as APIResponse),
     generatePerTopic: (payload: { topics?: string[]; questionsPerTopic?: number; perTopic?: number } = {}) => httpsCallable(functions, 'admin_generate_per_topic')(payload).then(r => r.data as APIResponse),
     // Fixed function names to match backend exports
@@ -128,7 +137,13 @@ export const api = {
     revokeAdminRole: (payload: AdminUserRequest) => 
       httpsCallable(functions, 'admin_revoke_role')(payload).then(r => r.data as APIResponse),
     listAdmins: () => 
-      httpsCallable(functions, 'admin_list_admins')({}).then(r => r.data as APIResponse),
+      httpsCallable(functions, 'admin_list_admins')({}).then(r => {
+        const d: any = r.data;
+        if (d && Array.isArray(d.admins)) {
+          return { success: true, data: { admins: d.admins } } as APIResponse;
+        }
+        return d as APIResponse;
+      }),
     // Dedicated admin question generation with ABD guidelines (uses extended timeout)
     generateQuestions: (payload: { 
       topic: string; 

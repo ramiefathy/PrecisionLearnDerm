@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth, getUserProfile, createUserProfile } from '../lib/firebase';
 import type { UserProfile } from '../lib/firebase';
@@ -9,6 +9,8 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   profileLoading: boolean;
+  isAdmin?: boolean;
+  isReviewer?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +18,8 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   profileLoading: false,
+  isAdmin: false,
+  isReviewer: false,
 });
 
 export function useAuth() {
@@ -31,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isAdminClaim, setIsAdminClaim] = useState(false);
+  const [isReviewerClaim, setIsReviewerClaim] = useState(false);
 
   useEffect(() => {
     // Create a single auth state listener for the entire app
@@ -41,6 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         setProfileLoading(true);
         try {
+          // Load token claims for role gating
+          try {
+            const token = await getIdTokenResult(firebaseUser, true);
+            const claims = token?.claims || {} as any;
+            setIsAdminClaim(!!claims.admin);
+            setIsReviewerClaim(!!claims.reviewer);
+          } catch (e) {
+            console.warn('Failed to get token claims:', e);
+            setIsAdminClaim(false);
+            setIsReviewerClaim(false);
+          }
           // Try to get existing profile
           let userProfile = await getUserProfile(firebaseUser.uid);
 
@@ -64,6 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
         setProfileLoading(false);
+        setIsAdminClaim(false);
+        setIsReviewerClaim(false);
       }
 
       setLoading(false);
@@ -77,6 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     profileLoading,
+    isAdmin: isAdminClaim,
+    isReviewer: isReviewerClaim,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

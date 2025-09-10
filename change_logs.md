@@ -1,3 +1,23 @@
+## 2025-09-09
+
+### Web
+- RunPanel: replaced single difficulty/count with per-difficulty `Basic/Intermediate/Advanced` inputs (0–50), added total cap display, and integrated taxonomy selection via `MultiSelectTaxonomy`. Built payload with `counts`, `taxonomySelection`, and merged freeform topics.
+- Added `web/src/features/eval/payload.ts` with helpers (`validateCounts`, `buildTopicsFromTaxonomy`, `buildTaxonomySelection`, `buildEvaluationRequestPayload`).
+- Extended `useRunEvaluation.EvaluationRequest` with optional `counts` and `taxonomySelection`.
+- Reviewer gating: `AuthContext` now exposes token claims (`isAdmin`, `isReviewer`) via `getIdTokenResult`. Introduced `ReviewerRoute` and applied to `/admin/review`. Navigation shows Review tab for reviewers or admins.
+- Review UI a11y: `AdminQuestionReviewPage` warns when image alt text is missing/too short and disables Approve until valid.
+- Added analytics dashboard page at `/admin/analytics` showing recent `evaluationSummaries` aggregates.
+
+### Functions
+- Extended `functions/src/types/evaluation.ts` with `counts` and `taxonomySelection`.
+- Updated `startPipelineEvaluation` to map `counts` to internal counts, validate each [0,50], total ≤ 50, at least one > 0, and resolve topics from `taxonomySelection` if empty.
+- Added scheduled psychometrics aggregation `scheduledAggregateItemPerformance` and shared helper `computeAndStoreItemPerformance`.
+- Tests: added unit and integration tests for counts/taxonomy mapping.
+
+### Rules/Docs
+- Firestore rules already support `isReviewer` and `isReviewerOrAdmin` for review collections.
+- Updated documentation pending in `project_plan.md` and `product_architecture.md`.
+
 # PrecisionLearnDerm - Change Logs
 
 **Last Updated**: 2025-09-08 (CI Build Environment Stability; PR #89 opened)  
@@ -1369,3 +1389,39 @@ The deployment failures were misleading - functions were actually deploying succ
 **Last Review**: 2025-08-14 (DEPLOYMENT SUCCESS)  
 **Next Review**: 2025-08-15 (Post-validation)  
 **Document Maintained By**: Development Team 
+
+## 2025-09-09 - Evaluation V2 wiring + Hosting deploy
+
+- Legacy `admin/evaluation` now redirects to V2 with `jobId` after `startPipelineEvaluation` returns.
+- `AdminEvaluationV2Page` reads `jobId` from URL and initializes running state.
+- Live components (`EvaluationDashboard`, `LiveEvaluationLogs`) confirmed binding to `evaluationJobs/{jobId}`.
+- Web built and deployed to Hosting (`dermassist-ai-1zyic`). 
+
+## 2025-09-09 Queue Consolidation: questionQueue → reviewQueue
+
+- Added reviewQueue index: status+createdAt desc in `firestore.indexes.json`.
+- Evaluation: enqueues candidates into `reviewQueue` (was `questionQueue`).
+- Admin generation: writes all new drafts to `reviewQueue` and admin reads use review_* endpoints.
+- Admin AI review/regeneration: now operates on `reviewQueue` docs.
+- Review approval: records `lastApprovalError: 'alt_text_missing'` when alt text absent.
+- User feedback: aggregates per item and re-enqueues to `reviewQueue` when avg < 3.4.
+- Web: restricted `/admin/review` to admins only; switched AdminQuestionReviewPage to use review_* API methods; added api.admin.review* functions.
+- Script: `functions/scripts/migrate-questionQueue-to-reviewQueue.ts` migrates pending docs from `questionQueue` → `reviewQueue`.
+- Tests: added emulator-backed tests to check a11y flagging and reviewQueue presence. 
+
+## 2025-09-10
+- Backend: Extended `functions/src/review/endpoints.ts` `review_list_queue` to support optional `source` and `sinceDays` filters; validated inputs; preserved pagination ordering by `createdAt` desc; restricted review endpoints to admin-only.
+- Firestore Indexes: Added composites in `firestore.indexes.json` for `reviewQueue` covering `(source,status,createdAt)`, `(topicIds CONTAINS,status,createdAt)`, and a superset `(topicIds CONTAINS,source,status,createdAt)` to support combined filters.
+- Firestore Indexes (items): Added retained indexes for `items` queries using legacy `topicIds` filtering to avoid delete prompts and support existing queries: `(status ASC, topicIds CONTAINS)`, `(topicIds CONTAINS, createdAt DESC)`, and `(status ASC, topicIds CONTAINS, createdAt DESC)`.
+- Frontend API: Updated `web/src/lib/api.ts` `api.admin.reviewListQueue` signature to accept `{ source?, sinceDays? }`.
+- Admin Review UI: `web/src/pages/AdminQuestionReviewPage.tsx` now reads `source` and `sinceDays` from URL query params, displays active filter chips, and provides a Clear Filters action; uses new API filters.
+- Admin Nav: `web/src/app/routes.tsx` restricts Review tab to admins only.
+- Analytics: `web/src/features/analytics/AdminEvalDashboard.tsx` counts last-30d feedback-triggered entries using `where('createdAt','>=', since)` and links to `/admin/review?source=user_feedback&sinceDays=30`.
+- Tests: Added emulator-backed `functions/src/test/integration.review-list-filters.test.ts` to verify filter behavior; included it in `functions/tsconfig.tests.json`. 
+
+----
+
+## 2025-09-10 - CI Workflow Alignment for PR Green ✅
+- Aligned `.github/workflows/ci.yml` to current GitHub config: PR-triggered, Node 20, separate web and functions steps.
+- Added Vite Firebase env variables to Web build/test steps to prevent env-related Vitest failures.
+- Next: run local CI-equivalent steps and push to trigger GitHub Actions. 

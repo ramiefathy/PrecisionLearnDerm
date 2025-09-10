@@ -21,7 +21,7 @@
 ### Infrastructure
 - ✅ **Firebase project exists** - dermassist-ai-1zyic
 - ✅ **Security rules defined** - Firestore and Storage rules ready
-- ✅ **Indexes configured** - Including new questionQueue index
+- ✅ **Indexes configured** - Including new reviewQueue indexes
 - ✅ **CI/CD pipeline** - GitHub Actions configured
 
 ## ❌ Critical Issues Blocking Deployment
@@ -58,7 +58,7 @@
 - **Examples**:
   - `ai_chat_explain` - not implemented
   - `test_multi_agent_system` - not exported
-  - `admin_getQuestionQueue` - incorrect name
+  - Legacy admin_getQuestionQueue removed; use review_list_queue
 - **File**: `web/src/lib/api.ts`
 
 ### 5. 🟡 **Test Suite Issues**

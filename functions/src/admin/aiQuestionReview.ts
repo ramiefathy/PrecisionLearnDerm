@@ -667,7 +667,7 @@ IMPORTANT:
     if (autoSave && questionId) {
       try {
         const db = admin.firestore();
-        const queueRef = db.collection('questionQueue').doc(questionId);
+        const queueRef = db.collection('reviewQueue').doc(questionId);
         
         // Prepare update data
         const updateData: any = {

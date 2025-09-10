@@ -18,23 +18,30 @@ export const auth = getAuth(app);
 // Ensure session persists across reloads/deep-links
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-// Initialize Firestore with connection settings to prevent ERR_BLOCKED_BY_CLIENT
-// Only initialize if not already done
+// Initialize Firestore with settings that mitigate ad blockers and network proxies
+// Ensure single initialization across HMR/reloads
 let db: ReturnType<typeof getFirestore>;
-try {
-  // Try to get existing Firestore instance first
-  db = getFirestore(app);
-} catch {
-  // If no existing instance, initialize with custom settings
-  db = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // Forces long-polling instead of WebSockets to avoid ad blocker issues
-  });
+const globalAny = globalThis as any;
+if (!globalAny.__firestoreInstance) {
+  try {
+    db = initializeFirestore(app, {
+      // Prefer auto-detection to choose the most reliable transport
+      experimentalAutoDetectLongPolling: true,
+      // Keep default fetch streams; let auto-detect decide
+    } as any);
+    globalAny.__firestoreInstance = db;
+  } catch {
+    // Fallback if Firestore already initialized elsewhere
+    db = getFirestore(app);
+    globalAny.__firestoreInstance = db;
+  }
+} else {
+  db = globalAny.__firestoreInstance as ReturnType<typeof getFirestore>;
 }
 
 // Connect to emulator in development
 if (import.meta.env.DEV && !import.meta.env.VITE_USE_FIREBASE_PROD) {
   // Track if we've already connected to emulator to prevent duplicate connections
-  const globalAny = globalThis as any;
   if (!globalAny.__firestoreEmulatorConnected) {
     try {
       connectFirestoreEmulator(db, 'localhost', 8080);

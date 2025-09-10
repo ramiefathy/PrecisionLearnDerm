@@ -5,8 +5,8 @@ import userEvent from '@testing-library/user-event';
 vi.mock('../lib/api', () => ({
   api: {
     admin: {
-      getQuestionQueue: vi.fn().mockResolvedValue({
-        questions: [{
+      reviewListQueue: vi.fn().mockResolvedValue({
+        items: [{
           id: 'q1',
           draftItem: {
             stem: 'Initial stem',
@@ -27,7 +27,8 @@ vi.mock('../lib/api', () => ({
           explanation: 'New explanation',
         },
       }),
-      reviewQuestion: vi.fn().mockResolvedValue({ shouldRefill: false }),
+      reviewApprove: vi.fn().mockResolvedValue({ success: true }),
+      reviewReject: vi.fn().mockResolvedValue({ success: true }),
     },
   },
 }));

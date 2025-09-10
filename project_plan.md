@@ -314,3 +314,29 @@ Create a comprehensive, AI-powered dermatology board exam preparation platform t
 **Last Updated**: 2025-08-14
 **Next Review**: 2025-08-21
 **Status**: Critical Phase - Deployment Recovery 
+
+### Recently Completed (2025-09-10)
+- RunPanel: per-difficulty counts + taxonomy selection integrated; web payload helpers added
+- Functions: `EvaluationRequest.counts/taxonomySelection` accepted; mapping/validation implemented
+- Reviewer gating: token-claim based gating (ReviewerRoute); review tab visible to reviewers
+- Review UI: image alt-text enforcement; approve disabled until valid
+- Psychometrics: daily scheduled aggregation job added
+- Dashboard: initial admin analytics dashboard for recent evaluation summaries
+ - Review Queue: added `source` and `sinceDays` filters to `review_list_queue`; Firestore indexes added; UI query-param filters wired; analytics shows 30d feedback-triggered count and deep link
+
+### Evaluation System (V2) - 2025-09-09
+- Redirect legacy evaluation to V2 UI with `jobId` after callable returns.
+- V2 page reads `jobId` from URL and shows live logs and dashboards.
+- Next: add deep links to specific pipeline runs, enrich filters, and export presets. 
+
+## 2025-09-09 — Consolidate questionQueue → reviewQueue (Big-bang)
+- Completed:
+  - Backend: exports for admin AI review; evaluation writes to reviewQueue; admin generation writes/reads reviewQueue; AI review operates on reviewQueue; a11y approval logs reason; feedback-triggered re-enqueue.
+  - Frontend: admin review UI switched to review_*; route guard restricted to admins; API methods added.
+  - Index: added reviewQueue status+createdAt desc.
+  - Migration: script added to migrate pending docs.
+  - Tests: emulator tests added for a11y logging and reviewQueue presence.
+- Next:
+  - Run migration in staging, verify counts and sampling in UI.
+  - Remove deprecated questionQueue callables/aliases after deploy.
+  - Expand review analytics dashboard to include feedback-triggered entries. 

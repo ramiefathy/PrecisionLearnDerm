@@ -33,6 +33,7 @@ import { generateBoardStyleMCQ } from '../ai/boardStyleGeneration';
 import { generateQuestionsOptimized } from '../ai/optimizedOrchestrator';
 import { routeHybridGeneration } from '../ai/hybridPipelineRouter';
 import { config } from '../util/config';
+import { generateQuestionsBatch } from '../generation/generateQuestionsBatch';
 
 // Batch size configuration constants
 const MAX_SAFE_BATCH_SIZE = 3;   // Maximum allowed batch size
@@ -398,12 +399,14 @@ export async function processBatchTestsLogic(
             });
             
             // Execute test with live logging
+            const stageStartTotal = Date.now();
             const result = await executePipelineTestWithLogging(
               jobId,
               testCase.pipeline,
               testCase.topic,
               testCase.difficulty
             );
+            const stageEndTotal = Date.now();
             
             const latency = Date.now() - testStartTime;
             const quality = calculateQualityScore(result);
@@ -420,6 +423,14 @@ export async function processBatchTestsLogic(
               quality,
               detailedScores
             );
+
+            // Ensure a lead-in exists for UI (derive default if missing)
+            if (result && result.result) {
+              const leadIn = result.result.leadIn && String(result.result.leadIn).trim().length > 5
+                ? String(result.result.leadIn).trim()
+                : 'Which of the following is the most likely diagnosis?';
+              result.result.leadIn = leadIn;
+            }
 
             // Store test result with all scores
             await storeTestResult(jobId, testIndex, {
@@ -718,6 +729,13 @@ async function executePipelineTestWithLogging(
         boardDifficulty as any,
         undefined
       );
+      // New: run ABD validators via batch generator (non-destructive) and log findings
+      try {
+        const v = await generateQuestionsBatch({ jobId, topic, difficulty: (difficulty as any), pipeline: 'boardStyle' });
+        await captureLog('abd_validator', { blueprintId: v.blueprintId, validation: v.validation });
+      } catch (e) {
+        await captureLog('abd_validator_error', { error: e instanceof Error ? e.message : String(e) });
+      }
       
       // Ensure options is an array for scoring compatibility
       if (boardResult && boardResult.options && !Array.isArray(boardResult.options)) {
@@ -771,6 +789,13 @@ async function executePipelineTestWithLogging(
         false,
         'evaluation-test'
       );
+      // New: validation pass
+      try {
+        const v = await generateQuestionsBatch({ jobId, topic, difficulty: (difficulty as any), pipeline: 'optimizedOrchestrator' });
+        await captureLog('abd_validator', { blueprintId: v.blueprintId, validation: v.validation });
+      } catch (e) {
+        await captureLog('abd_validator_error', { error: e instanceof Error ? e.message : String(e) });
+      }
       
       const difficultyKey = difficulty as 'Basic' | 'Advanced' | 'Very Difficult';
       
@@ -789,7 +814,19 @@ async function executePipelineTestWithLogging(
       }
       
       if (orchestratorResult && orchestratorResult[difficultyKey]) {
-        return orchestratorResult[difficultyKey];
+        const res = orchestratorResult[difficultyKey] as any;
+        // Normalize options for scoring compatibility (array of 5)
+        if (res && res.options && !Array.isArray(res.options) && typeof res.options === 'object') {
+          const optsObj = res.options;
+          res.options = ['A','B','C','D','E']
+            .map(k => optsObj[k])
+            .filter((v: any) => typeof v === 'string' && v.length > 0);
+        }
+        // Normalize correctAnswer to letter (keep if already letter)
+        if (typeof res.correctAnswer === 'number') {
+          res.correctAnswer = String.fromCharCode(65 + (res.correctAnswer as number));
+        }
+        return res;
       }
       
       throw new Error(`No question generated for difficulty: ${difficulty}`);
@@ -810,6 +847,13 @@ async function executePipelineTestWithLogging(
         features: {},
         userId: 'evaluation-test'
       });
+      // New: validation pass
+      try {
+        const v = await generateQuestionsBatch({ jobId, topic, difficulty: (difficulty as any), pipeline: 'hybridRouter' });
+        await captureLog('abd_validator', { blueprintId: v.blueprintId, validation: v.validation });
+      } catch (e) {
+        await captureLog('abd_validator_error', { error: e instanceof Error ? e.message : String(e) });
+      }
       
       await captureLog('routing_complete', { 
         hasResult: !!hybridResult,
@@ -824,7 +868,19 @@ async function executePipelineTestWithLogging(
       }
       
       if (hybridResult && hybridResult.questions && hybridResult.questions[difficulty]) {
-        return hybridResult.questions[difficulty];
+        const res = hybridResult.questions[difficulty] as any;
+        // Normalize options for scoring compatibility (array of 5)
+        if (res && res.options && !Array.isArray(res.options) && typeof res.options === 'object') {
+          const optsObj = res.options;
+          res.options = ['A','B','C','D','E']
+            .map(k => optsObj[k])
+            .filter((v: any) => typeof v === 'string' && v.length > 0);
+        }
+        // Normalize correctAnswer to letter (keep if already letter)
+        if (typeof res.correctAnswer === 'number') {
+          res.correctAnswer = String.fromCharCode(65 + (res.correctAnswer as number));
+        }
+        return res;
       }
       
       throw new Error(`No question generated for difficulty: ${difficulty}`);
@@ -988,8 +1044,8 @@ async function addQuestionToReviewQueue(testResult: any): Promise<void> {
   try {
     const { result: mcq, aiScores, testCase } = testResult;
     
-    // Create question queue entry
-    const queueRef = db.collection('questionQueue').doc();
+    // Create review queue entry
+    const queueRef = db.collection('reviewQueue').doc();
     
     const queuedQuestion = {
       id: queueRef.id,

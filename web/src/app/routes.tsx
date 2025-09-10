@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 function AdminNavigation() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
   
   const tabs = [
     { 
@@ -64,7 +65,8 @@ function AdminNavigation() {
       description: 'AI testing & system diagnostics',
       subPages: [
         { name: 'Testing', href: '/admin/testing', icon: '🧪' },
-        { name: 'Logs', href: '/admin/logs', icon: '📋' }
+        { name: 'Logs', href: '/admin/logs', icon: '📋' },
+        { name: 'Analytics', href: '/admin/analytics', icon: '📈' }
       ]
     },
   ];
@@ -85,7 +87,15 @@ function AdminNavigation() {
           </div>
         </div>
         <div className="flex items-center justify-center gap-2 overflow-x-auto">
-          {tabs.map((tab) => {
+          {tabs
+            .filter(tab => {
+              // Restrict Review tab to admin only
+              if (tab.href === '/admin/review') {
+                return !!isAdmin;
+              }
+              return true;
+            })
+            .map((tab) => {
             const isActive = location.pathname === tab.href || 
               (tab.subPages && tab.subPages.some(sub => sub.href === location.pathname));
             
@@ -142,7 +152,7 @@ function AdminNavigation() {
 }
 
 export function AdminRoute({ children }: { children?: ReactNode }) {
-  const { profile, user } = useAuth();
+  const { profile, user, isAdmin } = useAuth();
   
   if (!profile) {
     return (
@@ -159,7 +169,7 @@ export function AdminRoute({ children }: { children?: ReactNode }) {
   }
 
   // Check admin role
-  const isAdminRole = profile.role === 'admin' || profile.isAdmin;
+  const isAdminRole = isAdmin || profile.role === 'admin' || profile.isAdmin;
 
   if (!isAdminRole) {
     return (
@@ -192,6 +202,67 @@ export function AdminRoute({ children }: { children?: ReactNode }) {
       {children ?? <Outlet />}
     </div>
   );
+}
+
+export function ReviewerRoute() {
+  const { user, loading, isAdmin, isReviewer } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 grid place-items-center text-white font-bold animate-pulse">
+            PL
+          </div>
+          <p className="text-gray-600 text-sm">Preparing your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || (!isAdmin && !isReviewer)) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 grid place-items-center text-white text-2xl mx-auto mb-4">
+            🚫
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">
+            You need Reviewer or Admin access to view this page.
+          </p>
+          <button 
+            onClick={() => window.history.back()}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold hover:shadow-lg transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Restrict reviewer route: only admins should access admin review pages.
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 grid place-items-center text-white text-2xl mx-auto mb-4">
+            🚫
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">Only admins can access the admin review area.</p>
+          <button 
+            onClick={() => window.history.back()}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold hover:shadow-lg transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return <Outlet />;
 }
 
 export function ProtectedRoute() {

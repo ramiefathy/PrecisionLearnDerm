@@ -35,8 +35,9 @@ export default function AdminQuestionIterationPage() {
   async function loadQuestion() {
     try {
       setLoading(true);
-      const res = (await api.admin.getQuestionQueue({})) as any;
-      setQuestion(res.questions?.[0] || null);
+      const res = (await api.admin.reviewListQueue({ status: 'pending', limit: 1 })) as any;
+      const first = Array.isArray(res.items) ? res.items[0] : null;
+      setQuestion(first || null);
       setConversation([]);
     } catch (e: any) {
       handleAdminError(e, 'load question');
@@ -92,7 +93,7 @@ export default function AdminQuestionIterationPage() {
     if (!question) return;
     if (!confirm('Approve this question?')) return;
     try {
-      await api.admin.reviewQuestion({ questionId: question.id, action: 'approve', notes: '' });
+      await api.admin.reviewApprove({ draftId: question.id });
       toast.success('Question approved', 'Added to reference bank');
       await loadQuestion();
     } catch (e: any) {

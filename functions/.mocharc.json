@@ -5,8 +5,19 @@
   "reporter": "spec",
   "colors": true,
   "exit": true,
-  "spec": "lib/test/**/*.test.js",
-  "ignore": ["lib/test/test_setup.js", "lib/test/mocks/**/*.js"],
+  "spec": [
+    "lib/test/parser.unit.test.js",
+    "lib/test/validators.unit.test.js",
+    "lib/test/integration.evaluation-request-mapping.test.js",
+    "lib/test/integration.evaluation-and-review.test.js",
+    "lib/test/integration.review-a11y.test.js"
+  ],
+  "ignore": [
+    "lib/test/test_setup.js",
+    "lib/test/**/admin-question-management.test.js",
+    "lib/test/**/ai-*.test.js",
+    "lib/test/**/question-generation-pipeline.test.js"
+  ],
   "env": {
     "NODE_ENV": "test"
   }

@@ -65,7 +65,6 @@ const adaptiveExports = safeExportBatch('./pe/adaptiveGeneration', [
 ]);
 
 export const getPersonalizedQuestions = adaptiveExports.getPersonalizedQuestions;
-export const pe_get_personalized_questions = adaptiveExports.getPersonalizedQuestions;
 
 /* =========================================================
  * Item / Content Management - Defensive Exports
@@ -111,6 +110,64 @@ export const healthCheck = monitoringExports.healthCheck;
 export const getMetrics = monitoringExports.getMetrics;
 export const getLogs = monitoringExports.getLogs;
 export const comprehensiveHealthCheck = enhancedMonitoringExports.comprehensiveHealthCheck;
+
+/* =========================================================
+ * Explicit callable exports to align with web client usage
+ * (Avoid defensive stubs; fail fast if modules are missing)
+ * ======================================================= */
+// PE - Next item(s) and recording
+export { getNextItem as pe_next_item } from './pe/nextItem';
+export { getNextItems as pe_get_next_items } from './pe/nextItems';
+export { recordAnswer as pe_record_answer, recordQuizSession as pe_record_quiz_session } from './pe/recordAnswer';
+
+// PE - Quality retirement
+export { submitQuestionFeedback as pe_submit_question_feedback, getQualityReviewQueue as pe_get_quality_review_queue, resolveQualityReview as pe_resolve_quality_review, getQualityAnalytics as pe_get_quality_analytics } from './pe/qualityRetirement';
+
+// PE - Adaptive generation / personalization
+export { triggerAdaptiveGeneration as pe_trigger_adaptive_generation } from './pe/adaptiveGeneration';
+export { getPersonalizedQuestionsCallable as pe_get_personalized_questions, getPersonalizedQuestionsCallable as pe_get_personal_questions } from './pe/adaptiveGeneration';
+
+// KB
+export { kbSearch as kb_search } from './kb/search';
+
+// Items
+export { itemsList as items_list } from './items/list';
+export { itemsGet as items_get } from './items/get';
+export { itemsRevise as items_revise } from './items/revise';
+
+// Activities
+export { activities_log, activities_get, activities_summary } from './activities/endpoints';
+export { seedUserActivities as activities_seed, clearUserActivities as activities_clear } from './activities/seedActivities';
+
+// Admin - Question queue and taxonomy
+export { admin_generateQuestionQueue as admin_generate_question_queue, admin_generate_per_topic, admin_update_question } from './admin/questionQueue';
+export { admin_listUncategorized as admin_list_uncategorized, admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
+export { admin_getTaxonomy, admin_getTaxonomyEntities } from './admin/questionQueue';
+
+// Admin - Question bank stats and legacy import
+export { getQuestionBankStats as admin_get_question_bank_stats } from './admin/importQuestions';
+
+// Admin - Role management
+export { grantAdminRole as admin_grant_role, revokeAdminRole as admin_revoke_role, listAdminUsers as admin_list_admins } from './admin/grantAdminRole';
+
+// Admin - Generation endpoints
+export { adminGenerateQuestions as admin_generate_questions, adminBatchGenerateQuestions as admin_batch_generate_questions } from './admin/adminQuestionGeneration';
+
+// Admin - AI review and regeneration
+export { aiReviewQuestion as admin_ai_review_question, validateClinical as admin_validate_clinical, regenerateQuestionWithFeedback as admin_regenerate_question } from './admin/aiQuestionReview';
+
+// Setup callables
+export { grantAdminRole as setup_grant_admin } from './admin/grantAdminRole';
+export { setup_check_admin } from './admin/setup';
+
+// Evaluation callables
+export { startPipelineEvaluation } from './evaluation/startPipelineEvaluation';
+export { processEvaluationBatch } from './evaluation/evaluationProcessor';
+export { diag_cors } from './util/diagnostics';
+
+// Review queue endpoints (admin-only)
+export { review_enqueue_draft, review_list_queue, review_approve, review_reject, review_save_draft } from './review/endpoints';
+export { aggregateItemPerformance, scheduledAggregateItemPerformance } from './telemetry/psychometrics';
 
 /* =========================================================
  * Admin Status / Diagnostics (Development Only) - Conditional Export

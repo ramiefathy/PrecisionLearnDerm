@@ -346,11 +346,10 @@ interface UserAnswer {
       ]
     },
     {
-      "collectionGroup": "questionQueue", 
+      "collectionGroup": "reviewQueue", 
       "fields": [
         {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "priority", "order": "DESCENDING"},
-        {"fieldPath": "createdAt", "order": "ASCENDING"}
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
     }
   ]
@@ -540,8 +539,9 @@ POST /items_revise              // Revise existing item
 
 // Admin content management
 POST /admin_generate_question_queue  // Bulk question generation
-GET  /admin_get_question_queue       // Admin review queue
-POST /admin_review_question          // Approve/reject questions
+POST /review_list_queue              // Admin review queue (list)
+POST /review_approve                 // Approve question
+POST /review_reject                  // Reject question
 ```
 
 ## Key Workflows

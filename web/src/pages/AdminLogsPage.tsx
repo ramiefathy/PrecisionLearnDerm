@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../lib/api';
 import { toast } from '../components/Toast';
@@ -28,7 +28,7 @@ export default function AdminLogsPage() {
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const loadLogs = async (reset = false) => {
+  const loadLogs = useCallback(async (reset = false) => {
     try {
       if (reset) {
         setLoading(true);
@@ -37,9 +37,6 @@ export default function AdminLogsPage() {
       const response = await api.monitoring.getLogs({
         level: levelFilter === 'all' ? undefined : levelFilter,
         limit: 25
-      }).catch(() => {
-        // Fallback to mock data if endpoint doesn't exist
-        return generateMockLogs();
       });
 
       const newLogs = Array.isArray(response) ? response : (response as any).logs || [];
@@ -53,50 +50,16 @@ export default function AdminLogsPage() {
       setHasMore(newLogs.length === 25);
     } catch (error) {
       console.error('Error loading logs:', error);
-      if (reset) {
-        setLogs(generateMockLogs());
-      }
-      toast.error('Failed to load logs', 'Using sample data instead');
+      if (reset) setLogs([]);
+      toast.error('Failed to load logs');
     } finally {
       setLoading(false);
     }
-  };
-
-  const generateMockLogs = (): LogEntry[] => {
-    const levels: LogEntry['level'][] = ['info', 'warn', 'error', 'debug'];
-    const categories = ['AI Generation', 'User Auth', 'Database', 'API Request', 'System'];
-    const messages = [
-      'Question generation completed successfully',
-      'User authentication failed - invalid token',
-      'Database connection timeout',
-      'API rate limit exceeded',
-      'Memory usage above threshold',
-      'Scheduled backup completed',
-      'AI model response received',
-      'Cache invalidation triggered',
-      'Security scan completed',
-      'Performance monitoring alert'
-    ];
-
-    return Array.from({ length: 50 }, (_, i) => ({
-      id: `log-${i}`,
-      timestamp: new Date(Date.now() - i * 60000 * Math.random() * 1440).toISOString(),
-      level: levels[Math.floor(Math.random() * levels.length)],
-      message: messages[Math.floor(Math.random() * messages.length)],
-      category: categories[Math.floor(Math.random() * categories.length)],
-      userId: Math.random() > 0.5 ? `user-${Math.floor(Math.random() * 1000)}` : undefined,
-      endpoint: Math.random() > 0.6 ? `/api/admin/${categories[Math.floor(Math.random() * categories.length)].toLowerCase().replace(/\s+/g, '-')}` : undefined,
-      duration: Math.random() > 0.7 ? Math.floor(Math.random() * 5000) : undefined,
-      metadata: Math.random() > 0.8 ? { 
-        requestId: `req-${Math.random().toString(36).substring(2, 11)}`,
-        userAgent: 'Mozilla/5.0 (compatible; AdminPanel/1.0)'
-      } : undefined
-    }));
-  };
+  }, [levelFilter]);
 
   useEffect(() => {
     loadLogs(true);
-  }, [levelFilter, timeFilter, searchQuery]);
+  }, [loadLogs, timeFilter, searchQuery]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -106,7 +69,7 @@ export default function AdminLogsPage() {
     }, 30000); // Refresh every 30 seconds
     
     return () => clearInterval(interval);
-  }, [autoRefresh, levelFilter, timeFilter, searchQuery]);
+  }, [autoRefresh, loadLogs, timeFilter, searchQuery]);
 
   const filteredLogs = logs.filter(log => {
     if (levelFilter !== 'all' && log.level !== levelFilter) return false;

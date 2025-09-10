@@ -134,6 +134,30 @@ export function isAdmin(context: CallableContext): boolean {
 }
 
 /**
+ * Reviewer role check (custom claim: reviewer: true)
+ */
+export function isReviewer(context: CallableContext): boolean {
+  return !!context?.auth?.token?.reviewer === true || !!context?.auth?.token?.['reviewer'] === true;
+}
+
+/**
+ * Allow either admin or reviewer
+ */
+export function requireReviewerOrAdmin(context: CallableContext): void {
+  const uid = context?.auth?.uid || 'unknown';
+  const ok = isAdmin(context) || isReviewer(context);
+  if (!ok) {
+    if (!isAuthenticated(context)) {
+      logError('auth.authentication_failed', { uid, reason: 'no_auth_context', required: 'admin_or_reviewer', timestamp: new Date().toISOString() }).catch(()=>{});
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    logError('auth.authorization_failed', { uid, reason: 'insufficient_privileges', required: 'admin_or_reviewer', timestamp: new Date().toISOString() }).catch(()=>{});
+    throw new functions.https.HttpsError('permission-denied', 'Admin or Reviewer role required');
+  }
+  logInfo('auth.reviewer_or_admin_access_granted', { uid: context.auth!.uid, timestamp: new Date().toISOString() }).catch(()=>{});
+}
+
+/**
  * Type-safe admin requirement that returns user email or UID
  * Replacement for deprecated requireAdminByEmail
  * @param context - Firebase callable context

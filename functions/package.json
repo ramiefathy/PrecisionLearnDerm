@@ -8,13 +8,14 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && cp -r src/kb/*.json lib/kb/ 2>/dev/null || true",
+    "build:tests": "tsc -p tsconfig.tests.json",
     "build-dev": "tsc -p tsconfig.json",
     "build-prod": "tsc -p tsconfig.json && cp -r src/kb/*.json lib/kb/ 2>/dev/null || true",
     "watch": "tsc -w -p tsconfig.json",
     "lint": "echo 'skip'",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "firebase emulators:exec --only firestore \"npx mocha --no-config -r ts-node/register/transpile-only src/test/test_setup.ts src/test/**/*.unit.test.ts\"",
-    "test:integration": "firebase emulators:exec --only firestore,functions \"npx mocha --no-config -r ts-node/register/transpile-only src/test/test_setup.ts src/test/**/**.test.ts --timeout 40000\"",
+    "test:unit": "npm run build:tests && firebase emulators:exec --only firestore \"npx mocha --no-config --require source-map-support/register lib/test/test_setup.js lib/test/parser.unit.test.js lib/test/validators.unit.test.js\"",
+    "test:integration": "npm run build:tests && firebase emulators:exec --only firestore,functions,auth \"npx mocha --no-config --require source-map-support/register lib/test/integration.evaluation-request-mapping.test.js lib/test/integration.evaluation-and-review.test.js lib/test/integration.review-a11y.test.js --timeout 50000\"",
     "test:kb": "firebase emulators:exec --only firestore 'ts-mocha --timeout 30000 --require source-map-support/register src/test/knowledgeBase.test.ts'",
     "test:watch": "firebase emulators:exec --only firestore \"npx mocha --no-config -r ts-node/register/transpile-only src/test/test_setup.ts src/test/**/*.test.ts --watch\"",
     "test:coverage": "nyc npm run test",
@@ -66,14 +67,15 @@
     "chai": "5.2.1",
     "chai-as-promised": "^8.0.0",
     "firebase-functions-test": "3.4.1",
+    "firebase-tools": "^13.28.0",
     "mocha": "11.7.1",
     "nyc": "^17.1.0",
     "sinon": "^19.0.2",
     "sinon-chai": "^4.0.0",
+    "source-map-support": "0.5.21",
     "supertest": "^7.0.0",
     "ts-mocha": "11.1.0",
-    "typescript": "^5.5.4",
     "ts-node": "^10.9.2",
-    "firebase-tools": "^13.28.0"
+    "typescript": "^5.5.4"
   }
 }

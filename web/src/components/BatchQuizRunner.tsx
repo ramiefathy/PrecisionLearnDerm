@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import { saveAttempt, type StoredQuestionAttempt } from '../lib/attempts';
 import { addDoc, collection } from 'firebase/firestore';
@@ -14,7 +14,7 @@ export function BatchQuizRunner() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  async function loadItems(n = 5) {
+  const loadItems = useCallback(async (n = 5) => {
     setLoading(true);
     try {
       const items: any[] = [];
@@ -38,9 +38,9 @@ export function BatchQuizRunner() {
       setAnswers({});
       setStart(Date.now());
     } finally { setLoading(false); }
-  }
+  }, [activeQuiz]);
 
-  useEffect(()=>{ loadItems(5); }, []);
+  useEffect(()=>{ loadItems(5); }, [loadItems]);
 
   function choose(i: number, opt: number) {
     setAnswers(prev => ({ ...prev, [i]: { ...(prev[i]||{ confidence: 'Medium', timeSec: 0 }), chosenIndex: opt, timeSec: Math.round((Date.now()-start)/1000) }}));

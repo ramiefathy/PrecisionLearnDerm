@@ -17,7 +17,7 @@ import {
   CircularProgress,
   Chip
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { functions, db } from '../lib/firebase';
@@ -57,6 +57,7 @@ interface EvaluationJob {
 const AdminEvaluationV2Page: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   
   const [currentStep, setCurrentStep] = useState<EvaluationStep>('configure');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -66,12 +67,18 @@ const AdminEvaluationV2Page: React.FC = () => {
   const [previousJobs, setPreviousJobs] = useState<EvaluationJob[]>([]);
   const [runningJob, setRunningJob] = useState<EvaluationJob | null>(null);
 
-  // Load existing jobs when user is available (route already enforces admin)
+  // Initialize from URL param or load existing jobs when user is available
   useEffect(() => {
+    const jid = searchParams.get('jobId');
+    if (jid) {
+      setJobId(jid);
+      setCurrentStep('running');
+      return;
+    }
     if (user) {
       loadExistingJobs();
     }
-  }, [user]);
+  }, [user, searchParams]);
   
   const loadExistingJobs = async () => {
     try {

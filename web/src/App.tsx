@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Route, Routes, Navigate, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { ProtectedRoute, AdminRoute } from './app/routes';
+import { ProtectedRoute, AdminRoute, ReviewerRoute } from './app/routes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ToastContainer } from './components/Toast';
@@ -29,6 +29,8 @@ const AdminTestingPage = lazy(() => import('./pages/AdminTestingPage.tsx'));
 const AdminTaxonomyPage = lazy(() => import('./pages/AdminTaxonomyPage.tsx'));
 const AdminLogsPage = lazy(() => import('./pages/AdminLogsPage.tsx'));
 const AdminEvaluationV2Page = lazy(() => import('./pages/AdminEvaluationV2Page.tsx'));
+const EvaluationPage = lazy(() => import('./features/eval/EvaluationPage.tsx'));
+const AdminEvalDashboardPage = lazy(() => import('./features/analytics/AdminEvalDashboard.tsx'));
 // Legacy evaluation dashboard
 const AdminPipelineEvaluation = lazy(() => import('./pages/AdminPipelineEvaluation.tsx'));
 
@@ -178,14 +180,12 @@ function AppRoutes() {
                     </AdminRoute>
                   }
                 />
-                <Route
-                  path="/admin/review"
-                  element={
-                    <AdminRoute>
-                      <AdminQuestionReviewPage />
-                    </AdminRoute>
-                  }
-                />
+                <Route element={<ReviewerRoute />}>
+                  <Route
+                    path="/admin/review"
+                    element={<AdminQuestionReviewPage />}
+                  />
+                </Route>
                 <Route
                   path="/admin/iteration"
                   element={
@@ -234,6 +234,14 @@ function AppRoutes() {
                     </AdminRoute>
                   }
                 />
+                <Route
+                  path="/admin/analytics"
+                  element={
+                    <AdminRoute>
+                      <AdminEvalDashboardPage />
+                    </AdminRoute>
+                  }
+                />
                 {/* Legacy evaluation dashboard */}
                 <Route
                   path="/admin/evaluation"
@@ -249,6 +257,14 @@ function AppRoutes() {
                   element={
                     <AdminRoute>
                       <AdminEvaluationV2Page />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/evaluation-v2/run"
+                  element={
+                    <AdminRoute>
+                      <EvaluationPage />
                     </AdminRoute>
                   }
                 />

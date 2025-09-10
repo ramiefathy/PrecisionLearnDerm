@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { httpsCallable } from 'firebase/functions';
 import { functions, db } from '../lib/firebase';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import {
   BarChart,
@@ -80,6 +81,7 @@ interface EvaluationSummary {
 }
 
 export default function AdminPipelineEvaluation() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [currentSummary, setCurrentSummary] = useState<EvaluationSummary | null>(null);
@@ -89,8 +91,19 @@ export default function AdminPipelineEvaluation() {
 
   // Load latest evaluation on mount
   useEffect(() => {
-    loadLatestEvaluation();
-    loadHistoricalData();
+    (async () => {
+      try {
+        const token = await (await import('../lib/firebase')).auth.currentUser?.getIdTokenResult(true);
+        if (!token?.claims?.admin) {
+          // Skip subscribing if not admin
+          return;
+        }
+        await loadLatestEvaluation();
+        await loadHistoricalData();
+      } catch {
+        // Silent; page already admin-gated at route level
+      }
+    })();
   }, []);
 
   const loadLatestEvaluation = async () => {
@@ -142,14 +155,16 @@ export default function AdminPipelineEvaluation() {
     setError(null);
     
     try {
-      const runPipelineEvaluation = httpsCallable(functions, 'runPipelineEvaluation');
-      const result = await runPipelineEvaluation();
-      
-      if (result.data) {
-        // Refresh data
-        await loadLatestEvaluation();
-        setError(null);
+      const startEval = httpsCallable(functions, 'startPipelineEvaluation');
+      const result = await startEval({});
+      const data: any = result.data;
+      if (data?.success && data?.jobId) {
+        navigate(`/admin/evaluation-v2?jobId=${encodeURIComponent(data.jobId)}`);
+        return;
       }
+      // Fallback: refresh legacy summary if jobId missing
+      await loadLatestEvaluation();
+      setError(null);
     } catch (err: any) {
       console.error('Evaluation failed:', err);
       setError(err.message || 'Failed to run evaluation');
@@ -215,11 +230,14 @@ export default function AdminPipelineEvaluation() {
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }} sx={{ textAlign: 'right' }}>
+              {/* Admin claim check at UI level: route is already admin-gated, this is defense-in-depth */}
               <Button
                 variant="contained"
                 startIcon={running ? <CircularProgress size={20} /> : <PlayArrow />}
                 onClick={runEvaluation}
                 disabled={running}
+                aria-disabled={running}
+                title={running ? 'Running evaluation' : 'Run a new evaluation'}
               >
                 {running ? 'Running Evaluation...' : 'Run New Evaluation'}
               </Button>

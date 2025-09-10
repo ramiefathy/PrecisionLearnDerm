@@ -12,11 +12,11 @@ dotenv.config({ path: '.env' });
 
 const test = functionsTest();
 
-// Initialize admin SDK with test project
+// Initialize Admin SDK pointing to emulators (no external credentials)
+process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
+process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
 if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: 'test-project'
-  });
+  admin.initializeApp({ projectId: 'dermassist-ai-1zyic' });
 }
 
 // Mock configuration for Firebase Functions

@@ -36,7 +36,9 @@ const MCQSchema = z.object({
     E: z.string().min(1)
   }),
   correctAnswer: z.enum(['A', 'B', 'C', 'D', 'E']),
-  explanation: z.string().min(50)
+  explanation: z.string().min(50),
+  // Lead-in question displayed in UI; optional in schema but enforced downstream
+  leadIn: z.string().min(5).optional()
 });
 
 type MCQ = z.infer<typeof MCQSchema>;
@@ -57,14 +59,16 @@ type Difficulty = 'Basic' | 'Advanced' | 'Very Difficult';
 
 // Externalized configuration values
 const CONFIG = {
-  MAX_REFINEMENT_ATTEMPTS: Number(process.env.MAX_REFINEMENT_ATTEMPTS) || 3,
+  // Limit to a single refinement to cap tail latency
+  MAX_REFINEMENT_ATTEMPTS: Number(process.env.MAX_REFINEMENT_ATTEMPTS) || 1,
   MINIMUM_SCORE_THRESHOLD: Number(process.env.MINIMUM_SCORE_THRESHOLD) || 18,
   OPTION_COUNT: Number(process.env.MCQ_OPTION_COUNT) || 5,
   WEB_SEARCH_TIMEOUT: Number(process.env.WEB_SEARCH_TIMEOUT) || 10000,
   CIRCUIT_BREAKER_THRESHOLD: Number(process.env.CIRCUIT_BREAKER_THRESHOLD) || 3,
   CIRCUIT_BREAKER_RESET_TIME: Number(process.env.CIRCUIT_BREAKER_RESET_TIME) || 60000,
-  REVIEW_TIMEOUT: Number(process.env.REVIEW_TIMEOUT) || 130000, // 130 seconds for review agent (allows Gemini client 120s + buffer)
-  SCORING_TIMEOUT: Number(process.env.SCORING_TIMEOUT) || 130000, // 130 seconds for scoring agent (allows Gemini client 120s + buffer)
+  // Tightened timeouts for non-critical stages (prefer flash)
+  REVIEW_TIMEOUT: Number(process.env.REVIEW_TIMEOUT) || 60000, // 60s review timeout
+  SCORING_TIMEOUT: Number(process.env.SCORING_TIMEOUT) || 90000, // 90s scoring timeout
   USE_REVIEW_V2: true, // FORCE ENABLE - bypassing env var completely
   REVIEW_V2_MIN_SCORE: Number(process.env.REVIEW_V2_MIN_SCORE) || 6 // Minimum score out of 10 for Review Agent V2
 };
@@ -1076,6 +1080,9 @@ Use the following EXACT structured format. Do not deviate from this format:
 STEM:
 [Your complete clinical vignette here - 3-5 sentences providing a complete clinical scenario]
 
+LEAD_IN:
+[One concise board-style question that follows the vignette, e.g., "Which of the following is the most likely diagnosis?"]
+
 OPTIONS:
 A) [First option - complete, grammatically correct statement]
 B) [Second option - parallel in structure to option A]
@@ -1099,7 +1106,7 @@ KEY_TAKEAWAYS:
 2. [Secondary learning point - management principle or pathophysiology concept]
 
 **FORMATTING RULES**:
-- Use exactly the labels: STEM:, OPTIONS:, CORRECT_ANSWER:, EXPLANATION:, DISTRACTOR_ANALYSIS:, KEY_TAKEAWAYS:
+- Use exactly the labels: STEM:, LEAD_IN:, OPTIONS:, CORRECT_ANSWER:, EXPLANATION:, DISTRACTOR_ANALYSIS:, KEY_TAKEAWAYS:
 - Each option must start with the letter and closing parenthesis: A), B), C), D), E)
 - Do not use "all of the above" or "none of the above"
 - Keep all content clear and concise
@@ -1142,6 +1149,11 @@ function parseStructuredTextResponse(text: string, topic: string, difficulty: st
     }
     const stem = stemMatch[1].trim();
     
+    // Extract optional LEAD_IN (board-style question line)
+    const leadInMatch = cleanedText.match(/LEAD_IN:\s*([\s\S]*?)(?=\n\s*OPTIONS:|$)/i);
+    const leadInRaw = leadInMatch ? leadInMatch[1].trim() : '';
+    const derivedLeadIn = leadInRaw && leadInRaw.length > 5 ? leadInRaw : 'Which of the following is the most likely diagnosis?';
+
     // Extract OPTIONS
     const optionsMatch = cleanedText.match(/OPTIONS:\s*([\s\S]*?)(?=\n\s*CORRECT_ANSWER:|$)/i);
     if (!optionsMatch) {
@@ -1219,7 +1231,8 @@ function parseStructuredTextResponse(text: string, topic: string, difficulty: st
       stem,
       options,
       correctAnswer,
-      explanation
+      explanation,
+      leadIn: derivedLeadIn
     };
     
     // Validate with Zod schema

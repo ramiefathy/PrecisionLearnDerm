@@ -808,3 +808,28 @@ jobs:
 **Next Review**: 2025-09-23  
 **Status**: Production - Streaming Infrastructure Operational  
 **Key Achievement**: Successfully bypassed 70-second timeout limitation
+
+### Evaluation V2 Architecture Notes (2025-09-09)
+- Callable `startPipelineEvaluation` creates `evaluationJobs/{jobId}` and enqueues `processEvaluationBatch`.
+- UI redirects to `/admin/evaluation-v2?jobId=...` to bind to that job's `liveLogs` and `testResults`.
+- Security: Firestore rules restrict reads/writes to `isAdmin()` for `evaluationJobs/*` and subcollections.
+ - Request persists: pipelines, legacy `difficulty/count` or per-difficulty `counts` (Basic/Intermediate/Advanced), `topics`, optional `taxonomySelection`.
+ - Topics resolve from `taxonomySelection.topics` when explicit topics are omitted.
+
+### Review & Roles Updates (2025-09-10)
+- Review callable endpoints now require Admin only; Firestore rules for `reviewQueue/*` are admin-only.
+- Server-side a11y: approval requires image alt text when image present.
+- Client-side a11y: Approve button disabled unless alt text present (≥5 chars) when image detected.
+- Web gating: review tab visible only to admins; non-admin reviewers still submit post-question feedback in the learning flow.
+
+### Psychometrics & Analytics (2025-09-09)
+- Callable `aggregateItemPerformance` computes p-value and discrimination proxy under `ops/itemStats/items/{itemId}`.
+- Scheduled job `scheduledAggregateItemPerformance` runs daily to refresh recent items.
+- Admin dashboard `/admin/analytics` shows recent `evaluationSummaries` and pipeline aggregates.
+
+### Review Pipeline (Updated)
+- Draft source: evaluation candidates, admin generation, and user-feedback triggers now write to `reviewQueue/*`.
+- Admin-only review UI uses callable endpoints: `review_list_queue`, `review_approve`, `review_reject`, `review_save_draft`, `review_enqueue_draft`.
+- Approval enforces basic a11y: if an image exists, alt text is required; failure records `lastApprovalError` on the draft.
+- Feedback loop: learners submit per-item ratings; aggregate average below 3.4 auto re-enqueues the item into `reviewQueue`.
+- Review queue filtering: backend supports `source` and `sinceDays` filters; indexes added; UI can deep link via query params; analytics links to last-30d feedback items.

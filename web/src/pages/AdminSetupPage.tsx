@@ -65,13 +65,13 @@ export default function AdminSetupPage() {
       
       // Load dashboard stats
       const [queueResult, bankResult] = await Promise.all([
-        api.admin.getQuestionQueue({}).catch(() => ({ questions: [] })),
+        api.admin.reviewListQueue({ status: 'pending', limit: 50 }).catch(() => ({ items: [] })),
         api.admin.getQuestionBankStats({}).catch(() => ({ totalQuestions: 0, averageQuality: 0 }))
       ]);
 
       setStats({
         totalQuestions: (bankResult as any).totalQuestions || 0,
-        pendingReviews: (queueResult as any).questions?.length || 0,
+        pendingReviews: (queueResult as any).items?.length || 0,
         avgQuality: (bankResult as any).averageQuality || 0,
         recentActivity: 'System operational'
       });
@@ -89,7 +89,7 @@ export default function AdminSetupPage() {
 
     try {
       // Test database connectivity by checking question queue
-      await api.admin.getQuestionQueue({ limit: 1 });
+      await api.admin.reviewListQueue({ status: 'pending', limit: 1 });
       console.log('✅ Database connectivity test passed');
     } catch (dbError) {
       console.warn('❌ Database connectivity test failed:', dbError);

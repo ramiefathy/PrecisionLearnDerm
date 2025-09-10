@@ -140,20 +140,23 @@ export async function generateAdminQuestions(
           const savedIds: Record<string, string> = {};
           for (const [difficulty, question] of Object.entries(generatedQuestions)) {
             try {
-              const docRef = await db.collection('questionQueue').add({
+              const ref = db.collection('reviewQueue').doc();
+              await ref.set({
                 draftItem: question,
                 status: 'pending',
                 topicHierarchy: {
                   category: 'Dermatology',
                   topic: topic,
                   subtopic: difficulty,
-                  fullTopicId: `dermatology/${topic.toLowerCase().replace(/\s+/g, '_')}/${difficulty.toLowerCase()}`
+                  fullTopicId: `dermatology/${topic.toLowerCase().replace(/\s+/g, '_')}/${(difficulty as string).toLowerCase()}`
                 },
                 kbSource: {
                   entity: topic,
                   completenessScore: 100 // Board-style doesn't use KB scoring
                 },
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                versions: [],
                 priority: difficulty === 'Basic' ? 1 : difficulty === 'Advanced' ? 2 : 3,
                 source: 'board-style-generation',
                 metadata: {
@@ -162,11 +165,11 @@ export async function generateAdminQuestions(
                   useABDGuidelines: true
                 }
               });
-              savedIds[difficulty] = docRef.id;
+              savedIds[difficulty] = ref.id;
               logInfo('board_style_question_saved', { 
                 topic, 
                 difficulty, 
-                questionId: docRef.id 
+                questionId: ref.id 
               });
             } catch (saveError: any) {
               logError('board_style_save_failed', { 
