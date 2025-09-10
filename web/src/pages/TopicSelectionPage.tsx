@@ -2,13 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../app/store';
-import MultiSelectTaxonomy from '../components/MultiSelectTaxonomy';
+import TaxonomyTree from '../components/TaxonomyTree';
+import type { TaxonomySelection } from '../components/TaxonomyTree';
 
-interface TaxonomySelection {
-  category: string;
-  subcategories: string[];
-  subSubcategories: Record<string, string[]>; // subcategory -> sub-subcategories
-}
+// TaxonomySelection interface is imported from TaxonomyTree
 
 export default function TopicSelectionPage() {
   const setQuizConfig = useAppStore(s => s.setActiveQuiz);
@@ -99,10 +96,9 @@ export default function TopicSelectionPage() {
             </p>
           </div>
 
-          <MultiSelectTaxonomy
+          <TaxonomyTree
             value={taxonomySelections}
             onChange={setTaxonomySelections}
-            showEntityCount={true}
           />
         </motion.div>
 

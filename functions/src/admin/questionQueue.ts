@@ -1100,3 +1100,50 @@ export const initializeQueue = functions.https.onRequest(
     }
   })
 );
+
+export const admin_getTaxonomyFlat = functions.https.onCall(async (data, context) => {
+  requireAdmin(context);
+  try {
+    await initializeTaxonomyService();
+    const categories = await taxonomyService.getCategories();
+    const result: Array<{ name: string; category: string; subcategory: string; sub_subcategory: string }> = [];
+    for (const category of categories) {
+      const entities = await taxonomyService.getEntitiesByCategory(category);
+      for (const e of entities) {
+        result.push({
+          name: e.name,
+          category: e.category,
+          subcategory: e.subcategory,
+          sub_subcategory: e.sub_subcategory
+        });
+      }
+    }
+    return { success: true, count: result.length, entities: result };
+  } catch (error: any) {
+    console.error('Error getting flattened taxonomy:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+export const taxonomy_get_flat = functions.https.onCall(async (data, context) => {
+  try {
+    await initializeTaxonomyService();
+    const categories = await taxonomyService.getCategories();
+    const entities: Array<{ name: string; category: string; subcategory: string; sub_subcategory: string }> = [];
+    for (const category of categories) {
+      const es = await taxonomyService.getEntitiesByCategory(category);
+      for (const e of es) {
+        entities.push({
+          name: e.name,
+          category: e.category,
+          subcategory: e.subcategory,
+          sub_subcategory: e.sub_subcategory
+        });
+      }
+    }
+    return { success: true, count: entities.length, entities };
+  } catch (error: any) {
+    console.error('Error in taxonomy_get_flat:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});

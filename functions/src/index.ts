@@ -142,7 +142,7 @@ export { seedUserActivities as activities_seed, clearUserActivities as activitie
 // Admin - Question queue and taxonomy
 export { admin_generateQuestionQueue as admin_generate_question_queue, admin_generate_per_topic, admin_update_question } from './admin/questionQueue';
 export { admin_listUncategorized as admin_list_uncategorized, admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
-export { admin_getTaxonomy, admin_getTaxonomyEntities } from './admin/questionQueue';
+export { admin_getTaxonomy, admin_getTaxonomyEntities, admin_getTaxonomyFlat, taxonomy_get_flat } from './admin/questionQueue';
 
 // Admin - Question bank stats and legacy import
 export { getQuestionBankStats as admin_get_question_bank_stats } from './admin/importQuestions';

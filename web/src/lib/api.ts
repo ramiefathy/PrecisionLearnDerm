@@ -102,7 +102,8 @@ export const api = {
     getAnalytics: (payload: { timeRange?: string }) => httpsCallable(functions, 'pe_get_quality_analytics')(payload).then(r => r.data as QualityAnalytics),
   },
   kb: {
-    search: (payload: KBSearchRequest) => httpsCallable(functions, 'kb_search')(payload).then(r => r.data as KBSearchResponse)
+    search: (payload: KBSearchRequest) => httpsCallable(functions, 'kb_search')(payload).then(r => r.data as KBSearchResponse),
+    getTaxonomyFlatPublic: () => httpsCallable(functions, 'taxonomy_get_flat')({}).then(r => r.data as { success: boolean; count: number; entities: Array<{ name: string; category: string; subcategory: string; sub_subcategory: string }> })
   },
   items: {
     propose: (payload: ItemProposeRequest) => httpsCallable(functions, 'items_propose')(payload).then(r => r.data as APIResponse),
@@ -144,6 +145,8 @@ export const api = {
         }
         return d as APIResponse;
       }),
+    getTaxonomyFlat: () => 
+      httpsCallable(functions, 'admin_getTaxonomyFlat')({}).then(r => r.data as { success: boolean; count: number; entities: Array<{ name: string; category: string; subcategory: string; sub_subcategory: string }> }),
     // Dedicated admin question generation with ABD guidelines (uses extended timeout)
     generateQuestions: (payload: { 
       topic: string; 
