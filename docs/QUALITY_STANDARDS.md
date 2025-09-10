@@ -447,3 +447,11 @@ interface DailyQualityReport {
 ## Conclusion
 
 The Quality Standards & Validation Framework ensures that PrecisionLearnDerm maintains the highest standards in medical education content generation. Through comprehensive automated validation, iterative improvement processes, and continuous monitoring, the system delivers consistently high-quality, medically accurate, and educationally valuable dermatology board exam questions.
+
+## CI Guardrails (Sep 2025)
+- Charts typing: Do not import Recharts label prop types. Use untyped callbacks with null‑safe access to avoid version/type drift in CI.
+- Dependency stability: Commit `web/package-lock.json` and use `npm ci` in CI; pin Node 20 across local/CI.
+- Security: All callables must enforce `requireAuth` and, where relevant, `requireAdmin`; allow self‑email checks only unless caller is admin; include negative emulator tests.
+- Data paths: Centralize collection names; forbid deprecated `questionQueue` references via lint; admin generation must write to `reviewQueue`; emulator test asserts it.
+- React hooks: Memoize effect callees (useCallback) or inline logic; treat `react-hooks/exhaustive-deps` as error; remove unused `eslint-disable` comments.
+- CI parity: Provide minimal Vite `VITE_*` env in CI; keep `.env.ci.example`; run Functions tests under emulators in CI; deploy rules/indexes as part of checks.

@@ -304,3 +304,11 @@ Defensive patterns ensure that PrecisionLearnDerm maintains high availability ev
 - **Maintainability**: Consistent patterns for handling failures
 
 These patterns should be applied thoughtfully, with critical functions failing fast and non-critical functions degrading gracefully.
+
+### Callable Security (Sep 2025)
+- Always require `context.auth`; restrict email/resource checks to the caller unless `context.auth.token.admin === true`.
+- Add emulator tests for unauthenticated and forbidden cases; include negative tests in CI.
+
+### Deprecation Enforcement
+- Centralize collection names and expose via constants; add lint/CI check to block `questionQueue` usage.
+- Integration test: admin generation must create a `reviewQueue` doc; fail CI if missing.

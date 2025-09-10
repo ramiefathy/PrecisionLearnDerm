@@ -1425,3 +1425,7 @@ The deployment failures were misleading - functions were actually deploying succ
 - Aligned `.github/workflows/ci.yml` to current GitHub config: PR-triggered, Node 20, separate web and functions steps.
 - Added Vite Firebase env variables to Web build/test steps to prevent env-related Vitest failures.
 - Next: run local CI-equivalent steps and push to trigger GitHub Actions. 
+
+## 2025-09-10 – CI hardening and guardrails
+- Fixed CI failures: Recharts label typing drift, stale `questionQueue` writes, missing callable auth, and hook deps/lint issues.
+- Guardrails added to QUALITY_STANDARDS, TYPE_SAFETY_PATTERNS, DEFENSIVE_PATTERNS, and DEPLOYMENT_CHECKLIST to prevent regressions. 

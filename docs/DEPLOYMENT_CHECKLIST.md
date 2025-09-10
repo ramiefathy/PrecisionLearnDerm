@@ -221,3 +221,11 @@ firebase deploy
 
 Last Updated: 2025-09-02
 Status: Ready for deployment with security fixes
+
+### Pre‑merge CI Checklist (Sep 2025)
+- Node version pinned to 20 locally and in CI.
+- Web: build, lint (no errors), tests pass; Functions: build, lint; emulator tests run.
+- No references to deprecated `questionQueue`; admin generation writes to `reviewQueue`.
+- Callable auth verified: `requireAuth`/`requireAdmin` enforced; self‑email checks only for non‑admins.
+- Vite `VITE_*` env provided in CI; `.env.ci.example` up to date.
+- `web/package-lock.json` committed; CI uses `npm ci`.
