@@ -8,24 +8,35 @@ import * as admin from 'firebase-admin';
  */
 export const setup_check_admin = functions.https.onCall(async (data: any, context: any) => {
   try {
-    const emailFromData: string | undefined = data?.email;
-    const emailFromToken: string | undefined = (context?.auth?.token?.email as string) || undefined;
-    const email = emailFromData || emailFromToken;
-
-    if (!email) {
-      throw new functions.https.HttpsError('invalid-argument', 'Email is required or must be available in auth token');
+    if (!context?.auth?.token?.email) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
-    const user = await admin.auth().getUserByEmail(email);
+    const callerEmail: string = context.auth.token.email as string;
+    const callerIsAdmin: boolean = context.auth.token.admin === true;
+
+    const requestedEmail: string | undefined = typeof data?.email === 'string' ? data.email : undefined;
+    const targetEmail = requestedEmail || callerEmail;
+
+    if (!callerIsAdmin && targetEmail !== callerEmail) {
+      throw new functions.https.HttpsError('permission-denied', 'Insufficient permissions');
+    }
+
+    const user = await admin.auth().getUserByEmail(targetEmail);
     const isAdmin = user.customClaims?.admin === true;
 
-    return {
+    const response: any = {
       success: true,
       uid: user.uid,
-      email,
-      isAdmin,
-      claims: user.customClaims || {}
+      email: targetEmail,
+      isAdmin
     };
+
+    if (callerIsAdmin) {
+      response.claims = user.customClaims || {};
+    }
+
+    return response;
   } catch (error: any) {
     if (error?.code === 'auth/user-not-found') {
       throw new functions.https.HttpsError('not-found', 'User not found');
