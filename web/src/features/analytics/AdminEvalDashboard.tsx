@@ -26,7 +26,6 @@ export default function AdminEvalDashboard() {
         const qs = await getDocs(query(collection(db, 'evaluationSummaries'), orderBy('createdAt', 'desc'), limit(10)));
         setSummaries(qs.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn('Failed to load evaluation summaries', e);
         setSummaries([]);
       } finally {

@@ -1,86 +1,84 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
-    function isReviewer() { return isSignedIn() && request.auth.token.reviewer == true; }
-    function isReviewerOrAdmin() { return isAdmin() || isReviewer(); }
-    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isSignedIn(auth) { return auth != null; }
+    function isAdmin(auth) { return isSignedIn(auth) && auth.token.admin == true; }
+    function isOwner(uid, auth) { return isSignedIn(auth) && auth.uid == uid; }
 
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid, request.auth);
       
       // User activities subcollection
       match /activities/{activityId} {
-        allow read, write: if isOwner(uid);
+        allow read, write: if isOwner(uid, request.auth);
       }
     }
 
     // User answers collection
     match /userAnswers/{answerId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, write: if isSignedIn(request.auth) && resource.data.userId == request.auth.uid;
     }
 
     // User abilities collection
     match /userAbilities/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid, request.auth);
     }
 
     match /flashcards/{uid}/{document=**} {
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid, request.auth);
     }
 
     match /quizzes/{uid}/{document=**} {
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid, request.auth);
     }
 
     match /items/{itemId} {
       allow read: if resource.data.status == "active";
-      allow write: if isAdmin();
+      allow write: if isAdmin(request.auth);
     }
 
     match /feedback/{itemId}/users/{uid} {
-      allow read: if isAdmin() || isOwner(uid);
-      allow write: if isOwner(uid);
+      allow read: if isAdmin(request.auth) || isOwner(uid, request.auth);
+      allow write: if isOwner(uid, request.auth);
     }
 
     match /drafts/{draftId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin(request.auth);
     }
 
     match /ops/{document=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin(request.auth);
     }
 
     // Evaluation jobs collection for pipeline testing
     match /evaluationJobs/{jobId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if isAdmin(request.auth);
+      allow write: if isAdmin(request.auth);
       
       // Live logs subcollection
       match /liveLogs/{logId} {
-        allow read: if isAdmin();
-        allow write: if isAdmin();
+        allow read: if isAdmin(request.auth);
+        allow write: if isAdmin(request.auth);
       }
       
       // Test results subcollection  
       match /testResults/{resultId} {
-        allow read: if isAdmin();
-        allow write: if isAdmin();
+        allow read: if isAdmin(request.auth);
+        allow write: if isAdmin(request.auth);
       }
     }
 
     // Pipeline evaluations (summary/history) - admin only
     match /pipelineEvaluations/{docId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if isAdmin(request.auth);
+      allow write: if isAdmin(request.auth);
     }
 
     // Admin review queue (drafts)
     // Reads allowed to admins; writes restricted to admins (callables enforce auth)
     match /reviewQueue/{id} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if isAdmin(request.auth);
+      allow write: if isAdmin(request.auth);
     }
   }
 }

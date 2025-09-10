@@ -60,107 +60,92 @@ export default function TaxonomySelector({
 
   // Load initial taxonomy structure
   useEffect(() => {
-    loadTaxonomy();
-  }, []);
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getTaxonomy({});
+        const data = result.data as any;
+        if (data.success) {
+          setCategories(data.categories || []);
+          if (showStats) setStats(data.stats);
+        } else {
+          setError('Failed to load taxonomy');
+        }
+      } catch (err) {
+        console.error('Error loading taxonomy:', err);
+        setError('Failed to load taxonomy structure');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [showStats]);
 
-  // Load subcategories when category changes
   useEffect(() => {
-    if (selectedCategory && categories.includes(selectedCategory)) {
-      loadSubcategories(selectedCategory);
-    } else {
-      setSubcategories([]);
-      setSubSubcategories([]);
-      setEntities([]);
-    }
-  }, [selectedCategory, categories]);
-
-  // Load sub-subcategories when subcategory changes
-  useEffect(() => {
-    if (selectedCategory && selectedSubcategory && subcategories.includes(selectedSubcategory)) {
-      loadSubSubcategories(selectedCategory, selectedSubcategory);
-    } else {
-      setSubSubcategories([]);
-      setEntities([]);
-    }
-  }, [selectedSubcategory, subcategories]);
-
-  // Load entities when sub-subcategory changes (if entity selector or list is enabled)
-  useEffect(() => {
-    if ((showEntitySelector || showEntityList) && selectedCategory && selectedSubcategory && selectedSubSubcategory) {
-      loadEntities(selectedCategory, selectedSubcategory, selectedSubSubcategory);
-    } else if ((showEntitySelector || showEntityList) && selectedCategory && selectedSubcategory && !selectedSubSubcategory) {
-      loadEntities(selectedCategory, selectedSubcategory);
-    } else if ((showEntitySelector || showEntityList) && selectedCategory && !selectedSubcategory && !selectedSubSubcategory) {
-      loadEntities(selectedCategory);
-    }
-  }, [selectedSubSubcategory, showEntitySelector, showEntityList]);
-
-  const loadTaxonomy = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await getTaxonomy({});
-      const data = result.data as any;
-      
-      if (data.success) {
-        setCategories(data.categories || []);
-        if (showStats) {
-          setStats(data.stats);
+    (async () => {
+      if (selectedCategory && categories.includes(selectedCategory)) {
+        try {
+          const result = await getTaxonomyEntities({ category: selectedCategory });
+          const data = result.data as any;
+          if (data.success) {
+            const subcats = [...new Set(data.entities.map((e: any) => e.subcategory))].sort() as string[];
+            setSubcategories(subcats);
+          }
+        } catch (err) {
+          console.error('Error loading subcategories:', err);
         }
       } else {
-        setError('Failed to load taxonomy');
+        setSubcategories([]);
+        setSubSubcategories([]);
+        setEntities([]);
       }
-    } catch (err) {
-      console.error('Error loading taxonomy:', err);
-      setError('Failed to load taxonomy structure');
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, [selectedCategory, categories, getTaxonomyEntities]);
 
-  const loadSubcategories = async (category: string) => {
-    if (!categories.includes(category)) return;
-    
-    try {
-      const result = await getTaxonomyEntities({ category });
-      const data = result.data as any;
-      
-      if (data.success) {
-        const subcats = [...new Set(data.entities.map((e: TaxonomyEntity) => e.subcategory))].sort() as string[];
-        setSubcategories(subcats);
+  useEffect(() => {
+    (async () => {
+      if (selectedCategory && selectedSubcategory && subcategories.includes(selectedSubcategory)) {
+        try {
+          const result = await getTaxonomyEntities({ category: selectedCategory, subcategory: selectedSubcategory });
+          const data = result.data as any;
+          if (data.success) {
+            const subSubcats = [...new Set(data.entities.map((e: any) => e.sub_subcategory))].sort() as string[];
+            setSubSubcategories(subSubcats);
+          }
+        } catch (err) {
+          console.error('Error loading sub-subcategories:', err);
+        }
+      } else {
+        setSubSubcategories([]);
+        setEntities([]);
       }
-    } catch (err) {
-      console.error('Error loading subcategories:', err);
-    }
-  };
+    })();
+  }, [selectedSubcategory, subcategories, selectedCategory, getTaxonomyEntities]);
 
-  const loadSubSubcategories = async (category: string, subcategory: string) => {
-    try {
-      const result = await getTaxonomyEntities({ category, subcategory });
-      const data = result.data as any;
-      
-      if (data.success) {
-        const subSubcats = [...new Set(data.entities.map((e: TaxonomyEntity) => e.sub_subcategory))].sort() as string[];
-        setSubSubcategories(subSubcats);
+  useEffect(() => {
+    (async () => {
+      if (!(showEntitySelector || showEntityList)) return;
+      try {
+        if (selectedCategory && selectedSubcategory && selectedSubSubcategory) {
+          const res = await getTaxonomyEntities({ category: selectedCategory, subcategory: selectedSubcategory, subSubcategory: selectedSubSubcategory });
+          const data = res.data as any;
+          if (data.success) setEntities(data.entities || []);
+        } else if (selectedCategory && selectedSubcategory && !selectedSubSubcategory) {
+          const res = await getTaxonomyEntities({ category: selectedCategory, subcategory: selectedSubcategory });
+          const data = res.data as any;
+          if (data.success) setEntities(data.entities || []);
+        } else if (selectedCategory && !selectedSubcategory && !selectedSubSubcategory) {
+          const res = await getTaxonomyEntities({ category: selectedCategory });
+          const data = res.data as any;
+          if (data.success) setEntities(data.entities || []);
+        } else {
+          setEntities([]);
+        }
+      } catch (err) {
+        console.error('Error loading entities:', err);
       }
-    } catch (err) {
-      console.error('Error loading sub-subcategories:', err);
-    }
-  };
-
-  const loadEntities = async (category: string, subcategory?: string, subSubcategory?: string) => {
-    try {
-      const result = await getTaxonomyEntities({ category, subcategory, subSubcategory });
-      const data = result.data as any;
-      
-      if (data.success) {
-        setEntities(data.entities || []);
-      }
-    } catch (err) {
-      console.error('Error loading entities:', err);
-    }
-  };
+    })();
+  }, [showEntitySelector, showEntityList, selectedCategory, selectedSubcategory, selectedSubSubcategory, getTaxonomyEntities]);
 
   const handleCategoryChange = (value: string) => {
     onCategoryChange(value);
@@ -209,7 +194,27 @@ export default function TaxonomySelector({
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
         <p className="text-sm text-red-600">{error}</p>
         <button 
-          onClick={loadTaxonomy}
+          onClick={() => {
+            (async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                const result = await getTaxonomy({});
+                const data = result.data as any;
+                if (data.success) {
+                  setCategories(data.categories || []);
+                  if (showStats) setStats(data.stats);
+                } else {
+                  setError('Failed to load taxonomy');
+                }
+              } catch (err) {
+                console.error('Error loading taxonomy:', err);
+                setError('Failed to load taxonomy structure');
+              } finally {
+                setLoading(false);
+              }
+            })();
+          }}
           className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
         >
           Try again

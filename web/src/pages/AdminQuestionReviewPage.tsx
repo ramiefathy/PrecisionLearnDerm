@@ -113,8 +113,9 @@ export default function AdminQuestionReviewPage() {
     const sinceDays = sinceDaysParam ? Number(sinceDaysParam) : undefined;
     setActiveSource(source);
     setActiveSinceDays(Number.isFinite(sinceDays as number) ? (sinceDays as number) : undefined);
-    loadReviewQueue(source, Number.isFinite(sinceDays as number) ? (sinceDays as number) : undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      await loadReviewQueue(source, Number.isFinite(sinceDays as number) ? (sinceDays as number) : undefined);
+    })();
   }, [location.search]);
 
   const loadReviewQueue = async (source?: string, sinceDays?: number) => {

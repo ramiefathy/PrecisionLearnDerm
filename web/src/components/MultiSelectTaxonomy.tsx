@@ -43,34 +43,30 @@ export default function MultiSelectTaxonomy({
 
   // Load taxonomy structure on mount
   useEffect(() => {
-    loadTaxonomyStructure();
-  }, []);
-
-  const loadTaxonomyStructure = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await getTaxonomy({});
-      const data = result.data as any;
-      
-      if (data.success && data.structure) {
-        setTaxonomyData({
-          categories: data.categories || [],
-          structure: data.structure || {},
-          entityCounts: data.entityCounts || {},
-          totalEntities: data.stats?.totalEntities || 0
-        });
-      } else {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getTaxonomy({});
+        const data = result.data as any;
+        if (data.success && data.structure) {
+          setTaxonomyData({
+            categories: data.categories || [],
+            structure: data.structure || {},
+            entityCounts: data.entityCounts || {},
+            totalEntities: data.stats?.totalEntities || 0
+          });
+        } else {
+          setError('Failed to load taxonomy structure');
+        }
+      } catch (err) {
+        console.error('Error loading taxonomy:', err);
         setError('Failed to load taxonomy structure');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error loading taxonomy:', err);
-      setError('Failed to load taxonomy structure');
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, []);
 
   // Toggle category expansion
   const toggleCategoryExpanded = (category: string) => {
@@ -313,7 +309,31 @@ export default function MultiSelectTaxonomy({
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
         <p className="text-sm text-red-600">{error || 'Failed to load taxonomy'}</p>
         <button 
-          onClick={loadTaxonomyStructure}
+          onClick={() => {
+            (async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                const result = await getTaxonomy({});
+                const data = result.data as any;
+                if (data.success && data.structure) {
+                  setTaxonomyData({
+                    categories: data.categories || [],
+                    structure: data.structure || {},
+                    entityCounts: data.entityCounts || {},
+                    totalEntities: data.stats?.totalEntities || 0
+                  });
+                } else {
+                  setError('Failed to load taxonomy structure');
+                }
+              } catch (err) {
+                console.error('Error loading taxonomy:', err);
+                setError('Failed to load taxonomy structure');
+              } finally {
+                setLoading(false);
+              }
+            })();
+          }}
           className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
         >
           Try again

@@ -30,7 +30,7 @@ if (!globalAny.__firestoreInstance) {
       // Keep default fetch streams; let auto-detect decide
     } as any);
     globalAny.__firestoreInstance = db;
-  } catch (_e) {
+  } catch {
     // Fallback if Firestore already initialized elsewhere
     db = getFirestore(app);
     globalAny.__firestoreInstance = db;

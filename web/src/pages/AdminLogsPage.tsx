@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../lib/api';
 import { toast } from '../components/Toast';
@@ -28,7 +28,7 @@ export default function AdminLogsPage() {
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const loadLogs = async (reset = false) => {
+  const loadLogs = useCallback(async (reset = false) => {
     try {
       if (reset) {
         setLoading(true);
@@ -55,11 +55,11 @@ export default function AdminLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [levelFilter]);
 
   useEffect(() => {
     loadLogs(true);
-  }, [levelFilter, timeFilter, searchQuery]);
+  }, [loadLogs, timeFilter, searchQuery]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -69,7 +69,7 @@ export default function AdminLogsPage() {
     }, 30000); // Refresh every 30 seconds
     
     return () => clearInterval(interval);
-  }, [autoRefresh, levelFilter, timeFilter, searchQuery]);
+  }, [autoRefresh, loadLogs, timeFilter, searchQuery]);
 
   const filteredLogs = logs.filter(log => {
     if (levelFilter !== 'all' && log.level !== levelFilter) return false;

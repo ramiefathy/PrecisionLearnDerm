@@ -100,7 +100,7 @@ export default function AdminPipelineEvaluation() {
         }
         await loadLatestEvaluation();
         await loadHistoricalData();
-      } catch (_) {
+      } catch {
         // Silent; page already admin-gated at route level
       }
     })();
