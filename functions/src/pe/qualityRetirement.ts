@@ -26,6 +26,36 @@ export const submitQuestionFeedback = functions.https.onCall(async (data: any, c
       explanationQuality,
       submittedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    // Update aggregate and re-enqueue if average < 3.4
+    const aggRef = db.collection('questionFeedbackAgg').doc(itemId);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(aggRef);
+      const prev = snap.exists ? (snap.data() as any) : { count: 0, sum: 0, avg: 0, lastUpdated: null };
+      const nextCount = (prev.count || 0) + 1;
+      const thisAvg = (Number(questionQuality) + Number(explanationQuality)) / 2;
+      const nextSum = (prev.sum || 0) + thisAvg;
+      const nextAvg = nextSum / nextCount;
+      tx.set(aggRef, { count: nextCount, sum: nextSum, avg: nextAvg, lastUpdated: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      // If below threshold and not recently enqueued, add to reviewQueue
+      const threshold = 3.4; // 70%
+      if (nextAvg < threshold) {
+        const markerRef = db.collection('reviewQueue').where('sourceItemId', '==', itemId).where('status', '==', 'pending').limit(1);
+        const existing = await markerRef.get();
+        if (existing.empty) {
+          const rqRef = db.collection('reviewQueue').doc();
+          tx.set(rqRef, {
+            id: rqRef.id,
+            status: 'pending',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            source: 'user_feedback',
+            sourceItemId: itemId,
+            feedbackAvg: nextAvg,
+            draftItem: { itemRef: itemId },
+          });
+        }
+      }
+    });
     
     return {
       success: true,

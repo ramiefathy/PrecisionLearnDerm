@@ -1,11 +1,11 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { requireReviewerOrAdmin } from '../util/auth';
+import { requireAdmin } from '../util/auth';
 
 const db = admin.firestore();
 
 export const review_enqueue_draft = functions.https.onCall(async (data, context) => {
-  requireReviewerOrAdmin(context);
+  requireAdmin(context);
   if (!data?.draftItem) {
     throw new functions.https.HttpsError('invalid-argument', 'draftItem is required');
   }
@@ -22,22 +22,45 @@ export const review_enqueue_draft = functions.https.onCall(async (data, context)
 });
 
 export const review_list_queue = functions.https.onCall(async (data, context) => {
-  requireReviewerOrAdmin(context);
+  requireAdmin(context);
   const { status = 'pending', topicIds, limit = 20, cursor } = data || {};
-  let q: FirebaseFirestore.Query = db.collection('reviewQueue').where('status', '==', status).orderBy('createdAt', 'desc');
+  // New optional filters
+  const source: string | undefined = (data && typeof data.source === 'string' && data.source.trim()) ? String(data.source).trim() : undefined;
+  const sinceDays: number | undefined = (data && (typeof data.sinceDays === 'number' || typeof data.sinceDays === 'string'))
+    ? Number(data.sinceDays)
+    : undefined;
+
+  const pageSize = Math.max(1, Math.min(100, Number(limit) || 20));
+  const normalizedStatus = typeof status === 'string' && status ? status : 'pending';
+
+  let q: FirebaseFirestore.Query = db
+    .collection('reviewQueue')
+    .where('status', '==', normalizedStatus);
+
   if (Array.isArray(topicIds) && topicIds.length > 0) {
     q = q.where('topicIds', 'array-contains-any', topicIds.slice(0, 10));
   }
+  if (source) {
+    q = q.where('source', '==', source);
+  }
+  if (Number.isFinite(sinceDays) && (sinceDays as number) > 0) {
+    const ms = Date.now() - (sinceDays as number) * 24 * 60 * 60 * 1000;
+    const cutoff = admin.firestore.Timestamp.fromDate(new Date(ms));
+    q = q.where('createdAt', '>=', cutoff);
+  }
+
+  q = q.orderBy('createdAt', 'desc');
+
   if (cursor) {
     const snap = await db.collection('reviewQueue').doc(cursor).get();
     if (snap.exists) q = q.startAfter(snap);
   }
-  const snap = await q.limit(Math.max(1, Math.min(100, Number(limit) || 20))).get();
+  const snap = await q.limit(pageSize).get();
   return { success: true, items: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
 });
 
 export const review_save_draft = functions.https.onCall(async (data, context) => {
-  requireReviewerOrAdmin(context);
+  requireAdmin(context);
   const { draftId, edits } = data || {};
   if (!draftId || !edits) throw new functions.https.HttpsError('invalid-argument', 'draftId and edits are required');
   const ref = db.collection('reviewQueue').doc(draftId);
@@ -48,7 +71,7 @@ export const review_save_draft = functions.https.onCall(async (data, context) =>
 });
 
 export const review_approve = functions.https.onCall(async (data, context) => {
-  requireReviewerOrAdmin(context);
+  requireAdmin(context);
   const { draftId } = data || {};
   if (!draftId) throw new functions.https.HttpsError('invalid-argument', 'draftId is required');
   const ref = db.collection('reviewQueue').doc(draftId);
@@ -60,6 +83,9 @@ export const review_approve = functions.https.onCall(async (data, context) => {
   const imageUrl = media?.url || draft?.draftItem?.imageUrl;
   const altText = media?.alt || draft?.draftItem?.imageAlt;
   if (imageUrl && (!altText || String(altText).trim().length < 5)) {
+    try {
+      await ref.set({ lastApprovalError: 'alt_text_missing', lastTriedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    } catch {}
     throw new functions.https.HttpsError('failed-precondition', 'Image alt text is required when an image is present.');
   }
   // Write to items collection
@@ -76,7 +102,7 @@ export const review_approve = functions.https.onCall(async (data, context) => {
 });
 
 export const review_reject = functions.https.onCall(async (data, context) => {
-  requireReviewerOrAdmin(context);
+  requireAdmin(context);
   const { draftId, notes } = data || {};
   if (!draftId) throw new functions.https.HttpsError('invalid-argument', 'draftId is required');
   const ref = db.collection('reviewQueue').doc(draftId);

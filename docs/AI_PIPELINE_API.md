@@ -425,7 +425,7 @@ Defaults prioritize latency reductions while preserving final quality checks.
 
 ### Review Queue Enrichment
 When a test result is below threshold or flagged (e.g., boardReadiness ∈ {`major_revision`,`reject`}):
-- Add an entry to `questionQueue` with fields: `pipeline`, `topic`, `difficulty`, `jobId`, `testIndex`, `aiScoresFlat.*`, `metadata.boardReadiness`, and final MCQ (`result` after normalization). These are additive fields for Admin review.
+- Add an entry to `reviewQueue` with fields: `pipeline`, `topic`, `difficulty`, `jobId`, `testIndex`, `aiScoresFlat.*`, `metadata.boardReadiness`, and final MCQ (`result` after normalization). These are additive fields for Admin review.
 
 ### Deployment Tips (short-timeout safe)
 ```bash

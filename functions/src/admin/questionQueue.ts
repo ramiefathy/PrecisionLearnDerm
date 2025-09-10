@@ -17,12 +17,12 @@ import { taxonomyService, initializeTaxonomyService, TaxonomyEntity } from '../s
 const db = admin.firestore();
 
 // Lazy-loaded knowledge base for topic weighting
-let questionQueueKnowledgeBase: Record<string, any> | null = null;
+let queueKnowledgeBase: Record<string, any> | null = null;
 let topicWeights: Record<string, number> | null = null;
 
 // Initialize knowledge base on first use (async version)
 async function initializeKnowledgeBase() {
-  if (questionQueueKnowledgeBase !== null) {
+  if (queueKnowledgeBase !== null) {
     return; // Already loaded
   }
 
@@ -30,10 +30,10 @@ async function initializeKnowledgeBase() {
     // Use async file read to avoid blocking
     const kbPath = path.join(__dirname, '../kb/knowledgeBase.json');
     const kbData = await fsPromises.readFile(kbPath, 'utf8');
-    questionQueueKnowledgeBase = JSON.parse(kbData);
+    queueKnowledgeBase = JSON.parse(kbData);
     
     // Calculate topic weights based on completeness scores
-    const highQualityEntries = Object.entries(questionQueueKnowledgeBase!)
+    const highQualityEntries = Object.entries(queueKnowledgeBase!)
       .filter(([key, entity]) => entity.completeness_score > 65);
       
     // Create weighted topic distribution
@@ -45,12 +45,83 @@ async function initializeKnowledgeBase() {
       topicWeights![key] = normalizedWeight;
     });
     
-    console.log(`Question queue loaded ${highQualityEntries.length} weighted topics`);
+    console.log(`Queue loaded ${highQualityEntries.length} weighted topics`);
   } catch (error) {
-    console.error('Failed to load KB for question queue:', error);
-    questionQueueKnowledgeBase = {};
+    console.error('Failed to load KB for queue generation:', error);
+    queueKnowledgeBase = {};
     topicWeights = {};
   }
+}
+
+// Helper: derive high-quality entities from taxonomy service (fallback implementation)
+async function getHighQualityEntitiesFromTaxonomy(minScore: number): Promise<TaxonomyEntity[]> {
+  // Use categories to enumerate entities
+  const categories = await taxonomyService.getCategories();
+  const result: TaxonomyEntity[] = [];
+  for (const category of categories) {
+    const entities = await taxonomyService.getEntitiesByCategory(category);
+    for (const e of entities) {
+      const score = typeof e.completenessScore === 'number' ? e.completenessScore : 0;
+      if (score >= minScore) result.push(e);
+    }
+  }
+  return result;
+}
+
+// Helper: weighted selection from taxonomy, biased by completenessScore
+async function getWeightedEntitySelectionFromTaxonomy(
+  targetCount: number,
+  category?: string,
+  subcategory?: string
+): Promise<TaxonomyEntity[]> {
+  let pool: TaxonomyEntity[] = [];
+  if (category && subcategory) {
+    pool = await taxonomyService.getEntitiesBySubcategory(category, subcategory);
+  } else if (category) {
+    pool = await taxonomyService.getEntitiesByCategory(category);
+  } else {
+    // Default pool: high-quality entities >= 65
+    pool = await getHighQualityEntitiesFromTaxonomy(65);
+  }
+
+  // Build weights from completenessScore (fallback to 1)
+  const uniqueByName = new Map<string, TaxonomyEntity>();
+  for (const e of pool) {
+    uniqueByName.set(e.name, e);
+  }
+  const unique = Array.from(uniqueByName.values());
+  if (unique.length === 0) return [];
+
+  const weights = unique.map(e => Math.max(1, Math.floor((e.completenessScore ?? 0))));
+  const total = weights.reduce((a, b) => a + b, 0);
+
+  const selected: TaxonomyEntity[] = [];
+  const used = new Set<string>();
+  const maxPicks = Math.min(targetCount, unique.length);
+  for (let i = 0; i < maxPicks; i++) {
+    let r = Math.random() * total;
+    for (let idx = 0; idx < unique.length; idx++) {
+      if (used.has(unique[idx].name)) continue;
+      r -= weights[idx];
+      if (r <= 0) {
+        selected.push(unique[idx]);
+        used.add(unique[idx].name);
+        break;
+      }
+    }
+  }
+  return selected;
+}
+
+// Helper: compute entity counts per category
+async function getEntityCountsPerCategory(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const categories = await taxonomyService.getCategories();
+  for (const category of categories) {
+    const entities = await taxonomyService.getEntitiesByCategory(category);
+    counts[category] = entities.length;
+  }
+  return counts;
 }
 
 // Helper function to calculate quality score based on content characteristics and agent outputs
@@ -364,7 +435,7 @@ async function generateQuestionFromEntity(entityName: string, entity: any): Prom
         // Extract citations from the explanation and web search results
         const citations = extractCitations(mcq.explanation, entityName, difficultyAgentOutputs);
         
-        // Convert to the format expected by questionQueue
+        // Convert to the format expected by review queue draft
         const draftItem = {
           type: 'A',
           topicIds: [entityName.toLowerCase().replace(/\s+/g, '.')],
@@ -506,17 +577,42 @@ export const admin_generateQuestionQueue = functions
     // Initialize taxonomy service
     await initializeTaxonomyService();
 
-    // Get high-quality entities using taxonomy service
-    const highQualityEntities = await taxonomyService.getHighQualityEntities(65);
+    // Get high-quality entities using available taxonomy API
+    const highQualityEntities = await getHighQualityEntitiesFromTaxonomy(65);
 
-    if (highQualityEntities.length === 0) {
-      throw new Error('No high-quality entities found in knowledge base');
+    if (highQualityEntities.length > 0) {
+      console.log(`Found ${highQualityEntities.length} high-quality entities for question generation`);
+    } else {
+      console.warn('[GEN] No high-quality entities found (score>=65). Falling back to full taxonomy pool.');
     }
 
-    console.log(`Found ${highQualityEntities.length} high-quality entities for question generation`);
-
-    // Generate questions using weighted entity selection
-    const selectedEntities = await taxonomyService.getWeightedEntitySelection(targetCount, category, subcategory);
+    // Generate questions using weighted selection from taxonomy; if HQ empty, fallback to random unique from full pool
+    let selectedEntities: TaxonomyEntity[] = [];
+    if (category || subcategory) {
+      selectedEntities = await getWeightedEntitySelectionFromTaxonomy(targetCount, category, subcategory);
+    } else if (highQualityEntities.length > 0) {
+      selectedEntities = await getWeightedEntitySelectionFromTaxonomy(targetCount);
+    } else {
+      // Fallback: gather entire pool and sample
+      const cats = await taxonomyService.getCategories();
+      const pool: TaxonomyEntity[] = [];
+      for (const c of cats) {
+        const es = await taxonomyService.getEntitiesByCategory(c);
+        pool.push(...es);
+      }
+      const uniqueByName = new Map<string, TaxonomyEntity>();
+      for (const e of pool) uniqueByName.set(e.name, e);
+      const unique = Array.from(uniqueByName.values());
+      if (unique.length === 0) {
+        throw new Error('No entities available in taxonomy');
+      }
+      // Simple random sample without replacement
+      for (let i = 0; i < Math.min(targetCount, unique.length); i++) {
+        const idx = Math.floor(Math.random() * unique.length);
+        const picked = unique.splice(idx, 1)[0];
+        selectedEntities.push(picked);
+      }
+    }
     const generatedQuestions = [];
 
     for (const taxonomyEntity of selectedEntities) {
@@ -526,7 +622,7 @@ export const admin_generateQuestionQueue = functions
         
         // Create a separate queue entry for each difficulty level
         for (const draftItem of draftItems) {
-          const newQuestionRef = db.collection('questionQueue').doc();
+          const newQuestionRef = db.collection('reviewQueue').doc();
           
           // Extract pipeline outputs from draftItem if available
           const pipelineOutputs = draftItem.agentOutputs ? 
@@ -579,7 +675,7 @@ export const admin_getTaxonomy = functions.https.onCall(async (data, context) =>
     const structure = await taxonomyService.getTaxonomyStructure();
     const stats = await taxonomyService.getStats();
     const categories = await taxonomyService.getCategories();
-    const entityCounts = await taxonomyService.getEntityCounts();
+    const entityCounts = await getEntityCountsPerCategory();
 
     return {
       success: true,
@@ -652,12 +748,12 @@ export const admin_generate_per_topic = functions
 
     // Initialize and load knowledge base for topic weighting
     await initializeKnowledgeBase();
-    if (!questionQueueKnowledgeBase || Object.keys(questionQueueKnowledgeBase).length === 0) {
+    if (!queueKnowledgeBase || Object.keys(queueKnowledgeBase).length === 0) {
       throw new Error('Knowledge base not loaded');
     }
 
     // Get high-quality entities (completeness_score > 65)
-    const highQualityEntities = Object.entries(questionQueueKnowledgeBase)
+    const highQualityEntities = Object.entries(queueKnowledgeBase)
       .filter(([_, entity]: [string, any]) => entity.completeness_score > 65);
 
     if (highQualityEntities.length === 0) {
@@ -706,12 +802,16 @@ export const admin_generate_per_topic = functions
         usedEntities.add(entityName);
 
         try {
+          await initializeKnowledgeBase();
+          const entity = queueKnowledgeBase ? queueKnowledgeBase[entityName] : null;
+          if (!entity) continue;
+          
           const draftItems = await generateQuestionFromEntity(entityName, entity);
           const topicHierarchy = await mapEntityToTopicHierarchy(entityName);
           
           // Create a separate queue entry for each difficulty level
           for (const draftItem of draftItems) {
-            const newQuestionRef = db.collection('questionQueue').doc();
+            const newQuestionRef = db.collection('reviewQueue').doc();
             
             // Extract pipeline outputs from draftItem if available
             const pipelineOutputs = draftItem.agentOutputs ? 
@@ -735,8 +835,8 @@ export const admin_generate_per_topic = functions
             questionsForTopic.push(newQuestion);
             generatedQuestions.push(newQuestion);
           }
-        } catch (error) {
-          console.error(`Failed to generate questions for ${entityName} in topic ${topic}:`, error);
+        } catch (e) {
+          console.error(`Failed to generate questions for ${entityName} in topic ${topic}:`, e);
         }
       }
 
@@ -760,131 +860,8 @@ export const admin_generate_per_topic = functions
   }
 });
 
-export const admin_getQuestionQueue = functions.https.onCall(async (data, context) => {
-  requireAdmin(context);
+// Deprecated legacy aliases removed: admin_getQuestionQueue, admin_reviewQuestion
 
-  try {
-    const { status = 'pending', limit = 25 } = data || {};
-
-    const queueRef = db.collection('questionQueue');
-    
-    let query: any = queueRef;
-    
-    if (status && status !== 'all') {
-      query = query.where('status', '==', status);
-    }
-    
-    query = query.orderBy('createdAt', 'desc').limit(limit);
-    
-    const snapshot = await query.get();
-    const questions = snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    return {
-      success: true,
-      questions,
-      count: questions.length,
-      status,
-      limit
-    };
-  } catch (error: any) {
-    console.error('Error getting question queue:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-export const admin_reviewQuestion = functions.https.onCall(async (data, context) => {
-  requireAdmin(context);
-
-  try {
-    const { questionId, action, notes } = data || {};
-
-    if (!questionId || !action) {
-      throw new Error('Missing required parameters: questionId and action');
-    }
-    
-    const queueRef = db.collection('questionQueue').doc(questionId);
-    const itemsRef = db.collection('items');
-    
-    const questionDoc = await queueRef.get();
-    if (!questionDoc.exists) {
-      throw new Error('Question not found in queue');
-    }
-    
-    const questionData = questionDoc.data();
-    
-    if (action === 'approve') {
-      // Move to main question bank
-      const itemData: any = {
-        ...questionData,
-        status: 'active',
-        reviewedBy: context?.auth?.uid || 'admin',
-        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-        adminNotes: notes || '',
-        queueId: questionId
-      };
-      
-      // Remove queue-specific fields if they exist
-      if ('queueStatus' in itemData) delete itemData.queueStatus;
-      if ('queueCreatedAt' in itemData) delete itemData.queueCreatedAt;
-      
-      const newItemRef = await itemsRef.add(itemData);
-      
-      // Update queue status
-      await queueRef.update({
-        status: 'approved',
-        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        adminNotes: notes || '',
-        movedToItemId: newItemRef.id
-      });
-      
-      return {
-        success: true,
-        message: 'Question approved and moved to question bank',
-        itemId: newItemRef.id
-      };
-      
-    } else if (action === 'reject') {
-      // Mark as rejected
-      await queueRef.update({
-        status: 'rejected',
-        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
-        adminNotes: notes || ''
-      });
-      
-      return {
-        success: true,
-        message: 'Question rejected',
-        questionId
-      };
-      
-    } else if (action === 'revise') {
-      // Mark for revision
-      await queueRef.update({
-        status: 'needs_revision',
-        revisionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-        adminNotes: notes || ''
-      });
-      
-      return {
-        success: true,
-        message: 'Question marked for revision',
-        questionId
-      };
-      
-    } else {
-      throw new Error('Invalid action. Must be approve, reject, or revise');
-    }
-
-  } catch (error: any) {
-    console.error('Error reviewing question:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// New function to directly update question content in the queue
 export const admin_update_question = functions.https.onCall(async (data, context) => {
   requireAdmin(context);
 
@@ -899,7 +876,7 @@ export const admin_update_question = functions.https.onCall(async (data, context
       throw new Error('No updates provided');
     }
 
-    const queueRef = db.collection('questionQueue').doc(questionId);
+    const queueRef = db.collection('reviewQueue').doc(questionId);
     
     // Get current question data
     const questionDoc = await queueRef.get();
@@ -1040,7 +1017,7 @@ export const initializeQueue = functions.https.onRequest(
       const uid = context.auth?.uid || 'unknown';
       
       // Check if queue is already initialized
-      const existingQueue = await db.collection('questionQueue').limit(1).get();
+      const existingQueue = await db.collection('reviewQueue').limit(1).get();
       
       if (!existingQueue.empty) {
         res.status(200).send({ data: { message: 'Queue already initialized', count: existingQueue.size } });
@@ -1049,7 +1026,7 @@ export const initializeQueue = functions.https.onRequest(
       
       // Generate initial 25 questions directly using the internal logic
       const targetCount = 25;
-      const queueSnapshot = await db.collection('questionQueue')
+      const queueSnapshot = await db.collection('reviewQueue')
         .where('status', '==', 'pending')
         .get();
       
@@ -1067,7 +1044,7 @@ export const initializeQueue = functions.https.onRequest(
       for (const entityName of selectedTopics) {
         try {
           await initializeKnowledgeBase();
-          const entity = questionQueueKnowledgeBase ? questionQueueKnowledgeBase[entityName] : null;
+          const entity = queueKnowledgeBase ? queueKnowledgeBase[entityName] : null;
           if (!entity) continue;
           
           const draftItems = await generateQuestionFromEntity(entityName, entity);
@@ -1075,7 +1052,7 @@ export const initializeQueue = functions.https.onRequest(
           
           // Create a separate queue entry for each difficulty level
           for (const draftItem of draftItems) {
-            const newQuestionRef = db.collection('questionQueue').doc();
+            const newQuestionRef = db.collection('reviewQueue').doc();
             const queuedQuestion: QueuedQuestion = {
               id: newQuestionRef.id,
               draftItem,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from '../components/Toast';
 import { api } from '../lib/api';
@@ -100,18 +101,29 @@ export default function AdminQuestionReviewPage() {
   const [savingEdits, setSavingEdits] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [imageAltIssue, setImageAltIssue] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeSource, setActiveSource] = useState<string | undefined>(undefined);
+  const [activeSinceDays, setActiveSinceDays] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    loadQuestionQueue();
-  }, []);
+    const params = new URLSearchParams(location.search);
+    const source = params.get('source') || undefined;
+    const sinceDaysParam = params.get('sinceDays');
+    const sinceDays = sinceDaysParam ? Number(sinceDaysParam) : undefined;
+    setActiveSource(source);
+    setActiveSinceDays(Number.isFinite(sinceDays as number) ? (sinceDays as number) : undefined);
+    loadReviewQueue(source, Number.isFinite(sinceDays as number) ? (sinceDays as number) : undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
-  const loadQuestionQueue = async () => {
+  const loadReviewQueue = async (source?: string, sinceDays?: number) => {
     try {
       setLoading(true);
-      const result = await api.admin.getQuestionQueue({}) as any;
+      const result = await api.admin.reviewListQueue({ status: 'pending', limit: 50, source, sinceDays }) as any;
       
       // Set questions - ensure loadedQuestions is always an array
-      const loadedQuestions = Array.isArray(result.questions) ? result.questions : [];
+      const loadedQuestions = Array.isArray(result.items) ? result.items : [];
       setQuestions(loadedQuestions);
       
       // Calculate stats from questions if not provided by backend
@@ -141,18 +153,18 @@ export default function AdminQuestionReviewPage() {
     }
   };
 
+  // no-op: filters are cleared via navigate directly where needed
+
   const handleReview = async (questionId: string, action: 'approve' | 'reject') => {
     try {
       setReviewing(questionId);
 
-      const result = await api.admin.reviewQuestion({
-        questionId,
-        action,
-        notes: reviewNotes
-      }) as any;
+      const result = action === 'approve'
+        ? await api.admin.reviewApprove({ draftId: questionId }) as any
+        : await api.admin.reviewReject({ draftId: questionId, notes: reviewNotes }) as any;
 
       if (result.shouldRefill) {
-        await loadQuestionQueue();
+        await loadReviewQueue();
       } else {
         setQuestions(prev => prev.filter(q => q.id !== questionId));
       }
@@ -174,7 +186,7 @@ export default function AdminQuestionReviewPage() {
       console.log('Calling generateQuestionQueue...');
       const result = await api.admin.generateQuestionQueue({ count: 25 }) as any;
       console.log('Generation result:', result);
-      await loadQuestionQueue();
+      await loadReviewQueue();
       toast.success('Generated new questions', `Added ${result.generated} questions to review queue`);
     } catch (error: any) {
       handleAdminError(error, 'generate questions');
@@ -190,7 +202,7 @@ export default function AdminQuestionReviewPage() {
       const result = await api.admin.generatePerTopic({ perTopic: 5 }) as any;
       console.log('Per-topic generation result:', result);
       
-      await loadQuestionQueue();
+      await loadReviewQueue();
       toast.success('Per-topic generation complete', `Generated ${result.totalGenerated || 0} items across topics`);
     } catch (error: any) {
       handleAdminError(error, 'generate per-topic questions');
@@ -278,7 +290,7 @@ export default function AdminQuestionReviewPage() {
       
       if (result.success) {
         // Refresh the question queue to show updated question
-        await loadQuestionQueue();
+        await loadReviewQueue();
         setAdminFeedback('');
         setAiReviewResult(null);
         setShowAiReview(false);
@@ -371,7 +383,7 @@ export default function AdminQuestionReviewPage() {
       
       if (result.success) {
         // Refresh the question queue to show updated question
-        await loadQuestionQueue();
+        await loadReviewQueue();
         setIsEditMode(false);
         setEditedQuestion(null);
         setHasUnsavedChanges(false);
@@ -476,6 +488,14 @@ export default function AdminQuestionReviewPage() {
                 </div>
               </div>
 
+              {/* Active Filters */}
+              {(activeSource || activeSinceDays) && (
+                <div className="flex items-center gap-2 text-xs bg-yellow-50 border border-yellow-200 rounded-lg px-2 py-1">
+                  {activeSource && <span className="text-yellow-800">source: {activeSource}</span>}
+                  {activeSinceDays && <span className="text-yellow-800">sinceDays: {activeSinceDays}</span>}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2">
 
@@ -494,6 +514,14 @@ export default function AdminQuestionReviewPage() {
                 >
                   {generating ? 'Working...' : 'Generate per topic (×5)'}
                 </button>
+                {(activeSource || activeSinceDays) && (
+                  <button
+                    onClick={() => navigate('/admin/review')}
+                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold hover:shadow-lg transition-all text-xs"
+                  >
+                    Clear Filters
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -76,9 +76,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Admin review queue (drafts) - admin only
+    // Admin review queue (drafts)
+    // Reads allowed to admins; writes restricted to admins (callables enforce auth)
     match /reviewQueue/{id} {
-      allow read, write: if isReviewerOrAdmin();
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

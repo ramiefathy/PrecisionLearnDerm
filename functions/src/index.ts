@@ -140,7 +140,7 @@ export { activities_log, activities_get, activities_summary } from './activities
 export { seedUserActivities as activities_seed, clearUserActivities as activities_clear } from './activities/seedActivities';
 
 // Admin - Question queue and taxonomy
-export { admin_generateQuestionQueue as admin_generate_question_queue, admin_generate_per_topic, admin_getQuestionQueue as admin_get_question_queue, admin_reviewQuestion as admin_review_question, admin_update_question } from './admin/questionQueue';
+export { admin_generateQuestionQueue as admin_generate_question_queue, admin_generate_per_topic, admin_update_question } from './admin/questionQueue';
 export { admin_listUncategorized as admin_list_uncategorized, admin_setItemTaxonomy as admin_set_item_taxonomy } from './admin/taxonomy';
 export { admin_getTaxonomy, admin_getTaxonomyEntities } from './admin/questionQueue';
 
@@ -152,6 +152,9 @@ export { grantAdminRole as admin_grant_role, revokeAdminRole as admin_revoke_rol
 
 // Admin - Generation endpoints
 export { adminGenerateQuestions as admin_generate_questions, adminBatchGenerateQuestions as admin_batch_generate_questions } from './admin/adminQuestionGeneration';
+
+// Admin - AI review and regeneration
+export { aiReviewQuestion as admin_ai_review_question, validateClinical as admin_validate_clinical, regenerateQuestionWithFeedback as admin_regenerate_question } from './admin/aiQuestionReview';
 
 // Setup callables
 export { grantAdminRole as setup_grant_admin } from './admin/grantAdminRole';

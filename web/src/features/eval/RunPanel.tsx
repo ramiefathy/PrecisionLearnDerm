@@ -13,11 +13,11 @@ const PIPELINE_OPTIONS = [
   { value: 'hybridRouter', label: 'Hybrid Router' }
 ];
 
-const DIFFICULTY_OPTIONS = [
-  { value: 'Basic', label: 'Basic' },
-  { value: 'Intermediate', label: 'Intermediate' },
-  { value: 'Advanced', label: 'Advanced' }
-];
+// const DIFFICULTY_OPTIONS = [
+//   { value: 'Basic', label: 'Basic' },
+//   { value: 'Intermediate', label: 'Intermediate' },
+//   { value: 'Advanced', label: 'Advanced' }
+// ];
 
 interface RunPanelProps {
   defaultTopics?: string[];

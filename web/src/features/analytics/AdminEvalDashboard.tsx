@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, orderBy, limit, query } from 'firebase/firestore';
+import { Link } from 'react-router-dom';
+import { collection, getDocs, orderBy, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 interface PipelineAgg {
@@ -34,10 +35,36 @@ export default function AdminEvalDashboard() {
     })();
   }, []);
 
+  // Load feedback-triggered review entries count (last 30 days)
+  const [feedbackTriggeredCount, setFeedbackTriggeredCount] = useState<number>(0);
+  useEffect(() => {
+    (async () => {
+      try {
+        const since = new Date();
+        since.setDate(since.getDate() - 30);
+        const rq = await getDocs(query(
+          collection(db, 'reviewQueue'),
+          where('source', '==', 'user_feedback'),
+          where('createdAt', '>=', since),
+          orderBy('createdAt', 'desc')
+        ));
+        setFeedbackTriggeredCount(rq.size);
+      } catch {
+        setFeedbackTriggeredCount(0);
+      }
+    })();
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-2">Evaluation & Review Metrics</h1>
       <p className="text-gray-600 mb-6">Recent pipeline performance and review outcomes</p>
+      <div className="mb-6 flex items-center gap-3 text-sm">
+        <div className="px-3 py-2 rounded border bg-white">
+          Feedback-triggered reviews (30d): <span className="font-semibold">{feedbackTriggeredCount}</span>
+          <Link to="/admin/review?source=user_feedback&sinceDays=30" className="ml-3 text-blue-600 hover:underline">View</Link>
+        </div>
+      </div>
 
       {loading ? (
         <div className="p-6 bg-white rounded-xl shadow">Loading...</div>

@@ -5,7 +5,8 @@ import { setupTestEnvironment, testHelper, admin } from './test_setup';
 import { MockAI } from './mocks';
 
 // Import admin functions
-import { admin_generateQuestionQueue, admin_getQuestionQueue, admin_reviewQuestion } from '../admin/questionQueue';
+import { admin_generateQuestionQueue } from '../admin/questionQueue';
+import * as index from '../index';
 import { importLegacyQuestions, getQuestionBankStats } from '../admin/importQuestions';
 
 setupTestEnvironment();
@@ -146,7 +147,7 @@ describe('Admin Question Management Tests', () => {
         await db.collection('admin_queue').doc(item.id).set(item);
       }
 
-      const result = await admin_getQuestionQueue({}, testAdminContext);
+      const result = await (index.review_list_queue as any).run({ status: 'pending', limit: 50 }, testAdminContext);
 
       expect(result).to.have.property('success', true);
       expect(result).to.have.property('items');
@@ -194,7 +195,7 @@ describe('Admin Question Management Tests', () => {
         comments: 'Excellent clinical question'
       };
 
-      const result = await admin_reviewQuestion(requestData, testAdminContext);
+      const result = await (index.review_approve as any).run({ draftId: questionForReview.id }, testAdminContext);
 
       expect(result).to.have.property('success', true);
       expect(result).to.have.property('reviewId');
@@ -243,7 +244,7 @@ describe('Admin Question Management Tests', () => {
         comments: 'Poor quality - lacks clinical context'
       };
 
-      const result = await admin_reviewQuestion(requestData, testAdminContext);
+      const result = await (index.review_reject as any).run({ draftId: poorQualityQuestion.id, notes: 'Poor quality - lacks clinical context' }, testAdminContext);
 
       expect(result).to.have.property('success', true);
       expect(result).to.have.property('status', 'rejected');
@@ -395,8 +396,8 @@ describe('Admin Question Management Tests', () => {
       
       const restrictedFunctions = [
         () => admin_generateQuestionQueue({ topicIds: ['test'] }, testUserContext),
-        () => admin_getQuestionQueue({}, testUserContext),
-        () => admin_reviewQuestion({ questionId: 'test', action: 'approve' }, testUserContext),
+        () => (index.review_list_queue as any).run({ status: 'pending' }, testUserContext),
+        () => (index.review_approve as any).run({ draftId: 'test' }, testUserContext),
         () => getQuestionBankStats({}, testUserContext),
         () => importLegacyQuestions({ questions: [] }, testUserContext)
       ];
@@ -417,8 +418,8 @@ describe('Admin Question Management Tests', () => {
       const invalidRequests = [
         { func: 'generateQueue', data: {} }, // Missing topicIds
         { func: 'generateQueue', data: { topicIds: 'invalid' } }, // Invalid topicIds type
-        { func: 'reviewQuestion', data: {} }, // Missing questionId
-        { func: 'reviewQuestion', data: { questionId: 'test' } }, // Missing action
+        { func: 'reviewApprove', data: {} }, // Missing draftId
+        { func: 'reviewReject', data: {} }, // Missing draftId
         { func: 'importQuestions', data: {} }, // Missing questions
         { func: 'importQuestions', data: { questions: 'invalid' } } // Invalid questions type
       ];
@@ -429,8 +430,11 @@ describe('Admin Question Management Tests', () => {
             case 'generateQueue':
               await admin_generateQuestionQueue(request.data, testAdminContext);
               break;
-            case 'reviewQuestion':
-              await admin_reviewQuestion(request.data, testAdminContext);
+            case 'reviewApprove':
+              await (index.review_approve as any).run(request.data, testAdminContext);
+              break;
+            case 'reviewReject':
+              await (index.review_reject as any).run(request.data, testAdminContext);
               break;
             case 'importQuestions':
               await importLegacyQuestions(request.data, testAdminContext);
@@ -467,7 +471,7 @@ describe('Admin Question Management Tests', () => {
       await batch.commit();
 
       const startTime = Date.now();
-      const result = await admin_getQuestionQueue({ limit: 20 }, testAdminContext);
+      const result = await (index.review_list_queue as any).run({ status: 'pending', limit: 20 }, testAdminContext);
       const endTime = Date.now();
 
       expect(endTime - startTime).to.be.lessThan(3000); // Should complete within 3 seconds
@@ -504,7 +508,7 @@ describe('Admin Question Management Tests', () => {
       const operations = [
         admin_generateQuestionQueue({ topicIds: ['test1'], count: 1 }, testAdminContext),
         admin_generateQuestionQueue({ topicIds: ['test2'], count: 1 }, testAdminContext),
-        admin_getQuestionQueue({}, testAdminContext),
+        (index.review_list_queue as any).run({ status: 'pending' }, testAdminContext),
         getQuestionBankStats({}, testAdminContext)
       ];
 

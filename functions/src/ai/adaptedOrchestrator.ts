@@ -317,7 +317,7 @@ async function saveQuestionsToDatabase(
           };
         }
         
-        // Save to questionQueue for review instead of items collection
+        // Save to reviewQueue for admin review instead of items collection
         const queueItem = {
           draftItem: {
             type: 'mcq',
@@ -376,7 +376,7 @@ async function saveQuestionsToDatabase(
           }
         };
         
-        const docRef = await db.collection('questionQueue').add(queueItem);
+        const docRef = await db.collection('reviewQueue').add(queueItem);
         savedIds[difficulty] = docRef.id;
         
         logger.info(`[ADAPTED] Successfully saved ${difficulty} question to review queue with ID: ${docRef.id}`);

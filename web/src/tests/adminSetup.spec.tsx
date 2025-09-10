@@ -27,7 +27,7 @@ const apiMocks = vi.hoisted(() => ({
       ],
     },
   }),
-  getQuestionQueue: vi.fn().mockResolvedValue({ questions: [] }),
+  reviewListQueue: vi.fn().mockResolvedValue({ items: [] }),
   getQuestionBankStats: vi.fn().mockResolvedValue({ totalQuestions: 0, averageQuality: 0 }),
 }));
 
@@ -36,7 +36,7 @@ vi.mock('../lib/api', () => ({
     admin: {
       listAdmins: apiMocks.listAdmins,
       revokeAdminRole: apiMocks.revokeAdminRole,
-      getQuestionQueue: apiMocks.getQuestionQueue,
+      reviewListQueue: apiMocks.reviewListQueue,
       getQuestionBankStats: apiMocks.getQuestionBankStats,
     },
   },

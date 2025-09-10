@@ -1044,8 +1044,8 @@ async function addQuestionToReviewQueue(testResult: any): Promise<void> {
   try {
     const { result: mcq, aiScores, testCase } = testResult;
     
-    // Create question queue entry
-    const queueRef = db.collection('questionQueue').doc();
+    // Create review queue entry
+    const queueRef = db.collection('reviewQueue').doc();
     
     const queuedQuestion = {
       id: queueRef.id,

@@ -1396,3 +1396,25 @@ The deployment failures were misleading - functions were actually deploying succ
 - `AdminEvaluationV2Page` reads `jobId` from URL and initializes running state.
 - Live components (`EvaluationDashboard`, `LiveEvaluationLogs`) confirmed binding to `evaluationJobs/{jobId}`.
 - Web built and deployed to Hosting (`dermassist-ai-1zyic`). 
+
+## 2025-09-09 Queue Consolidation: questionQueue → reviewQueue
+
+- Added reviewQueue index: status+createdAt desc in `firestore.indexes.json`.
+- Evaluation: enqueues candidates into `reviewQueue` (was `questionQueue`).
+- Admin generation: writes all new drafts to `reviewQueue` and admin reads use review_* endpoints.
+- Admin AI review/regeneration: now operates on `reviewQueue` docs.
+- Review approval: records `lastApprovalError: 'alt_text_missing'` when alt text absent.
+- User feedback: aggregates per item and re-enqueues to `reviewQueue` when avg < 3.4.
+- Web: restricted `/admin/review` to admins only; switched AdminQuestionReviewPage to use review_* API methods; added api.admin.review* functions.
+- Script: `functions/scripts/migrate-questionQueue-to-reviewQueue.ts` migrates pending docs from `questionQueue` → `reviewQueue`.
+- Tests: added emulator-backed tests to check a11y flagging and reviewQueue presence. 
+
+## 2025-09-10
+- Backend: Extended `functions/src/review/endpoints.ts` `review_list_queue` to support optional `source` and `sinceDays` filters; validated inputs; preserved pagination ordering by `createdAt` desc; restricted review endpoints to admin-only.
+- Firestore Indexes: Added composites in `firestore.indexes.json` for `reviewQueue` covering `(source,status,createdAt)`, `(topicIds CONTAINS,status,createdAt)`, and a superset `(topicIds CONTAINS,source,status,createdAt)` to support combined filters.
+- Firestore Indexes (items): Added retained indexes for `items` queries using legacy `topicIds` filtering to avoid delete prompts and support existing queries: `(status ASC, topicIds CONTAINS)`, `(topicIds CONTAINS, createdAt DESC)`, and `(status ASC, topicIds CONTAINS, createdAt DESC)`.
+- Frontend API: Updated `web/src/lib/api.ts` `api.admin.reviewListQueue` signature to accept `{ source?, sinceDays? }`.
+- Admin Review UI: `web/src/pages/AdminQuestionReviewPage.tsx` now reads `source` and `sinceDays` from URL query params, displays active filter chips, and provides a Clear Filters action; uses new API filters.
+- Admin Nav: `web/src/app/routes.tsx` restricts Review tab to admins only.
+- Analytics: `web/src/features/analytics/AdminEvalDashboard.tsx` counts last-30d feedback-triggered entries using `where('createdAt','>=', since)` and links to `/admin/review?source=user_feedback&sinceDays=30`.
+- Tests: Added emulator-backed `functions/src/test/integration.review-list-filters.test.ts` to verify filter behavior; included it in `functions/tsconfig.tests.json`. 

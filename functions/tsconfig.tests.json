@@ -8,8 +8,15 @@
     "sourceMap": true
   },
   "include": [
+    "src/index.ts",
     "src/test/test_setup.ts",
-    "src/test/integration.evaluation-and-review.test.ts"
+    "src/test/integration.evaluation-and-review.test.ts",
+    "src/test/integration.evaluation-request-mapping.test.ts",
+    "src/test/integration.review-a11y.test.ts",
+    "src/test/integration.admin-generation-to-reviewqueue.test.ts",
+    "src/test/integration.review-list-filters.test.ts",
+    "src/test/parser.unit.test.ts",
+    "src/test/validators.unit.test.ts"
   ],
   "exclude": [
     "node_modules"

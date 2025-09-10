@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 function AdminNavigation() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
   
   const tabs = [
     { 
@@ -88,10 +89,9 @@ function AdminNavigation() {
         <div className="flex items-center justify-center gap-2 overflow-x-auto">
           {tabs
             .filter(tab => {
-              // Show Review tab if admin or reviewer; other admin tabs remain visible here.
+              // Restrict Review tab to admin only
               if (tab.href === '/admin/review') {
-                const { isAdmin, isReviewer } = useAuth();
-                return isAdmin || isReviewer;
+                return !!isAdmin;
               }
               return true;
             })
@@ -204,7 +204,7 @@ export function AdminRoute({ children }: { children?: ReactNode }) {
   );
 }
 
-export function ReviewerRoute({ children }: { children?: ReactNode }) {
+export function ReviewerRoute() {
   const { user, loading, isAdmin, isReviewer } = useAuth();
 
   if (loading) {
@@ -242,6 +242,26 @@ export function ReviewerRoute({ children }: { children?: ReactNode }) {
     );
   }
 
+  // Restrict reviewer route: only admins should access admin review pages.
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 grid place-items-center text-white text-2xl mx-auto mb-4">
+            🚫
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">Only admins can access the admin review area.</p>
+          <button 
+            onClick={() => window.history.back()}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold hover:shadow-lg transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
   return <Outlet />;
 }
 

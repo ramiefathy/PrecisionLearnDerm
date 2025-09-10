@@ -51,7 +51,7 @@ vi.mock('../lib/api', () => {
     api: {
       admin: {
         listAdmins,
-        getQuestionQueue: vi.fn().mockResolvedValue({ questions: [] }),
+        reviewListQueue: vi.fn().mockResolvedValue({ items: [] }),
         getQuestionBankStats: vi.fn().mockResolvedValue({ totalQuestions: 0, averageQuality: 0 }),
         grantAdminRole: vi.fn(),
         revokeAdminRole: vi.fn(),

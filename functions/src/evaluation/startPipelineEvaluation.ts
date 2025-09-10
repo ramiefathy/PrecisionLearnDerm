@@ -134,6 +134,8 @@ export const startPipelineEvaluation = functions
         topics: evaluationTopics
       });
       
+      const cleanReq = JSON.parse(JSON.stringify(req));
+
       logger.info('[START_EVAL] Created evaluation job', {
         jobId,
         userId,
@@ -144,11 +146,33 @@ export const startPipelineEvaluation = functions
           pipelines,
           topics: evaluationTopics
         },
-        request: req
+        request: cleanReq
       });
       
-      // Queue the first batch using Cloud Tasks
+      // Queue the first batch using Cloud Tasks (skip in emulator to avoid external SA token fetch)
       try {
+        const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true' || !!process.env.FIREBASE_EMULATOR_HUB || !!process.env.FIRESTORE_EMULATOR_HOST;
+        if (isEmulator) {
+          await admin.firestore().collection('evaluationJobs').doc(jobId).set({
+            status: 'queued',
+            taskIds: [],
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            request: cleanReq
+          }, { merge: true });
+
+          return {
+            success: true,
+            jobId,
+            message: 'Evaluation job started successfully (emulator mode: tasks not enqueued)',
+            estimatedDuration: calculateEstimatedDuration({
+              basicCount,
+              advancedCount,
+              veryDifficultCount,
+              pipelines,
+              topics: evaluationTopics
+            })
+          };
+        }
         const taskQueue = getFunctions().taskQueue('processEvaluationBatch');
         const taskId = crypto.randomUUID();
         await taskQueue.enqueue({
@@ -166,7 +190,7 @@ export const startPipelineEvaluation = functions
           status: 'queued',
           taskIds: admin.firestore.FieldValue.arrayUnion(taskId),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          request: req
+          request: cleanReq
         }, { merge: true });
       } catch (queueError) {
         const errorMessage = queueError instanceof Error ? queueError.message : String(queueError);
